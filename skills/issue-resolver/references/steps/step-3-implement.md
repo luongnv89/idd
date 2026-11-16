@@ -289,7 +289,7 @@ Step 4 reviewer. **Auto mode never blocks:** a check that cannot run is
 
 Before the implementer applies any fix, run the red-capable reproduction checkpoint —
 see `references/bug-verification.md` for the full procedure. It applies **only** when the
-issue `type` is `bug`; non-bug issues skip it entirely (acceptance criterion 5).
+issue `type` is `bug`; non-bug issues skip it entirely.
 
 For a bug issue, the implementer (per `references/agents/implementer.md` Task 1.5):
 
@@ -307,12 +307,13 @@ match, regression-test path or "manual — no seam"). The main agent folds it in
 body's Decision Record and Acceptance Criteria Verification table (durable home — see
 `references/report-templates.md`); when `.idd/analysis-<N>.json` is **fresh** by the
 predicate in *Step 0h — Analysis reuse gate* in `references/steps/step-0h-analysis-reuse.md` (its single home — "fresh" is never
-used undefined), the same data also lives in its `decision_record.reproduction` field
-(optional cache mirror, written by `/issue-analysis`, never created by the resolver).
+used undefined) and already carries a `decision_record.reproduction` field, lift it too
+(an optional cache mirror that no skill writes: `/issue-analysis` runs before the fix
+and the resolver never creates the file).
 
 **Auto mode never blocks** (`--auto` / `IDD_AUTO_MODE=1`): a missing or failed
 reproduction is logged, recorded as `not_reproduced`, and the pipeline continues to
-deliver with the affected criterion marked `unverified` (acceptance criterion 6).
+deliver with the affected criterion marked `unverified`.
 Interactive mode behaves the same — surface the evidence (or its absence); do not halt.
 
 ### Max commits guard

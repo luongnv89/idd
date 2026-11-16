@@ -311,15 +311,15 @@ Quick summary — **2** extract keywords & file refs from the issue · **3** cod
 Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.idd/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout, color codes, truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
 
 Summary:
-- Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
-- JSON top-level keys: `version`, `timestamp`, `source`, `issue`, `extraction`, `affected_files`, `analysis`, `options`, `criteria`, `recommended_option`, `overall_complexity`, `overall_risk`, `history`, `cross_references`, `scan_stats`, `git_state`, `decision_record` — see `references/output-and-persist.md`.
+- Terminal report: the sections under *Step 8 — Output (Terminal Report)* in `references/output-and-persist.md`, in that order.
+- JSON top-level keys: the schema under *JSON Schema (`.idd/analysis-<N>.json`)* in the same file, `research_status` included.
 
 ### Durable analysis fields
 
 `/issue-analysis` JSON is local cache — see *Analysis Artifacts and Durable Memory* in `references/docs/idd-methodology.md`. Two structured fields are persisted alongside the analysis content to make it durable, so `/issue-resolver` can lift them into the PR body:
 
 1. **`git_state`** — the branch and commit SHA the analysis ran against, under the exact keys `git_state.commit_sha` (never `sha`) and `git_state.captured_at`. It pins the analysis to a point in time, so reviewers can check the recommendation against the code it was made on and `/issue-resolver`'s *Step 0h — Analysis reuse gate* can test whether the pin still holds — capture every value by running the commands in `references/output-and-persist.md`, never by inventing one.
-2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause`, `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues carry an optional sixth `reproduction` field that `/issue-analysis` never populates — `/issue-resolver`'s post-fix bug-verification checkpoint produces it; see `references/output-and-persist.md`.
+2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause` (from the `analysis` block's `summary`), `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues may carry an optional sixth `reproduction` field that no skill writes — `/issue-resolver`'s post-fix bug-verification checkpoint produces that evidence in the PR body; see `references/output-and-persist.md`.
 
 These add two JSON keys and a *Decision Record* section to the terminal report; nothing else changes. Exact schema and rendering: `references/output-and-persist.md`.
 

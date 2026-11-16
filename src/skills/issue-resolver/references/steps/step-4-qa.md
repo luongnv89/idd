@@ -55,7 +55,7 @@ progress record: the count the suite
 reported, and `tests_sha` = `git rev-parse HEAD` evaluated in the same step,
 *before* anything else commits. Full 40-character SHA — the short form is
 display-only. It is a
-**run-state variable**, not merely the marker field it renders into (issue #256);
+**run-state variable**, not merely the marker field it renders into;
 `references/report-templates.md` (*QA handoff marker*) describes how to render
 it; it neither defines nor consumes the run-state decision.
 
@@ -134,7 +134,7 @@ The contract, opt-in, lifecycle and verdict handling live in `docs/ui-review.md`
 
 - **Max cycles (hard bound):** `resolve.qa_max_cycles` (default: 5). Never
   exceed this configured cap.
-- **Policy ceiling by class** (issue #308; distinct from the hard bound):
+- **Policy ceiling by class** (distinct from the hard bound):
   `light` → **1**; `full` + low/medium complexity → **2**; `full` + high/complex
   → `resolve.qa_max_cycles`. Missing profile/complexity fail-safe as full +
   medium (ceiling **2**). The reviewer spawn still runs on the `light` path

@@ -14,7 +14,7 @@ to bug issues only.
 | Condition | Behavior |
 |-----------|----------|
 | Issue `type` is `bug` (label `bug`, or normalized `## Type` is Bug) | Run the checkpoint below before the fix. |
-| Issue `type` is `feature` / `improvement` / anything else | **Skip entirely.** Non-bug issues are unaffected (acceptance criterion 5). |
+| Issue `type` is `feature` / `improvement` / anything else | **Skip entirely.** Non-bug issues are unaffected. |
 
 Type is read from the issue data already loaded in Step 0 (labels + normalized
 `## Type` section). Do not re-fetch the issue.
@@ -76,11 +76,11 @@ Once the fix is applied (implementer Tasks 2–5), turn the minimized reproducti
 - **No test seam, or the project has no test runner** (e.g. a docs/skills repo, a shell-
   script-only project) → **do not invent a framework.** Record the **manual**
   reproduction command as the evidence and note that no automated regression test was
-  added. Acceptance criterion 3 is satisfied "when a seam exists"; with no seam, the
+  added. A regression test is required only when a seam exists; with no seam, the
   named manual command is the evidence of record.
 
 Never install a new test framework solely to add the regression test (mirrors implementer
-constraint #9).
+constraint #7).
 
 ## Recording the evidence
 
@@ -103,17 +103,17 @@ the durable artifacts, with the local-cache JSON as an optional mirror:
 
 3. **Optional cache mirror.** The `decision_record.reproduction` field in
    `.idd/analysis-<N>.json` is defined in `/issue-analysis`'s output schema
-   (`references/output-and-persist.md`) so the two skills agree on its shape, but it is
-   usually empty: `/issue-analysis` is read-only and runs *before* the fix, so it cannot
-   produce the post-fix `regression_test` proof. The resolver **lifts** the field on the
-   rare occasion a prior analysis recorded a red repro, but it does **not** create or
-   write the cache file itself — the JSON is deletable local cache, not the home of
+   (`references/output-and-persist.md`) so the two skills agree on its shape, but no
+   skill writes it: `/issue-analysis` is read-only and runs *before* the fix, so it cannot
+   produce the post-fix `regression_test` proof, and the resolver does **not** create or
+   write the cache file. The resolver **lifts** the field only when a fresh analysis
+   file already carries one — the JSON is deletable local cache, not the home of
    project memory, and the PR body (above) is the always-present durable home.
 
 ## Auto mode never blocks
 
 In auto mode (`--auto` / `IDD_AUTO_MODE=1`) this checkpoint **records evidence and proceeds —
-it never blocks** (acceptance criterion 6). A missing or failed reproduction is logged,
+it never blocks**. A missing or failed reproduction is logged,
 recorded as `status: not_reproduced` (or `not_applicable` for non-bug issues), and the
 pipeline continues to deliver. Interactive mode behaves the same way by default — the
 checkpoint surfaces the evidence (or its absence) rather than halting; a fix without a

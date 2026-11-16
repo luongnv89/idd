@@ -40,13 +40,13 @@
           "references/output-and-persist.md",
           "references/subagent-steps.md"
         ],
-        "measured": 35916
+        "measured": 36040
       },
       "budget": 168699,
-      "measured": 167774,
+      "measured": 167763,
       "skill_md": {
-        "budget": 25078,
-        "measured": 24054
+        "budget": 24945,
+        "measured": 23921
       }
     },
     "issue-creator": {
@@ -96,10 +96,10 @@
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 11027
+        "measured": 11025
       },
       "budget": 435601,
-      "measured": 435110,
+      "measured": 434893,
       "skill_md": {
         "budget": 33856,
         "measured": 33527

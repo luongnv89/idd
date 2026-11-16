@@ -164,7 +164,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** local setup preparation fails after the worktree was created (copy error, dependency install failure, bootstrap failure). The resolver removes the partial worktree, deletes only a branch created by this Step 0e, then continues on the in-place path. If cleanup fails, stop and ask the user to run the recovery commands.
 
-## Verify
+## Tests and commits
 
 ### Tests failed
 ```
@@ -194,10 +194,10 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   This may indicate the change is too large for a single issue.
   Continue creating PR? [y/N]
 ```
-**Trigger:** Number of commits created during Execute exceeds `resolve.max_commits`.
+**Trigger:** Number of commits created during Step 3 — Implement exceeds `resolve.max_commits`.
 **Auto:** takes the default No — no push, no PR; the commits stay on the local branch; recommend splitting the issue, `skipped_reason: max_commits_exceeded`. <!-- auto:no -->
 
-## Ship
+## Deliver
 
 ### PR creation failed
 ```
@@ -213,7 +213,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ Branch has merge conflicts with {base_branch}
 
   To fix:  git rebase {base_branch} and resolve conflicts
-  Then:    /issue-resolver N (to resume from verify phase)
+  Then:    /issue-resolver N (to continue on the rebased branch)
 ```
 **Trigger:** `git push` or `gh pr create` reports merge conflicts with the base branch.
 

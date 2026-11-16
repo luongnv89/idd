@@ -292,8 +292,10 @@ check_has "$SRC_TEMPLATES" '[Nn]o secret-scan field, ever' \
   "T5.2: the producer states the omission as a deliberate rule"
 check_has "$SRC_LOOP" 'no security-scan field, in any spelling, and none may be added' \
   "T5.3: the consumer forbids adding one later"
-check_has "$SRC_TEMPLATES" '#274' \
-  "T5.4: the producer cites #274 as the standing proof"
+# The producer once cited #274 (a PR disabling the secret scan through its own
+# .idd.yml); it now states the rule that ticket proved.
+check_has "$SRC_TEMPLATES" 'repo-controlled input' \
+  "T5.4: the producer states why a security gate must not trust repo-controlled input"
 check_has "$SRC_LOOP" '#274' \
   "T5.5: the consumer cites #274 as the standing proof"
 check_has "$SRC_LOOP" 'forgery is worthless, not impossible|worthless, not impossible' \
