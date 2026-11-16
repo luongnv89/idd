@@ -512,3 +512,6 @@ jobs:
 
       - name: test-merge-gate-copies-619
         run: bash tests/test-merge-gate-copies-619.sh
+
+      - name: test-autopilot-stale-facts-622
+        run: bash tests/test-autopilot-stale-facts-622.sh
