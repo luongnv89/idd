@@ -359,7 +359,7 @@ After each issue is created, when `projects.sync_enabled` is `true`, sync it per
 
 For every terminal outcome, **read references/examples.md (Review contract) now** and apply its result, evidence, uncertainty, and decision contract. Keep concise text; use per-item tables for batches.
 
-A successful create prints Step 6's `◆ Issue Created` block; Normalize and Batch print their own (`references/modes.md`, Steps 12 and 6), batch adding a line per issue and a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+A successful create prints Step 6's `◆ Issue Created` block; Normalize and Batch print their own (`references/modes.md`, Steps 12 and 6), batch adding a line per issue and Step 6's `Create:` totals row.
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome in every mode, a run that created nothing included: a cancelled confirmation, an invalid config, a failed `gh issue create`. One footer per batch, never one per issue.
 

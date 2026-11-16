@@ -124,7 +124,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ○ No cached triage found — running first analysis...
 ```
-**Trigger:** `/issue-triage` or `/issue-triage view` invoked but `.idd/triage.json` does not exist. The skill automatically falls through to a full analysis.
+**Trigger:** `/issue-triage` invoked but `.idd/triage.json` does not exist. The skill automatically falls through to a full analysis.
 **Note:** This is an informational message, not an error.
 
 ### Corrupted triage report
@@ -134,7 +134,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  rm .idd/triage.json && /issue-triage update
   Check:   was the file edited manually?
 ```
-**Trigger:** `/issue-triage` or `/issue-triage view` finds the file but JSON parsing fails.
+**Trigger:** `/issue-triage` finds the file but JSON parsing fails.
 
 ### Could not save triage report
 ```

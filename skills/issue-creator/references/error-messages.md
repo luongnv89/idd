@@ -210,7 +210,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Model Suggestion
 
-All model-suggestion failures are **non-fatal** — they warn and continue creating the issue without a suggestion. None block creation.
+These failures warn and never block creation; each trigger says whether a suggestion still renders. The two stops are in SKILL.md *Configuration*.
 
 ### Model data refresh failed
 ```
