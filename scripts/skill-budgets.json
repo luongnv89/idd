@@ -27,10 +27,10 @@
         "measured": 0
       },
       "budget": 145114,
-      "measured": 145009,
+      "measured": 144905,
       "skill_md": {
-        "budget": 26006,
-        "measured": 24994
+        "budget": 25914,
+        "measured": 24890
       }
     },
     "issue-analysis": {
@@ -130,10 +130,10 @@
         "measured": 5062
       },
       "budget": 171356,
-      "measured": 171344,
+      "measured": 171334,
       "skill_md": {
         "budget": 26657,
-        "measured": 25656
+        "measured": 25660
       }
     }
   }

@@ -203,7 +203,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 | Only rebase | `rebase only` |
 | Nothing allowed | `no merge strategies enabled` |
 
-This repo today sets no `review.merge_method` and allows squash only, so it reads `squash allowed · IDD's merge carries the PR body`. See `docs/decisions/b1-binding-declaration.md`.
+A repo that sets no `review.merge_method` (so the method is `squash`), allows squash only and sets `review.auto_merge: true` reads `squash allowed · IDD's merge carries the PR body`.
 
 ---
 

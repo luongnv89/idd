@@ -139,7 +139,7 @@ src/skills/issue-creator/docs/README.md
 src/skills/issue-creator/SKILL.source.md
 ```
 
-These two are the only files in scope. Other skills (`/issue-analysis`, `/init-idd`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
+These two are the only files in scope. Other skills (`/issue-analysis`, `/init-idd`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, any file under `docs/` other than the `docs/README.md` above, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
 
 ### Forbidden patterns (case-insensitive substring match, with surrounding negation)
 
@@ -212,7 +212,7 @@ Check 1's *Pattern match algorithm* without its negation steps: every matching l
 
 ## Check 3 — Autopilot mode
 
-Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
+Verify that `.idd.yml`, when present, sets `autopilot.mode`. Without it, an explicit legacy `autopilot.auto_merge` key decides the merge mode instead of the `balanced` default, and `auto_merge: true` means `aggressive` with partial merges. The mapping is in `docs/config-schema.md` under `autopilot.auto_merge`.
 
 ### Procedure
 

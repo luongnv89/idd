@@ -160,6 +160,15 @@ else
   fail "T4: Check 1 does not document the negation guard"
 fi
 
+# Issue #625: Check 1 scans src/skills/issue-creator/docs/README.md, so its
+# exclusion list may name docs/ only with that README carved out.
+excl="$(grep -E 'Do \*\*not\*\* scan' "$SKILL" || true)"
+if [ -n "$excl" ] && { ! printf '%s' "$excl" | grep -qF '`docs/`' || printf '%s' "$excl" | grep -qF 'docs/README.md'; }; then
+  pass "T4: Check 1 exclusion keeps the in-scope docs/README.md"
+else
+  fail "T4: Check 1 exclusion drops docs/ without carving out the in-scope docs/README.md"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T5: Check 2 — forbidden template fields enumerated
 # ───────────────────────────────────────────────────────────
@@ -202,6 +211,14 @@ if grep -qE 'skipped[^.]*no \.idd\.yml' "$SKILL"; then
   pass "T6: Check 3 documents skip when .idd.yml is absent"
 else
   fail "T6: Check 3 does not document skip-when-missing"
+fi
+
+# Issue #625: autopilot.mode defaults to balanced (docs/config-schema.md);
+# the rationale must not call conservative the default.
+if grep -qiE 'conservative[- ](merge )?default' "$SKILL"; then
+  fail "T6: Check 3 calls conservative the default merge mode (the default is balanced)"
+else
+  pass "T6: Check 3 does not call conservative the default merge mode"
 fi
 
 # ───────────────────────────────────────────────────────────

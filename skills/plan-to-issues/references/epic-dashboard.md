@@ -47,6 +47,7 @@ supersedes it; two lists of the same children drift within a week.
 
 ```markdown
 <!-- plan-dashboard:start -->
+
 ## Plan
 
 **Plan:** `MODERNIZATION_PLAN.md` · **Baseline at audit:** AMBER — builds; 41/58 tests pass
@@ -86,7 +87,7 @@ Open/closed status is live in the **Sub-issues** panel above — this map is sta
 |---|---|---|---|
 | F-DEP-009 | Medium | upstream v4 unreleased | when v4 ships |
 
-<sub>Rendered by `/plan-to-issues` — refresh with `/plan-to-issues sync 100`</sub>
+<sub>Plan map rendered 2026-08-26 by `/plan-to-issues` — re-render after filing more issues with `/plan-to-issues sync 100`</sub>
 <!-- plan-dashboard:end -->
 ```
 

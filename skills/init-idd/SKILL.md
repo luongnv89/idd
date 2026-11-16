@@ -453,7 +453,7 @@ Optional, propose-only. With no user present to approve (a subagent, unattended,
 
 ## Example Runs
 
-Full example outputs for three scenarios (TypeScript + Next.js project, minimal Python project, config-already-exists merge) live in `references/examples.md` — read that file when debugging detection or merge behavior.
+Full example outputs live in `references/examples.md` — read that file when debugging detection or merge behavior.
 
 ---
 

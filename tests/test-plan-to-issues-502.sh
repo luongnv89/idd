@@ -171,6 +171,30 @@ has   "$PRE" '^\| G6 \| items probe fails \| \*\*warn\*\*' "R3: a failed count p
 has   "$PRE" '\{lookups\} lookups × \{pages\} pages' "R3: API budget block shows the lookup breakdown"
 has   "$PRE" '~324 needed · 1240 items' "R3: report example matches 50 tasks, 6 phases, 1240 items"
 
+# ── R4: reference text matches the scripts it describes (issue #625) ────────
+# The Layout example in epic-dashboard.md is what an agent copies when the
+# renderer cannot run, so its framing lines must be the renderer's. Compare
+# against a real render ($TMP/a.md, AC4) with the date and epic number masked.
+DASH="$ROOT/src/skills/plan-to-issues/references/epic-dashboard.md"
+# Fence-aware: the example itself holds a `## Plan` heading.
+awk '/^```/{c=!c} !c && /^## /{f=($0=="## Layout"); next} f' "$DASH" > "$TMP/layout.md"
+mask() { sed -E 's/[0-9]{4}-[0-9]{2}-[0-9]{2}/DATE/g; s/sync [0-9]+/sync N/g'; }
+want_footer="$(grep '^<sub>' "$TMP/a.md" | mask)"
+got_footer="$(grep '^<sub>' "$TMP/layout.md" | mask)"
+if [ -n "$want_footer" ] && [ "$got_footer" = "$want_footer" ]; then
+  pass "R4: Layout footer has the shape gi-plan-map.py renders"
+else
+  fail "R4: Layout footer '$got_footer' ≠ rendered '$want_footer'"
+fi
+want_open="$(sed -n '2p' "$TMP/a.md")"
+got_open="$(awk 'p{print; exit} /^<!-- plan-dashboard:start -->$/{p=1}' "$TMP/layout.md")"
+[ "$got_open" = "$want_open" ] && pass "R4: Layout opens like the render (line after the start sentinel)" \
+  || fail "R4: Layout line after the start sentinel is '$got_open', render has '$want_open'"
+# gi-deps.py reads both markers; the bridge must not say the gate reads one.
+has "$ROOT/src/shared/scripts/gi-deps.py" 'blocked' "R4: gi-deps.py still reads Blocked by"
+flows "$SRC/references/issue-creator-bridge.md" 'merge gate reads `Depends on` and `Blocked by`' \
+  "R4: bridge names both dependency markers the merge gate reads"
+
 # ── AC5: shipped and listed ──────────────────────────────────────────────────
 BUILT="$ROOT/skills/plan-to-issues"
 if cmp -s "$BUILT/references/scripts/gi-plan-map.py" "$SCRIPT"; then

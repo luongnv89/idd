@@ -189,7 +189,8 @@ Depends on #103, #104
 
 `Depends on #N` is scope-independent of `Part of #<epic>` and answers a different question: `Part of`
 says the child serves the epic's outcome, `Depends on` says it cannot merge first (IDD SPEC §2.1).
-`/auto-pilot`'s merge gate reads `Depends on` only, which is why the pass is worth the extra edits.
+`/auto-pilot`'s merge gate reads `Depends on` and `Blocked by`, not `Part of`, which is why the pass
+is worth the extra edits.
 
 - Skip children with no dependencies — most of the backlog gets no edit.
 - A dependency id absent from the map is skipped and reported as `⚠ unknown dep <id>`; never emit a
