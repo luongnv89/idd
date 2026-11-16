@@ -11,13 +11,13 @@
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46859
+        "measured": 46893
       },
-      "budget": 450680,
-      "measured": 450680,
+      "budget": 451160,
+      "measured": 451160,
       "skill_md": {
         "budget": 26986,
-        "measured": 26887
+        "measured": 26938
       }
     },
     "init-idd": {

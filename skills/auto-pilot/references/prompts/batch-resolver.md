@@ -38,7 +38,7 @@ Instructions:
    minimum set of changes to resolve everything.
 5. Execute the unified fix
 6. Write one focused test per behavior stated in the plan or an acceptance criterion, plus bug regression tests, using the repo's existing test layers
-7. Run QA loop: review, test, build, fix — up to 3 cycles
+7. Run QA loop: review, test, build, fix — up to the class ceiling the `ceiling` field below names
 8. Ship: create ONE PR with body containing Closes #N for EACH issue
 
 Use --auto mode — no one is watching this run to answer a prompt, so make every decision yourself.

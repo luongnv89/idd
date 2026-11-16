@@ -113,7 +113,7 @@ Spawn the **Analyzer Subagent** (`references/prompts/analyzer.md`, per `referenc
   The analyzer could not complete analysis for all issues.
   Proceeding with original order without batching optimization.
 ```
-Set `optimized_order` to the original validated list, `batches` to empty, and proceed to Confirmation. The auto-pilot still works — it just loses the optimization.
+Set `optimized_order` to the original validated list, `batches` to empty, and proceed to the *Execution Plan (auto-start)* section. The auto-pilot still works — it just loses the optimization.
 
 **On partial failure** (analyzer could not analyze a specific issue), output for each failed issue:
 ```
@@ -162,7 +162,7 @@ Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all bat
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  {valid_count} (of {original_count} provided)
   Review cycles:      {review_cycles}
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   Mode:               explicit list (analyzed + optimized)
   Batches:            {batch_count} (saving ~{saved_iterations} iterations)
 
