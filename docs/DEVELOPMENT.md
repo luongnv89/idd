@@ -271,7 +271,7 @@ bash tests/test-build-script.sh          # run one
 git ls-files 'tests/*.sh' | xargs -n1 bash   # run all
 ```
 
-`tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
+`tests/README.md`, `tests/README-sprint2.md`, and `tests/README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
 
 ### Anchor markers (assert on contracts, not on sentences)
 

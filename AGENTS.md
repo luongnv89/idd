@@ -123,7 +123,7 @@ docs/                              # All documentation — single tree (issue #8
 
 All documentation lives in top-level `docs/`. Two kinds coexist there:
 
-1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs — all 16 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `agent-overrides.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`, `post-merge-cleanup.md`, `context-threshold.md`.
+1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a **skill** — the build picks it up automatically. Today's runtime docs — all 16 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `agent-overrides.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`, `post-merge-cleanup.md`, `context-threshold.md`.
 2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
 
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
@@ -242,6 +242,23 @@ Examples:
 - In auto-pilot mode, all agents/skills run autonomously without user prompts
 - Static sequential output — each step prints a new line, no terminal animation
 
+### Writing skill text
+
+These rules cover every file a skill reads at run time: `src/skills/`, `src/internal-skills/`, `src/shared/` and the bundled runtime docs. The agent reading them sees only the current bundle, so the text has to be true and self-contained there.
+
+- **State the rule and its reason, not its history.** The runtime agent cannot open an issue or a PR, so a ticket or acceptance-criterion number never stands in for a reason or a name: write "the traceability hard-block", not "the #36 hard-block", and drop "(issue #256)", "satisfies acceptance criterion 5" or "reduced from 10". Ticket numbers belong in commit messages, tests, `docs/decisions/` and this file.
+- **Describe current behaviour as the only behaviour.** "Today's pipeline", "as before", "unchanged", "now also", "the original path", "no new config key is introduced", or calling a shipped default "legacy" all compare against a version the agent never saw, and it may go looking for the phantom alternative. Say what happens: "the full pipeline", "`false` skips the check". `legacy` stays right for the pre-rename config, marker and directory names and for `autopilot.auto_merge`: those compatibility paths still run.
+- **Point to one home, and make sure the pointer resolves.** Before citing a step, section heading, config key, JSON field, script flag or numbered constraint, check that it exists under that name in the bundle the reader will have and that it belongs to this skill. Prefer a pointer to a restatement: a restated list ("the only…", "exactly three places", "these phases") goes wrong as soon as its source grows. When you rename, renumber or remove something, grep `src/` and `docs/` for the old name in the same change.
+- **Check a command against its script before writing it.** Use only flags the script's `--help` lists, and never pipe a fetch into a gate without checking that the fetch succeeded: an unknown flag exits 2 with empty stdout, and an empty body reads as "nothing found", so the gate fails open.
+- **A safety rule has one full statement.** Every other mention — an error-catalog entry, a quick reference, an example command — reproduces it exactly or points to it. A shortened copy is a weaker gate: fewer merge gates, a looser secret pattern, `--title` where the rule says `--from-issue`, a sync without the stash.
+- **Change the examples with the contract.** Examples set the output shape more strongly than prose does. When an output block, report section, PR body section or command form changes, update every example and runtime doc that shows it in the same PR (each skill's `examples.md`, `docs/terminal-style.md`, `docs/naming-conventions.md`). An example never shows behaviour the skill forbids.
+- **Keep maintainer material out of the bundle.** Eval grading criteria, CI workflow descriptions, catalog-maintenance steps and notes to a future maintainer go in `evals/`, `docs/DEVELOPMENT.md` or `tests/`; inside a skill the agent reads them on every run and may act on them.
+- **Don't copy data that has a source file.** Model picks and prices live in the model-data snapshot, benchmark versions come from that data, and prose pins no tool version. A copied table is wrong after the next refresh.
+- **Write paths as the built skill sees them.** The runtime file is `SKILL.md`, not `SKILL.source.md`; cite scripts as `shared/scripts/<name>.py` and docs as `docs/<name>.md` so the build rewrites them.
+
+Several tests pin skill wording. When a rewrite drops a pinned phrase, update the test in the same commit rather than keeping the stale phrase.
+
 ### Testing
-- Integration tests in `tests/` directory
-- Shell scripts that verify skill behavior against real or mock GitHub repos
+- The automated suite is `tests/*.sh` — shell scripts that assert on `src/`, `docs/`, and the built `skills/`. They need no GitHub repo, no token, and no setup. Run one with `bash tests/<name>.sh`; run them all with `git ls-files 'tests/*.sh' | xargs -n1 bash`
+- `.github/workflows/dist-check.yml` is the authoritative list of the suite: one named step per script, in the order CI runs them. `tests/test-build-script.sh` (T9) fails if a tracked `tests/*.sh` is missing from it, so the list cannot silently fall behind
+- `tests/README.md`, `tests/README-sprint2.md`, and `tests/README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo
