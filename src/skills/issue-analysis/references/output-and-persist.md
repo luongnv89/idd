@@ -29,24 +29,6 @@ These bounded comparisons do not need an interactive report. Honor a requested
 format while retaining result, evidence, uncertainty, and decision. Print `Saved:`
 only after the new file was verified; a retained old cache is not a successful save.
 
-### Evaluate report understanding
-
-Apply these criteria to actual outputs as well as schema correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | Opening text states status and the main finding; limitations are visible without searching logs. |
-| Facts and assumptions are separate | Code observations, hypotheses, cached data, and untested reproduction are labeled distinctly. |
-| Claims are traceable | Each material claim names supporting code, commit, tracker evidence, or an observed validation check. |
-| Next decision is clear | Output identifies the next decision or says no approval is needed, and lists remaining work. |
-
-When running behavioral evaluations, include fresh analysis, cached view, scan
-timeout, and failed persistence. Grade the agent's report against all four rows.
-Ask human reviewers the corresponding four questions and record their responses
-with the evaluation. Missing, blank, or nonresponsive feedback leaves human
-understanding **unconfirmed**. Contract tests inspect instructions and examples;
-they do not establish live agent behavior or human understanding.
-
 ## Validate analysis data
 
 Before rendering cached data or replacing a cache, check the schema below:

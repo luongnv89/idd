@@ -467,9 +467,7 @@ After a successful run the repo root contains a validated `.idd.yml`, a
 `.gitignore` that ignores `.idd/cache/`, and the terminal prints the *Step 4 —
 Report* block above — the `Validation:` row is the checkable bar: the run only reports `DONE` after the written file parsed as YAML
 with no placeholder tokens left and a `platform` key. Variations (merge mode,
-missing framework, missing test runner) are listed under that step. Grade report
-understanding — findable result, separated facts, traceable claims, clear next
-decision — with the criteria in `references/review-contract.md`.
+missing framework, missing test runner) are listed under that step.
 
 ## Edge Cases
 

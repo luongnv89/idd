@@ -62,21 +62,3 @@ animation; `.idd/runs.jsonl` is the machine-readable form and
 `.idd/last-run-report.md` the persisted copy. Another requested format renders
 the same summary and keeps the `Result`, `Evidence`, `Uncertainty` and
 `Decision` rows; if the host cannot render it, say so and print the terminal one.
-
-## Evaluate report understanding
-
-Grade actual summaries against these criteria as well as merge-gate correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states the status, `complete`/`partial`, and the main finding without reading the iteration rows or logs. |
-| Facts and assumptions are separate | Observed checks (merge, CI verdict, follow-up filed, persisted report) are distinct from degraded or reused verdicts listed under `Uncertainty`. |
-| Claims are traceable | Each `merged` row names its PR and its AC pass/fail/unverified counts; each `left_open`/`blocked_by_dependency` row names its blocker; `partial` names what made it partial. |
-| Next decision is clear | The summary says `No approval needed.` or names the one pending critical decision, and lists remaining user actions on `Next action:`. |
-
-When running behavioral evaluations, include a clean run, a run with a
-`left_open` PR, a critical-issue pause and a rate-limited stop, and grade each
-summary against all four rows. Ask human reviewers the matching four questions
-and record their answers in the eval case's `human_review` block. Missing, blank,
-or nonresponsive feedback leaves human understanding unconfirmed; agent
-inspection cannot confirm it.

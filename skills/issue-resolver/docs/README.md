@@ -78,7 +78,7 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 | `../references/closing-already-resolved.md` | Closing-summary variant when the fix is already on the default branch |
 | `../references/closing-blocked.md` | Closing-summary variant when the run stops before a PR |
 | `../references/run-log-fields.md` | Run-log field derivation and suppression |
-| `../references/report-examples.md` | Expected pipeline output, format rule, evaluation rubric |
+| `../references/report-examples.md` | Expected pipeline output and format rule |
 | `../references/step-reports.md` | Step completion report rules and the per-step check table |
 | `../references/skill-index.md` | Progressive-disclosure index of the skill's reference files |
 | `../references/error-messages.md` | Complete error catalog with triggers and exact output for every failure scenario |

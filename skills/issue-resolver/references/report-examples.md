@@ -40,21 +40,3 @@ PR body is the durable Markdown record. If the user asks for another format (for
 example a Markdown summary or JSON), render it from the same facts and keep the
 `Result`, `Evidence`, `Uncertainty`, `Decision` and `Next action` rows. If the
 host cannot render the requested format, say so and print the terminal block.
-
-## Evaluate report understanding
-
-Grade actual outputs against these criteria as well as correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states `DONE`, `PARTIAL` or `BLOCKED` and the PR or stop reason, without reading the tracker or logs. |
-| Facts and assumptions are separate | Observed checks (suite run, secret scan, `gh pr create` URL) are distinct from unverified ACs, skipped legs and `risk_rating`. |
-| Claims are traceable | Each test claim names its count and SHA; `already_resolved` names the fixing commit; `BLOCKED` names the failed check; `PARTIAL` names the residual gap. A created PR is not reported as merged. |
-| Next decision is clear | The output says `No approval needed.` and names the next action. |
-
-When running behavioral evaluations, include a delivered PR, a PR with residual
-QA findings, a blocked secret scan, and an `already_resolved` issue, and grade
-each closing block against all four rows. Ask human reviewers the matching four
-questions and record their answers in the eval case's `human_review` block.
-Missing, blank, or nonresponsive feedback leaves human understanding
-unconfirmed; agent inspection cannot confirm it.

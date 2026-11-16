@@ -80,21 +80,3 @@ the user asks for another format (for example a Markdown table or a diff against
 the previous file), produce it from the same values and keep the `Result`,
 `Evidence`, `Uncertainty`, and `Decision` rows. If the host cannot render the
 requested format, say so and print the terminal block.
-
-## Evaluate report understanding
-
-Grade actual outputs against these criteria as well as config correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states the status and what happened to `.idd.yml` without reading other rows. |
-| Facts and assumptions are separate | Observed checks (script exit, file re-read, parser, `gh` reads) are distinct from marker-file inferences and hand-resolved fields. |
-| Claims are traceable | Each detected value names its marker file; `BLOCKED` names the error block; `PARTIAL` names the skipped check. |
-| Next decision is clear | The output says `No approval needed.` and names the remaining user actions, including commit and any merge-settings fix. |
-
-When running behavioral evaluations, include a fresh generate, a merge, a cancel
-(interactive and auto mode), a degraded scan, and a failed validation, and grade
-each report against all four rows. Ask human reviewers the matching four
-questions and record their answers with the eval results. Missing, blank, or
-nonresponsive feedback leaves human understanding unconfirmed; agent inspection
-cannot confirm it.

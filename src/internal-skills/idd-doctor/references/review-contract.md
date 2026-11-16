@@ -1,9 +1,8 @@
 # Review contract — /idd-doctor
 
 Read this before printing the *Summary footer*. It defines the four rows that
-follow the `Result:` line, the format rule, and the criteria a reviewer grades
-a doctor report against. The doctor is report-only: it authorizes no change,
-so it never asks for approval.
+follow the `Result:` line and the format rule. The doctor is report-only: it
+authorizes no change, so it never asks for approval.
 
 ## The rows
 
@@ -68,21 +67,3 @@ summary rows.
 lines plus their findings and one summary section. A reader inspects the whole
 report without filtering, and every finding already carries its
 `{path}:{line_number}` source.
-
-## Understanding criteria
-
-Grade an actual doctor report against these criteria when a behavioral review
-is run. A heading's presence is not evidence of understanding.
-
-| Criterion | Observable check |
-|---|---|
-| Main result is findable | The `Result:` line states `PASS`, `WARN`, or `FAIL` before any contract row, without reading findings. |
-| Facts and assumptions are separated | `Evidence` names only checks that ran; skipped checks and heuristic limits appear under `Uncertainty`, never as passes. |
-| Claims are traceable | Every failed or warned check has a `{path}:{line_number}` finding or a quoted configuration value; `PASS` is never claimed for a skipped check. |
-| Next decision is clear | `Decision` says no approval is needed and names the fix hints to apply, or `Next: none`. |
-
-Ask a human reviewer whether they could find the result, separate facts from
-assumptions, trace each finding, and name the next action. Record the answers
-on the PR or issue that ran the review. Missing, blank, or nonresponsive
-feedback leaves human understanding **unconfirmed**; an agent's own inspection
-cannot confirm it.
