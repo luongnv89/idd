@@ -13,8 +13,8 @@
         ],
         "measured": 46893
       },
-      "budget": 450913,
-      "measured": 449889,
+      "budget": 450844,
+      "measured": 449820,
       "skill_md": {
         "budget": 26986,
         "measured": 26938
@@ -43,7 +43,7 @@
         "measured": 34918
       },
       "budget": 167538,
-      "measured": 167507,
+      "measured": 167438,
       "skill_md": {
         "budget": 24945,
         "measured": 23921
@@ -62,11 +62,11 @@
         ],
         "measured": 42245
       },
-      "budget": 185783,
-      "measured": 184759,
+      "budget": 185557,
+      "measured": 184533,
       "skill_md": {
         "budget": 26490,
-        "measured": 25466
+        "measured": 25474
       }
     },
     "issue-pr-review": {
@@ -82,7 +82,7 @@
         "measured": 126889
       },
       "budget": 324334,
-      "measured": 323380,
+      "measured": 323311,
       "skill_md": {
         "budget": 32125,
         "measured": 32123
@@ -98,8 +98,8 @@
         ],
         "measured": 11025
       },
-      "budget": 434920,
-      "measured": 433896,
+      "budget": 434851,
+      "measured": 433827,
       "skill_md": {
         "budget": 33856,
         "measured": 33527
