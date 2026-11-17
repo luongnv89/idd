@@ -29,10 +29,9 @@ invent a parallel scale.
 | L | L | high (extra-high) |
 | XL | XL | max |
 
-The advisory OpenAI and Anthropic model for each band is that band's
-`complexity_mapping` entry in the issue-creator skill's bundled
-`templates/model-data.json`; it is not copied here because a data refresh
-replaces it.
+This table sets the thinking effort only. When an issue carries an advisory
+OpenAI and Anthropic model, it is the issue's own `**Suggested model:**` line in
+`## Metadata`, written by `/issue-creator`.
 
 The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
 maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator
