@@ -198,6 +198,15 @@ has "$EXAMPLES" "◆ Issue Triage — cached" "T11: cached-view example prints t
 has "$EXAMPLES" "○ Report is 3d 2h old (>24 hours)." "T11: cached-view example fires the >24 hours age line"
 has "$EXAMPLES" "Run stats   elapsed" "T11: examples end with the run-stats footer"
 lacks "$EXAMPLES" "Issues may have changed." "T11: no update-suggestion wording outside the contract"
+# A maybe-fixed issue still counts as stale (#3 is 28d old), so the
+# explicit-update example must print the Stale line; a whole-file grep would
+# pass on the first-run example alone.
+update_ex="$(awk '/^## Example: Explicit update/{f=1;next} /^## Example:/{f=0} f' "$EXAMPLES")"
+if grep -qF -e "  ⚠  Stale: 1 issue (>14 days inactive)" <<<"$update_ex"; then
+  pass "T11: explicit-update example prints the Stale line beside Maybe fixed"
+else
+  fail "T11: explicit-update example omits the Stale line while #3 is stale"
+fi
 # The issue column is the first one after the row number; #9 also appears in
 # #5's Blocks column, which must not count as #9's own row.
 row9="$(grep -E '^ *[0-9]+ +│ #9 ' "$EXAMPLES" || true)"

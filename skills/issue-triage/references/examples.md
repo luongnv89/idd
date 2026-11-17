@@ -4,7 +4,7 @@ One full run per mode.
 
 ## Example: First run (no cache exists)
 
-**User says:** `/issue-triage` (no previous triage run)
+**User says:** `/issue-triage` (no cache)
 
 ```
   ○ No cached triage found — running first analysis...
@@ -94,11 +94,11 @@ One full run per mode.
 **User says:** `/issue-triage` (cache exists, no commits since last triage)
 
 ```
-  ... (cache header with age 2h, table and summary lines, as above) ...
+  ... (cache header, age 2h, table and summary lines) ...
 
   ○ Cached report is up to date. No changes detected since last triage.
 
-  ... (cached Final Report, age 2h, next /issue-resolver 12, and footer) ...
+  ... (cached Final Report, next /issue-resolver 12, footer) ...
 ```
 
 ---
@@ -115,11 +115,12 @@ One full run per mode.
 
   ◆ Issue Triage
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  ... (header and rows 1-2 as in the first run) ...
+  ... (header, rows 1-2 as in the first run) ...
   3  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
   4  │ #3  Old UI alignment   │ P3  │ —      │ maybe-fixed
 
   ⚡ Parallelizable: #12 + #8 (independent)
+  ⚠  Stale: 1 issue (>14 days inactive)
   ◆  Maybe fixed: 1 issue may already be resolved
   ○  Suggested order: #12 → #8 → #15 → #3
 
@@ -186,7 +187,7 @@ One full run per mode.
 
   ✓ Triage saved to .idd/triage.json
 
-  ... (Final Report for these 2 issues, start #5, and footer) ...
+  ... (Final Report for these 2 issues, start #5, footer) ...
 ```
 
 ---
