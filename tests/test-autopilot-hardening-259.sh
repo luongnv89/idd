@@ -1058,7 +1058,7 @@ expect_grep "AC3: summary-format.md ties the budget stop to the persisted report
   'Runtime budget check' "$AP_SUMMARY_VAR"
 expect_grep "AC3: configuration.md explains why the budget is a start gate, not a kill switch" \
   '**start gate, not a kill switch**' "$AP_CONFIG"
-expect_grep "AC3: an unbounded default preserves today's behavior" \
+expect_grep "AC3: the default budget is unbounded" \
   '0` (the default) is unbounded' "$AP_CONFIG"
 expect_grep "AC3: the worked example shows a budget-triggered stop" \
   'BUDGET REACHED' "$AP_EXAMPLES"
@@ -1239,7 +1239,7 @@ expect_block "AC1: the sum invariant survives the two added rows" \
 # Cross-file agreement — cycle 1's lesson was that one claim with three homes
 # gets two of them updated.
 expect_grep "AC1: run-log.md says a triage-mode label skip writes no line at all" \
-  '**no** line at all, exactly as a `wontfix` issue does today' "$AP_RUNLOG"
+  '**no** line at all, exactly as a `wontfix` issue does.' "$AP_RUNLOG"
 expect_grep "AC1: run-log.md still gives explicit-list mode its counter slot and line" \
   'it gets an `[Issue {i}/{total}]` slot and its' "$AP_RUNLOG"
 expect_grep "AC1: the No-eligible catalog names the two new skip-list reasons" \
@@ -1279,8 +1279,8 @@ expect_block "AC2: the between-chunk heartbeat refresh is scoped out of prefligh
   "$PAUSE_BLOCK" 'the between-chunk heartbeat refresh **does not apply**'
 expect_block "AC2: the pause may not create run-state.json ahead of --init" \
   "$PAUSE_BLOCK" 'ahead of the `--init` that owns creating it'
-expect_block "AC2: chunking itself is unchanged — only the refresh drops away" \
-  "$PAUSE_BLOCK" 'The chunked `--wait` call itself is unchanged'
+expect_block "AC2: chunking itself still runs — only the refresh drops away" \
+  "$PAUSE_BLOCK" 'The chunked `--wait` call itself still runs'
 expect_block "AC2: the bracketing runtime-budget check is scoped out too" \
   "$PAUSE_BLOCK" 'the bracketing *Runtime budget check* does not apply either'
 expect_block "AC2: the deadline is named as the enforcement at the preflight site" \

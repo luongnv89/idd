@@ -267,7 +267,7 @@ exactly one `i` and writes exactly one run-log line — never zero (silently
 resolved inside someone else's batch) and never two (skipped at the spawn *and*
 at its own turn).
 
-The write side is unchanged: a failure inside this mode runs the same *Quarantine
+On the write side, a failure inside this mode runs the same *Quarantine
 after repeated failures* procedure in `references/phases/phase-2-resolve.md`.
 
 When advancing to the next item in `optimized_order`:
@@ -321,7 +321,7 @@ A batch resolves N issues in one PR, but the contract is **one line per processe
 result out. The **attempted set** is the issue numbers sent into the Batch Resolver
 (what `batch_map` holds at spawn); the invariant is keyed on that set and **never**
 on `issues_resolved` (success-only keying would drop processed-but-failed issues —
-the inverse under-count #156/#158 exist to kill).
+the inverse under-count this invariant exists to prevent).
 
 The invariant holds **across the whole auto-pilot run**, not at batch time: an
 attempted issue is logged here if it resolved here, and at its individual retry
@@ -336,7 +336,7 @@ otherwise. Never both (double-count) and never neither (drop).
 
 Writing a `failed` batch line for an unresolved issue **and** letting its
 individual retry log it would double-count it — the exact
-double-count this fix removes. It is strictly one-or-the-other, resolved by disposition:
+double-count this invariant forbids. It is strictly one-or-the-other, resolved by disposition:
 **resolved-here → logged here; unresolved → logged at its retry, never here.**
 
 **Re-queue every unresolved attempted issue — including the batch's primary
@@ -344,8 +344,7 @@ double-count this fix removes. It is strictly one-or-the-other, resolved by disp
 is easy to miss:** the primary sits at the batch's own slot in `optimized_order`,
 which has already been consumed, so without an explicit re-append to the end of
 `optimized_order` it has no later turn and would drop to **zero** lines (the
-inverse under-count criterion 5 forbids, and the failure the #158 Technical Notes
-name: "a failed batch drops fully-processed issues").
+inverse under-count: a failed batch would drop fully-processed issues).
 
 **An in-batch skip writes no run-log line.** The last table row is the **one
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half

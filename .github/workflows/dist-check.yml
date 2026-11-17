@@ -518,3 +518,6 @@ jobs:
 
       - name: test-eval-grading-out-of-bundle-630
         run: bash tests/test-eval-grading-out-of-bundle-630.sh
+
+      - name: test-runtime-text-history-628
+        run: bash tests/test-runtime-text-history-628.sh

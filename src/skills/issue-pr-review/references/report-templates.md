@@ -33,7 +33,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
      stays `PASS`.
    - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
-     findings remain after the cycle cap, a stagnation stop, a #36 hard-block, or a
+     findings remain after the cycle cap, a stagnation stop, an AC or traceability hard-block, or a
      strict-pass blocker. Never merged.
    - `BLOCKED ({reason})` — the run stopped before a verdict, or the merge
      failed: a failed prerequisite or missing bundled dependency, invalid
@@ -153,7 +153,7 @@ commit it is inherited from, never `✓ pass`:
   {pr_url}
 ```
 
-Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only group them — a finding's blocking behavior comes from its dimension status, not its axis. The `traceability: fail` line is the one Standards-axis case where tests can be green and the PR is still blocked from soft-pass. Issue #36's contract: missing `Closes #N` always reports a traceability failure even if tests pass.
+Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only group them — a finding's blocking behavior comes from its dimension status, not its axis. The `traceability: fail` line is the one Standards-axis case where tests can be green and the PR is still blocked from soft-pass. A missing `Closes #N` always reports a traceability failure even if tests pass.
 
 ### Summary — Strict-pass blockers
 
@@ -276,7 +276,7 @@ Log the matching mechanism (label name or pattern). Emptying both keys disables 
 ## Auto-Merge
 
 When SKILL.md *Step 7 → Merge rule* allows the merge, run the
-merge identity check, then merge with the expected-head guard (issue #516):
+merge identity check, then merge with the expected-head guard:
 
 ```bash
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read

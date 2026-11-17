@@ -29,9 +29,9 @@ Instructions:
    and Step 1.2b trims it to those three fields, so no issue body reaches you
    here: you can
    never take acceptance criteria out of it. Your Step 3 acceptance-criteria
-   verification always re-fetches the live issue body and evaluates the #36
+   verification always re-fetches the live issue body and evaluates the
    acceptance_criteria hard-block against it. The payload may gate duplicated work, never a safety gate:
-   the Step 5 CI wait, the gi-secscan pre-commit scan and both #36 hard-blocks
+   the Step 5 CI wait, the gi-secscan pre-commit scan and both AC and traceability hard-blocks
    run in full, on evidence they fetched themselves, whatever it contains.
 7. resume: {resume} — pass --resume only when this line says yes; never otherwise.
    run_id: {run_id} — send it as caller_run_id in the progress record's --start

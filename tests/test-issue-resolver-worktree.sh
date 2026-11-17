@@ -146,8 +146,8 @@ done
 # ───────────────────────────────────────────────────────────
 # T7 (#129/#260): legacy auto remains in-place; parallel lanes are caller-owned.
 # ───────────────────────────────────────────────────────────
-check_contains "$SRC_AUTOPILOT_PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\): use the legacy in-place path exactly' \
-  "T7.1 (#129): max_parallel=1 keeps the legacy in-place resolver"
+check_contains "$SRC_AUTOPILOT_PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\): use the in-place path exactly' \
+  "T7.1 (#129): max_parallel=1 keeps the in-place resolver"
 check_contains "$SRC_AUTOPILOT_PROMPTS" 'no `git worktree add`' \
   "T7.2 (#129): legacy auto-pilot prompt still forbids worktree add"
 check_contains "$SRC_AUTOPILOT_PROMPTS" 'IDD_CALLER_WORKTREE=1' \

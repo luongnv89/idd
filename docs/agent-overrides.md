@@ -18,7 +18,7 @@ Per spawn, per knob, for the role being spawned:
 | set (`effort`) | no such parameter | Append `Thinking effort: {value}` to the prompt; print `○ {role}: effort override not supported here — passed as a prompt hint` once |
 
 Values are opaque: never translate or guess one. "Never set `subagent_type`"
-is unchanged. A re-messaged agent keeps its spawn configuration.
+still holds. A re-messaged agent keeps its spawn configuration.
 
 ## Fallback ladder
 
@@ -36,7 +36,7 @@ never on output quality, a blocking verdict or a failed test.
 
 - **Safety gates.** Secret scans, repo sync, hard-blocks and tool posture run
   identically under any model.
-- **The pipeline profile.** `light` / `full` selection is unchanged.
+- **The pipeline profile.** `light` / `full` selection is unaffected.
 - **The advisory tier.** A configured model **wins** over the advisory `XS … XL`
   tier for that role; the tier stays as the prompt hint.
 

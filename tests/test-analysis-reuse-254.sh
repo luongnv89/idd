@@ -190,12 +190,12 @@ check_has "$SRC_STEPS" '[Ff]ail-safe' \
   "T3.3: the fail-safe rule is named as such"
 check_has "$SRC_STEPS" 'any (condition that )?cannot be evaluated|any doubt' \
   "T3.4: any doubt resolves to stale"
-check_has "$SRC_STEPS" "stale.*today's full pipeline, unchanged" \
-  "T3.5: stale/absent run today's full pipeline unchanged"
+check_has "$SRC_STEPS" "stale.*the full pipeline" \
+  "T3.5: stale/absent run the full pipeline"
 check_has "$SRC_STEPS" 'resolve\.adaptive_effort. is .false|resolve\.adaptive_effort` is `false' \
   "T3.6: resolve.adaptive_effort=false disables reuse (no new config key)"
-check_has "$SRC_STEPS" '[Nn]o new config key is introduced' \
-  "T3.7: the gate states it introduces no new config key"
+check_has "$SRC_STEPS" 'the one key disables both' \
+  "T3.7: the gate states its one off-switch is the existing key"
 check_has "$SRC_SKILL" 'fail-safe|Any doubt' \
   "T3.8: the SKILL pointer carries the fail-safe default"
 

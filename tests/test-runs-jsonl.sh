@@ -205,7 +205,7 @@ has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_res
 # (d) Failed/partial batch coverage: no inverse under-count, no re-resolve
 #     double-count. The unresolved issues are re-resolved individually and logged
 #     there — not double-logged as a batch 'failed' line.
-has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
+has "$EXPLICIT" "double-count this invariant forbids" "T7: spec guards the re-resolve double-count"
 has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
 has "$RUNLOG"   "no inverse under-count" "T7: run-log-schema documents no inverse under-count"
 # (d.0) Discriminates the batch-TIME write rule: an unresolved attempted issue is

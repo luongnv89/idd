@@ -120,9 +120,9 @@ absolute `$HOME`), nothing is written: the seed is served from memory for this
 run, the script exits 0 with `persisted: false` and `cache_file: null`, and
 prints a `⚠` line. Suggestions keep working; only the cache is skipped.
 
-> **Per-repo legacy cache (AC7).** A pre-existing `.idd/model-data.json`
-> from an older skill version is **ignored** — the skill neither reads nor
-> writes it, so model suggestions keep working unchanged. It is stale project
+> **Per-repo legacy cache.** A `.idd/model-data.json` in the repo is
+> **ignored** — the skill neither reads nor writes it, and model suggestions
+> never depend on it. It is stale project
 > state, safe to delete; the skill does not touch or migrate it.
 
 ### States
@@ -147,7 +147,7 @@ prints a `⚠` line. Suggestions keep working; only the cache is skipped.
    into `{cache_dir}` under a dated name, then offer a fresh fetch. By hand:
    ```bash
    # Date portion of the seed's own last_fetched — NOT today's date — so the
-   # filename date and the cache's last_fetched can never disagree (AC5).
+   # filename date and the cache's last_fetched can never disagree.
    seed_date="$(grep -o '"last_fetched": *"[0-9-]\{10\}' \
      "$skill_dir/templates/model-data.json" | grep -o '[0-9-]\{10\}$')"
    mkdir -p "$cache_dir"
@@ -167,7 +167,7 @@ prints a `⚠` line. Suggestions keep working; only the cache is skipped.
 In auto mode (`docs/auto-mode.md` — `--auto` or `IDD_AUTO_MODE=1`), never prompt: use cached or seeded
 data as-is, log staleness as a warning, and skip the fetch.
 
-### Forcing a refresh (AC6)
+### Forcing a refresh
 
 `/issue-creator … --refresh-model-data` refreshes the cache **unconditionally**,
 regardless of staleness, so users can pull the latest CursorBench data on

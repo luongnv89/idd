@@ -24,16 +24,15 @@ analysis_reuse = fresh | stale | absent
 | Value | When | Effect |
 |-------|------|--------|
 | `fresh` | every condition below holds | Step 1 runs the seeded verify-first pass; Step 2 skips the synthesizer |
-| `stale` | the file exists but any condition fails | today's full pipeline, unchanged |
-| `absent` | no file, or it does not parse as JSON | today's full pipeline, unchanged |
+| `stale` | the file exists but any condition fails | the full pipeline |
+| `absent` | no file, or it does not parse as JSON | the full pipeline |
 
 `stale` and `absent` are distinguished for the operator's benefit only — they
-take the identical code path, which is the pipeline that already exists.
+take the identical code path: the full pipeline.
 
 When `resolve.adaptive_effort` is `false`, **skip this gate**: set
 `analysis_reuse = stale` and continue. That key already pins the pipeline to
 `full`, and reuse is the same class of saving, so the one key disables both.
-**No new config key is introduced.**
 
 ### The predicate — five conditions, all must hold <!-- a:rs-step0h-predicate -->
 
@@ -104,7 +103,7 @@ never fire. *0a* runs **before** 0d and already fetches the issue, so it capture
 
 A missing key, a short or unknown SHA, an unparsable timestamp, a `git` command
 that errors for any reason, or any condition that cannot be evaluated ⇒ `stale`
-⇒ today's full pipeline, unchanged. The gate may only skip work it has
+⇒ the full pipeline. The gate may only skip work it has
 positively proven redundant. This default is what keeps a wrong answer cheap:
 the fallback is the pipeline that runs today.
 

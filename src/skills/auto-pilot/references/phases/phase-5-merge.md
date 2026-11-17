@@ -39,8 +39,7 @@ commit it waited on** — `passed@<sha40>` / `failed@<sha40>`, or a bare `no_ci`
 (*Binding the verdict to a commit* in that skill's
 `references/prepass-tests-ci-mechanics.md`). Re-running the whole wait here is
 duplicated work whenever the head has not moved since **and** the live rollup
-already reports every check green — both conditions, never the first alone
-(issue #256).
+already reports every check green — both conditions, never the first alone.
 
 Set exactly one variable:
 
@@ -85,11 +84,11 @@ before any merge.
 **`failed@<sha40>` is never `trusted`.** A failing verdict already leaves the PR
 open under Step 5.1's own rules; routing it through this gate would only let a
 `trusted` label attach to a red build. Read it as `absent` and let the wait
-below reach the same "not mergeable" outcome it reaches today.
+below reach its own "not mergeable" outcome.
 
 **Fail-safe: any doubt is `absent`.** A missing field, a SHA that is not 40 hex
 characters, a `headRefOid` that cannot be read, a `pending` or `none` that
-somehow arrived here — every one of them runs today's wait, byte-for-byte. The
+somehow arrived here — every one of them runs the full wait. The
 gate can only ever *remove* a duplicate wait; it can never merge something the
 wait would have blocked.
 
@@ -109,7 +108,7 @@ GitHub itself, read here, already reports every check green. Trusting a verdict
 on those two conditions is not a loosening of the marker rule; a marker still
 buys nothing at this step.
 
-**No new config key.** `review.adaptive_depth: false` disables this gate — it
+`review.adaptive_depth: false` disables this gate — it
 already disables the QA handoff gate — and forces `absent`.
 
 One `○` line, per `docs/terminal-style.md`:
@@ -272,7 +271,7 @@ Continue to Step 5.1c.
 
 ### Step 5.1c — Merge identity gate <!-- a:ap-merge-identity-gate -->
 
-**Single home of the merge-identity rule** (issue #516). A CI verdict authorizes
+**Single home of the merge-identity rule.** A CI verdict authorizes
 one commit merged onto one base. This gate refuses the merge when either has
 moved since that verdict. It runs last, immediately before `gh pr merge`, after
 the `trusted` fast path and after the full wait alike, and it guards every
@@ -284,7 +283,7 @@ read**, the head that Step 5.1a's verdict or the wait after it is about. Never
 take it from a later read: the guard pins the commit that was checked, so a SHA
 read after the wait would pin whatever the head became. `{merge_floor}` is
 check 3's value, pasted only as `met@<40 hex>:<40 hex>`: the floor must have
-classified this head on this live base tip (#605, #606).
+classified this head on this live base tip.
 
 Then one fresh read and one ancestry check. `{owner}` and `{repo}` are `gh api`'s
 own placeholders, filled from the current repository. The base name is bound
@@ -427,7 +426,7 @@ mode gate declines to merge — with the *Step 1.0b* procedure:
 During a parallel drain, include `"lanes": [{"issue": 42, "phase":
 "cleanup", "outcome": "merged"}]` in the same patch. A resume that reads `outcome: merged` never re-merges and never re-opens: the PR
 is gone and the issue is closed, so the iteration is finished and the loop moves
-to Step 5.3. **AC2 holds here too** — nothing in this phase closes an issue whose
+to Step 5.3. Likewise, nothing in this phase closes an issue whose
 PR is still open and unreviewed; the issue is closed by GitHub, as the
 consequence of merging the `Closes #N` PR, and by nothing else.
 
@@ -632,7 +631,7 @@ explicit-list skip above is the one thing this does not cover, and it is not an
 exception to it: the mode is known at invocation, so it is never a doubt.
 
 **Under `--dry-run`, compute the removal and print it, but write nothing.** This
-step is the one place in #258's work that persists anything, so it takes the same
+step is the one place in the triage-cache flow that persists anything, so it takes the same
 rule *Step 1.1*'s `--out` and every `gi-state.py` call take: a dry run mutates no
 file on disk. Apply the nine rules below in memory, print the `✓ Triage cache
 updated` line with the counts the update *would* have produced, and skip the
@@ -709,7 +708,7 @@ apart; *Step 1.2* is the single home of that retry.
 set `retriage_required`, and carry on. This step never stops the loop: a cache
 that could not be updated costs **one** full triage — *Step 1.1* clears the flag
 as it runs, so the cost is the next iteration's scan and not every iteration's
-from here on — which is what every iteration paid before this gate existed.
+from here on.
 
 ```
 ✓ Triage cache updated — #{issue_number} resolved, {n} remain

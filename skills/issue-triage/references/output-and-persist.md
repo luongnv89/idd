@@ -241,7 +241,7 @@ A full re-triage **overwrites the entire file** — it does not append to previo
 1. **Removal only, never a recomputation.** It deletes the merged issue's number from `issues[]`, from `summary.suggested_order`, from `summary.parallel_groups`, and from every remaining issue's `blocked_by` / `blocks` — plus the one derived consequence, flipping an issue whose `blocked_by` just emptied from `blocked` to `ready`. It never re-derives an order, because the persisted records carry `updated_at` and not `created_at`, and `created_at` is an input to the ordering. Removing one node from a valid topological order leaves a valid one; anything more goes through a full re-triage here.
 2. **Exactly one appended `history[]` entry per update**, with `source: "/auto-pilot"`. So `history` still reads as one entry per write, and a reader can tell a full re-triage from an incremental update by that `source` and by the entry's `changes` text.
 
-The schema is unchanged by this — no field is added, none is removed, and a payload an incremental update wrote is the same shape as one a full re-triage wrote.
+This keeps the schema — no field is added, none is removed, and a payload an incremental update wrote is the same shape as one a full re-triage wrote.
 
 ### Error handling
 

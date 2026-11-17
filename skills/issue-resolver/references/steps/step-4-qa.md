@@ -91,14 +91,14 @@ Both consumers layer **under `resolve.auto_test`**, never over it: when
 `resolve.auto_test` is `false` the suite is skipped for that reason alone and
 `tests_state` is never consulted. Fail-safe is `run`: nothing recorded, a short
 or non-hex SHA, a count that is not a number, or any doubt at all ⇒ run the
-suite, exactly as today. `resolve.adaptive_effort: false` also forces `run`;
-no new config key is introduced. Never compare against a SHA captured anywhere but
+suite. `resolve.adaptive_effort: false` also forces `run`.
+Never compare against a SHA captured anywhere but
 the step that ran the suite, and never substitute the current head for a missing
 record.
 
 *Update documentation* commits **after** Step 5's Verify (see the Deliver order in
 SKILL.md), so a doc-only commit is never covered by `tests_state` — that is
-today's ordering, unchanged by this variable, and the reason `tests=` is captured
+the Deliver order, which this variable does not change, and the reason `tests=` is captured
 in Step 4 rather than at push time.
 
 One `○` line per skip, per references/docs/terminal-style.md:

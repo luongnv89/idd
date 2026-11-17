@@ -24,8 +24,7 @@ A checkpoint is **not** a run-log line: it records where the loop is, not what a
 issue's run concluded. Reading the run state to reconstruct telemetry would
 double-count (it holds `processed[]` for every issue this run touched), and
 reading the run log to resume would be wrong (it has no phase, no branch, and no
-PR-in-flight). Everything below is about the run log and is unchanged by resume
-support.
+PR-in-flight). Everything below is about the run log alone.
 
 ## Single-writer rule (per processed issue)
 
@@ -150,6 +149,6 @@ one `skipped` line with `skipped_reason: quarantined`
 label is a pick filter: *Step 1.2* drops the issue from the candidates, or — on a
 reused cache whose labels predate the label — *Step 1.2b*'s post-pick re-check
 rejects it and re-picks. Either way the issue is never processed, so it writes
-**no** line at all, exactly as a `wontfix` issue does today. Both are the same
+**no** line at all, exactly as a `wontfix` issue does. Both are the same
 rule: one line per *processed* issue, and a candidate filtered before the spawn
 was not one.

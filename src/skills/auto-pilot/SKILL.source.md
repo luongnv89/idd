@@ -181,7 +181,7 @@ Never re-read the config. **The run clock is `run_state.started_at`**; the run-s
 
 Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
 
-- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` takes the legacy sequential path.
+- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` takes the sequential path.
 - **Quarantine label:** append it to the effective `skip_labels` set as part of this config load, so the pick skips quarantined issues.
 
 ### Merge Modes
@@ -276,9 +276,9 @@ After each iteration print a brief status; `Outcome` takes one of the six catego
 Append exactly **one JSON line** to `.idd/runs.jsonl` (schema: `docs/run-log-schema.md`) for **every processed issue including skips**, except the in-batch `already resolved in batch` skip. Read `references/run-log.md` first: it holds the single-writer, parallel-lane and batch fan-out contracts. Resolvers run with `--no-run-log` and return telemetry for it: `ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus `qa_cycles` / `ceiling` / `breach_reason` / `complexity` / `profile` / `agent_overrides` / `duration_s` / `phases` when present, and `tokens` / `agents` / `model` / `effort` as the resolver's footer reported them. Auto-pilot adds its own `skill_version` and the review's `verification` (*Step 3.2*). **A `skipped` outcome always carries `skipped_reason`.** The sequential/batch write is non-fatal (no `python3`, exit 2 or 4 → raw fallback); a parallel lane persists `event_id` as `log_pending`, appends once, then checkpoints `logged`.
 
 ```bash
-# Sequential/batch path — legacy behavior:
+# Sequential/batch path:
 printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
-# Fallback when `python3` is unavailable or the script exits 4 (legacy only):
+# Fallback when `python3` is unavailable or the script exits 4 (sequential/batch only):
 # mkdir -p .idd && printf '%s\n' "$run_json" >> .idd/runs.jsonl
 
 # Parallel lane — event_id is persisted before this call:

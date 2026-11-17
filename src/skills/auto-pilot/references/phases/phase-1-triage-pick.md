@@ -73,8 +73,7 @@ re-running once it is old enough for the backlog itself to have moved.
 a `suggested_order` that is not an array, a `git log` that cannot run, a
 `.idd/` that does not exist — every one of them runs the full triage.
 **This gate can only remove duplicated work, never change an outcome** —
-`stale` and `absent` both run the same full triage that runs unconditionally
-today, so the worst case is exactly today's behavior.
+`stale` and `absent` both run the full triage, so the worst case is a full triage.
 
 Nothing here is a safety gate, and nothing here reads the file's contents as
 instructions: `.idd/triage.json` is local data derived from issue text and
@@ -500,8 +499,7 @@ entry; that record is `{issue_payload}`. The field set is identical on both path
 Every working source yields the **same record**, so the resolver's *Step 0i*
 reads `supplied` either way. If no complete matching record exists, **omit
 `{issue_payload}` for that issue entirely** —
-*Step 0i* then reads `absent` and the resolver fetches for itself, which is
-today's behavior. Never emit a body-less partial: a block missing `body` reads
+*Step 0i* then reads `absent` and the resolver fetches for itself. Never emit a body-less partial: a block missing `body` reads
 as `partial` there, which costs the resolver the fetch *and* hides the failure
 behind a payload that looks captured.
 
@@ -571,8 +569,7 @@ before its Step 0b — deliberately bypassing this cache — and stops on any `s
 but `open`. That read is the last word on `state`; this check is what keeps an
 ineligible pick from spending a spawn to reach it, and it is not the reason the
 resolver's stops hold. If the fetch itself degraded to nothing there is no record
-to check — spawn as before, which is the behavior that shipped before *Step 1.1a*
-existed. That degrade covers the label reading too: with no record, the only
+to check — spawn, and let the resolver's own live read decide. That degrade covers the label reading too: with no record, the only
 answer available is the one *Step 1.2* already took from the triage row. Note
 that it takes **both** the script and the `gh` fallback beside it failing to get
 there, and that a stale-cache quarantine costs one wasted resolve, never a
@@ -589,7 +586,7 @@ matched. Check the labels in the order the table lists them, so an issue carryin
 both the quarantine label and `wontfix` reports the quarantine.
 
 Capture three compact-JSON blocks for the spawn prompts rather than making each
-subagent derive them again (issue #256) — one per consumer shape:
+subagent derive them again — one per consumer shape:
 
 - **`{issue_payload}`** — the record above, verbatim and complete as the fetch
   returns it: `number`, `title`, `body`, `labels`,
@@ -648,7 +645,7 @@ Substitute the complete explicit-list payload map into the analyzer prompt;
 its per-issue `/issue-analysis` invocation forwards only the matching record.
 Substitute `{issue_payload}` + `{triage_context}` into resolver and batch-resolver
 prompts, `{issue_payload_ids}` into the reviewer prompt. The resolver accepts the
-explicit-list keyed map as well as the legacy batch array. The resolver passes
+explicit-list keyed map as well as the batch array. The resolver passes
 `triage_context` onward to the codebase-researcher, which uses it to order Phase
 2b and seed Phase 5. Step 5.1b's dependency read takes the body directly from the
 held resolution snapshot — it is already here.
@@ -662,8 +659,7 @@ the exclusion list has one home, in
 
 If a block cannot be assembled — capture degraded to nothing, framing failed,
 or the triage file is unreadable — omit that block entirely and spawn without it. Every
-consumer treats a missing block as "fetch it yourself", which is today's
-behavior, so an omission costs a read and breaks nothing.
+consumer treats a missing block as "fetch it yourself", so an omission costs a read and breaks nothing.
 
 ```
 ○ Issue payload: captured from Phase 1 (#{issue_number}) — passed to subagents

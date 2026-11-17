@@ -11,7 +11,7 @@ Two `.idd.yml` flags decide whether the acceptance-criteria and traceability che
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
 | `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: disabled (review.require_traceability_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
 
-Both default to `true` (the issue #36 contract); `false` lifts that dimension's hard-block (SKILL.md *Review Loop*).
+Both default to `true`; `false` lifts that dimension's hard-block (SKILL.md *Review Loop*).
 
 ## Reviewer-category → dimension mapping
 
@@ -103,10 +103,10 @@ Runs in Step 4 when `linked_issue_snapshot` is a bug (label or `## Type`; never 
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `references/docs/idd-methodology.md`), the durable analysis signal must survive the merge into git history. Run the following four checks against the PR body, the commits in the PR, and the repo's merge configuration:
 
-1. **Issue link** — the PR-link surface still requires `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue (issue #36 hard-fail when absent, unless the *Refactor/chore exemption* or a valid *Intentional reference* below applies). Detect with the same regex GitHub uses: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. Use the loaded `review.merge_method` — no API call — to choose which body surface is merge-effective:
+1. **Issue link** — the PR-link surface still requires `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue (a traceability hard-fail when absent, unless the *Refactor/chore exemption* or a valid *Intentional reference* below applies). Detect with the same regex GitHub uses: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. Use the loaded `review.merge_method` — no API call — to choose which body surface is merge-effective:
    - `squash` or `merge`: evaluate the regex against the **raw** PR body. Do **not** strip markdown. Keywords that appear only inside fenced code, inline code spans, or blockquotes **are** merge-effective — IDD's merge writes the body bytes into the commit message (as does a hand merge under `PR_BODY`), and commit-message closing keywords do not honour markdown.
    - `rebase`: evaluate the regex with **markdown-aware** PR-body rules (ignore matches that live only in fenced code, inline code spans, or blockquotes). No commit carries the body, so those matches are not closers.
-   Collect every issue number the merge-effective surface would close. If that set differs from the markdown-aware PR-link set, report a `note` (never `action: fix`) naming the extra and/or missing numbers as issues that will close — or will not close — at merge. The #36 hard-fail still keys off the PR-link requirement for `{N}`, not off extra merge-only numbers.
+   Collect every issue number the merge-effective surface would close. If that set differs from the markdown-aware PR-link set, report a `note` (never `action: fix`) naming the extra and/or missing numbers as issues that will close — or will not close — at merge. The traceability hard-fail still keys off the PR-link requirement for `{N}`, not off extra merge-only numbers.
    A revert PR (line 1 `Reverts {owner}/{repo}#{M}` plus a `This reverts commit` line) passes check 1 with no closing keyword: it must not re-close the issue it reopened. Checks 2-4 still run.
 2. **Commit references issue** — at least one commit between base and head references the issue number:
    ```bash

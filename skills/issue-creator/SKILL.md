@@ -223,7 +223,7 @@ probe_limit=$((backlog_limit + 1))
 fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
 ```
 
-Then **read `references/dup-score-fallback.md` now** — the parse-and-truncation rule and the canonical scoring rules the script implements. Read it only on this branch; the medium-judgement protocol above is unchanged.
+Then **read `references/dup-score-fallback.md` now** — the parse-and-truncation rule and the canonical scoring rules the script implements. Read it only on this branch; the medium-judgement protocol above still applies.
 
 #### Present results
 
@@ -248,7 +248,7 @@ The Step 6 summary still reports it as `⚠ warn`, exactly as an interactive ove
 
 ### Step 3.5 — Clarify Ambiguous Intent
 
-Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op and the Step 3 → Step 4 path is unchanged. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaults and mark those fields `(needs review)`.
+Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op: Step 3 goes straight to Step 4. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaults and mark those fields `(needs review)`.
 
 Resolve from the repo before asking, and hold the **Output Contract boundary**: inspection here sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint reaches the body. When the step fires, **read `references/clarify-intent.md` now** for the gating rules, the example prompt with its `[Y/n]` default, and the confidence each answer earns.
 

@@ -278,8 +278,8 @@ for s in $ALL_SKILLS; do
 done
 DISABLED="$(awk '/^## Disabled$/{on=1; next} on && /^## /{exit} on' "$DOC")"
 printf '%s\n' "$DISABLED" | grep -qF '`compaction.enabled: false` turns every rule below off' \
-  && printf '%s\n' "$DISABLED" | grep -qF 'behaves exactly as before' \
-  && pass "T5c runtime doc's Disabled clause: false turns everything off, behavior as before" \
+  && printf '%s\n' "$DISABLED" | grep -qF 'no re-entry rule, no extra checkpoint.' \
+  && pass "T5c runtime doc's Disabled clause: false turns every rule off" \
   || fail "T5c Disabled clause missing or weakened"
 
 # ─── T6: auto-pilot threshold check ─────────────────────────────────────────

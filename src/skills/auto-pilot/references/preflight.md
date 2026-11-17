@@ -139,7 +139,7 @@ install: stop with the `✗ Missing bundled dependency` block above. But no
 `⚠ gi-state unavailable — running without the run lock` and continue: check for
 `.idd/run.lock` with `test -f`, treat a file younger than an hour as a live
 holder and stop, otherwise proceed and skip every checkpoint. The run is then
-correct but not resumable, which is exactly today's behavior.
+correct but not resumable.
 
 ## Rate-limit pause
 
@@ -225,7 +225,7 @@ Prerequisite 8:
   age out and nothing to refresh. Skip it, and in particular do **not** run
   *Step 1.0b*'s checkpoint here: that would create `.idd/run-state.json`
   ahead of the `--init` that owns creating it, and the next run would read a
-  state no run ever started. The chunked `--wait` call itself is unchanged; only
+  state no run ever started. The chunked `--wait` call itself still runs; only
   the refresh between chunks drops away.
 - the bracketing *Runtime budget check* does not apply either — it measures from
   a `started_at` that does not exist yet. The `--deadline` above **is** the

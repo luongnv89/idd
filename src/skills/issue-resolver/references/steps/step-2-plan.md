@@ -124,7 +124,7 @@ repo's own static checker before an option is selected. It runs after the
 options exist and before *Plan selection*, in auto mode too.
 
 **When it runs.** All three must hold; otherwise print
-`○ Design sketches: skipped ({reason})` and plan by scope as before:
+`○ Design sketches: skipped ({reason})` and keep the scope options:
 
 - options are synthesized on this run (the spawn or its *Inline fallback*) —
   the `light` path has no options, and

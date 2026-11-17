@@ -42,10 +42,10 @@ merge, `.idd/runs.jsonl`, `.idd/run-state.json`,
 `.idd/triage.json`, issue labels, and worktree cleanup have one writer: the
 main agent's serialized drain.
 
-## Compatibility branch (`max_parallel = 1`)
+## Sequential branch (`max_parallel = 1`)
 
-Value `1` is an explicit early branch, not a one-element use of the new
-scheduler. It runs the legacy sequence byte-for-byte: pick one issue, sync the
+Value `1` is an explicit early branch, not a one-element use of the parallel
+scheduler. It runs the sequential loop: pick one issue, sync the
 original checkout, spawn the ordinary in-place resolver prompt, wait, review,
 merge, log, checkpoint, update the cache, and loop. It creates no caller-managed
 worktree, writes no `lanes[]` entries, and sets no `IDD_CALLER_WORKTREE`.

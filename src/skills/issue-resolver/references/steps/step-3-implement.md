@@ -22,7 +22,7 @@ hardcodes the source repo, so the catalog can be re-pointed at a different sourc
 without changing this step's logic.
 
 Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
-is **installed-only** — today's path. When true, the propose set is the **full
+is **installed-only**. When true, the propose set is the **full
 catalog**, each entry marked `installed` or `available to borrow`.
 
 **One exit-code rule for this whole sub-step — the single home.** Every
@@ -238,7 +238,7 @@ leftover*) and leave that one entry so a later run retries.
 Prompt never appears.
 
 - `resolve.borrow_skills: false` (default): `selected_skills = []`, no
-  install — today's path. Audit: `○ Skill proposal (auto): skipped — using
+  install. Audit: `○ Skill proposal (auto): skipped — using
   internal agents`.
 - `resolve.borrow_skills: true`: no prompt; auto-select the relevant
   catalog subset (installed + available-to-borrow), install missing,

@@ -448,7 +448,7 @@ fact contradicts the other.
 
 ## Unattended hardening: quarantine, rate-limit pause, runtime budget
 
-One run showing all three of issue #259's behaviors, with
+One run showing all three behaviors, with
 `autopilot.max_runtime_minutes: 90` and the default `quarantine_after: 3`.
 
 A resolve fails for the third run in a row, so the issue is labelled and the loop
