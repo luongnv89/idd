@@ -181,6 +181,19 @@ has "$PERSIST" "Atomically replace" "T10: new analysis replaces cache only after
 has "$PERSIST" 'Do not print `Saved:`' "T10: failed persistence cannot claim a saved result"
 has "$SKILL" "Validate analysis data" "T10: view mode validates cached data before rendering"
 
+# --- T11: examples show the current report shape (#631) ----------------------
+# Examples set the output shape more strongly than prose, so the full-flow
+# example must carry the Decision Record and every example run the footer.
+EXAMPLES="$REPO_ROOT/src/skills/issue-analysis/references/examples.md"
+has "$EXAMPLES" "◆ Decision Record" "T11: full-flow example renders the Decision Record"
+has "$EXAMPLES" "Analyzed at:        main @ " "T11: example pins the analysis to a commit"
+has "$EXAMPLES" "Run stats   elapsed" "T11: examples end with the run-stats footer"
+if grep -qF "extracted from SKILL.md" "$EXAMPLES"; then
+  fail "T11: examples.md still narrates its history"
+else
+  pass "T11: examples.md carries no history phrase"
+fi
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"
