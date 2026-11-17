@@ -82,7 +82,7 @@ none "T5: no ticket numbers as merge-gate provenance (#516, #605, #564)" \
 
 # ── #629: comparison with a version the reader never saw ────────
 none "T6: no 'today's pipeline / behavior / path' comparisons" \
-  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b|as today\b|runs today\b|identical to today"
+  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b|as today\b|runs today\b|identical to today|as it (is|does|runs) today"
 none "T7: no 'as before' comparisons" \
   '(behaves?|skips it,|result|scope|pipeline|--init.) (exactly )?as before|= (behave )?as before|as before this'
 none "T8: no 'no new config key' asides" \
