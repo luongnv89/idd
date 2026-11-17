@@ -335,7 +335,7 @@ line (`references/report-templates.md`).
 
 The minimum-viable risk gate from SKILL.md (*Step 2 — Plan → Design-confirm checkpoint*):
 only high-complexity interactive work earns one extra confirmation before Step 3. It
-reuses the recommended option — no new phase, artifact or config key — and is separate
+presents the recommended option and is separate
 from the sensitive-change gate, which keys off sensitivity, not size.
 
 #### When it fires

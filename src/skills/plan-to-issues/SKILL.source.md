@@ -159,8 +159,9 @@ summarised or improved — enriching a thin Description from the codebase is a c
 
 *Completion criteria:* task count equals `grep -cE '^#{3,4} Task ' <plan>`; every task has an id,
 title, ≥ 1 acceptance criterion, a `Dependencies` value (`None` allowed), and an effort; every phase
-appears with its goal and milestone; the dependency table references only ids in the worklist; the
-critical path is recorded. Any mismatch is a **FAIL** — report the missing ids rather than filing a
+appears, with its goal and milestone where the plan states them and `null` where it does not; the
+dependency table references only ids in the worklist; the critical path is recorded when the plan
+states one. Any mismatch is a **FAIL** — report the missing ids rather than filing a
 partial backlog silently.
 
 **`conversation`** — draft from the user's turns, print compact rows plus the epic title, ask
@@ -397,15 +398,3 @@ with explicit field selection, never parsed text (docs/platform-github.md). `Par
 `Depends on #N` follow the IDD markers (`references/issue-creator-bridge.md` → *Step 5*;
 methodology: https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md). Errors use
 `references/error-messages.md`.
-
-## Reference files
-
-`references/`: `glossary.md` (term definitions) · `input-resolution.md` (input kinds, resolution
-order, the draft-and-confirm gate, conversation-path epic identity) · `preflight.md` (dependency
-detection, failure blocks) · `security-boundary.md` (injection and shell-interpolation rules) ·
-`phase-contracts.md` (full prose for Phases 0–6) · `acceptance-criteria.md` (unabridged contract) ·
-`reporting.md` (report format, check names, review contract, closing summary) · `sync-mode.md` ·
-`edge-cases.md` · `plan-parsing.md` (grammar, worklist schema) · `plan-parser.md` (Phase 1 parser
-spawn prompt for a large plan) · `labels.md` · `issue-creator-bridge.md` · `epic-identity.md` ·
-`epic-dashboard.md` · `error-messages.md` · `run-stats.md`.
-`shared/scripts/gi-plan-map.py` renders the map (stdin JSON → markdown stdout).

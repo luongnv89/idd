@@ -75,8 +75,7 @@ The payload substitutes for **Step 0a's fetch and nothing else**: <!-- a:rs-step
   capture used a different field set), so a later repeat read for the same issue
   may be a one-time miss-and-refetch: still served fresh, gated by the same
   freshness rules, and still in the same resolution boundary and reason — it
-  costs a read, never correctness. The budget is measured per issue and
-  boundary/reason, not per `gh` call.
+  costs a read, never correctness.
 - **0a's own two stops are never decided from the payload.** 0a stops when the
   issue is **not found** and stops when it is **closed**. Both are freshness
   judgements, and a payload's `state` is only as fresh as the caller's fetch that

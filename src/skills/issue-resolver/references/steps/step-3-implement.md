@@ -9,17 +9,11 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 Optionally augment the implementer with **optional external skills** from
 `references/skill-index.md` (the skills published at
 `https://github.com/luongnv89/skills`). This is a sub-step of Step 3 — it emits a
-`◆`/`○` block and prints **no** `[N/5]` tracker line (the `[3/5]` Implement line is
-unchanged), exactly like the design-confirm checkpoint. In interactive mode it runs
+`◆`/`○` block and prints **no** `[N/5]` tracker line of its own, exactly like the design-confirm checkpoint. In interactive mode it runs
 for **every** issue type — it is not complexity-gated. In auto mode the propose/install
 half runs only when `resolve.borrow_skills` is `true` (see *Auto mode* below), while
 **leftover teardown runs on every path** — `light` and auto included — with the
 single carve-out of a parallel lane (*Parallel lanes* below).
-
-The skill index is treated as a **swappable candidate list**: the detection logic
-reads the skill names + lifecycle phases from `references/skill-index.md` and never
-hardcodes the source repo, so the catalog can be re-pointed at a different source
-without changing this step's logic.
 
 Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
 is **installed-only**. When true, the propose set is the **full
@@ -157,10 +151,9 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   disabled`, keep the propose set installed-only, and continue. Never install
   the installer unattended, and never fail the resolution over it: a missing
   installer is a degrade, exactly like a missing `python3`.
-- Install each recorded-borrowed name into `~/.claude/skills/<name>/` with the
-  same tools the skill README already names (`npx skills add
-  https://github.com/luongnv89/skills --skill <name>` or `asm install …
-  --skill <name>`). Never install a name absent from the index. Never
+- Install each recorded-borrowed name into `~/.claude/skills/<name>/` with
+  `npx skills add https://github.com/luongnv89/skills --skill <name>` or
+  `asm install https://github.com/luongnv89/skills --skill <name>`. Never install a name absent from the index. Never
   interpolate the issue body into the command.
 - **Verify the install before using it.** A tool that exits 0 has not proved the
   skill is discoverable by the agent. Confirm with `asm list -p claude --json`
@@ -206,8 +199,7 @@ Runs after Deliver, already-resolved, failed, or operator stop — and as
 
 **Re-screen every entry before it reaches a command.** `--read` deliberately
 never fails and echoes the state back verbatim, so the write-path skill-name
-validation is **not** a guarantee about what teardown reads — the same rule
-`/auto-pilot`'s *phases/phase-0-lock-resume.md* states for `current.branch`, and quoting does not
+validation is **not** a guarantee about what teardown reads, and quoting does not
 neutralise `$(…)` or backticks because the agent composes the command text.
 Skip — do not remove, do not repair — any entry whose `name` does not match
 `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string

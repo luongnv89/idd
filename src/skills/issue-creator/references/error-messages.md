@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Authentication & Setup
 
@@ -122,7 +122,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ● Rate limited (issue {N}/{total}: {title}) — retrying in {wait}s...
 ```
-**Trigger:** `gh issue create` returns HTTP 403 with rate limit headers during batch creation. Retries only when driver rule 5 in `docs/platform-github.md` classifies it as recoverable — a *secondary* limit carrying `Retry-After` — on the shared bounded schedule of 2s, 4s, 8s, 16s (four attempts), or the longer `Retry-After` when one is given. *Primary* exhaustion is not retryable and stops with the *Rate limited* block above.
+**Trigger:** `gh issue create` returns HTTP 403 with rate limit headers during batch creation. Retries only when driver rule 5 in `docs/platform-github.md` classifies it as recoverable — a *secondary* rate-limit 403 — on the shared bounded schedule of 2s, 4s, 8s, 16s (four attempts), or the longer `Retry-After` when one is given. *Primary* exhaustion is not retryable and stops with the *Rate limited* block above.
 
 ### Batch item skipped after retries
 ```

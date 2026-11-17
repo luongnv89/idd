@@ -65,8 +65,8 @@ the default — leaves every spawn exactly as the step file writes it. A rejecte
 retries once with no overrides and never blocks the step; the `[N/5]` tracker line
 gains `· model: {x}` (or `· model: {x} → inherited`) only when a model was configured.
 
-**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — the four
-signals the run log folds into its single line — plus the `[N/5]` tracker line the user
+**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — fields
+of the run-log line — plus the `[N/5]` tracker line the user
 sees.
 
 ## Step files

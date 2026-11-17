@@ -174,8 +174,7 @@ rephrased slugs differently. So on the conversation path, idempotent re-run is
   search entirely**, and **restores the worklist from `## Source`** (section above). This is
   the supported way to resume a conversation-sourced run.
 
-The `file` path keeps its existing exact-match reuse: a normalized path *is* stable, so a hit there
-is reused without asking (`references/epic-identity.md` step 1).
+On the `file` path a normalized path *is* stable, so an exact marker hit is reused without asking (`references/epic-identity.md` step 1).
 
 **Never materialize a plan file to obtain an identity.** This skill writes to the tracker only; its
 acceptance criteria require `git status --porcelain` to match the pre-run snapshot.

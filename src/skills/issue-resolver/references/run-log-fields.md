@@ -63,7 +63,7 @@ found the issue already fixed and exited early), or `failed` (a step failed). A
 
 `--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
 subagent and writes the **single** run-log line per issue itself — appending here
-too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
+too would write the issue twice and double-count it in `/auto-pilot --stats`. Instead **return** the
 telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `agent_overrides`, `duration_s`, `phases`) in the
 subagent result so the orchestrator folds it into its own line — with `tokens`,
 `agents`, `model` and `effort` by the same rules (`skill_version` is the

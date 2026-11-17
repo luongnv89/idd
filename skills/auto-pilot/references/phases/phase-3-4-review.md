@@ -4,7 +4,7 @@ One part of `references/phases.md` — the index that maps every step to its fil
 
 ## Phase 3 & 4 — PR Review (via /issue-pr-review)
 
-After the PR is created, the auto-pilot delegates review, testing, CI checking and fixing to the `/issue-pr-review` skill, run as `--auto --no-merge`; the merge itself is Phase 5's. This replaces the former inline review-fix loop with a more comprehensive pipeline that includes CI status monitoring.
+After the PR is created, the auto-pilot delegates review, testing, CI checking and fixing to the `/issue-pr-review` skill, run as `--auto --no-merge`; the merge itself is Phase 5's.
 
 ### What issue-pr-review does in auto mode
 
@@ -72,7 +72,7 @@ The review-fix loop tried `review_cycles` times (default: 3) but could not resol
 
 #### Non-critical issues: mode-gated partial-merge decision
 
-For non-critical issues (no `critical` or `priority:critical` label), the auto-pilot always captures the unresolved problems as a follow-up issue. Whether the original PR is then merged depends on the mode:
+For non-critical issues (no label in `autopilot.critical_labels`), the auto-pilot always captures the unresolved problems as a follow-up issue. Whether the original PR is then merged depends on the mode:
 
 | Mode (effective) | `merge_partial` | Behavior | Outcome label |
 |------------------|-----------------|----------|----------------|
@@ -122,7 +122,7 @@ Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in
 
 **Step 2a — Dependency and CI gates (before any merge):**
 
-Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), apply Step 5.1's merge-floor check (an unmet floor is `left_open`), then run **Step 5.1b — Dependency Gate** using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Last, immediately before the merge, run **Step 5.1c — Merge identity gate** with `verified_head` bound to the head this CI gate checked: a moved head, a live base that is ahead of that head, or any doubt is `stale`, so do **not** merge — record `left_open`, leave the PR open, add the issue to the session skip list, and continue to the next eligible issue. Patch-id equality never stands in for a fresh verdict here either. Only when all four gates pass — merge floor, dependency, CI and merge identity — may the flow proceed to Step 2b.
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), apply Step 5.1's merge-floor check (an unmet floor is `left_open`), then run **Step 5.1b — Dependency Gate** using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. These checks run before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Last, immediately before the merge, run **Step 5.1c — Merge identity gate** with `verified_head` bound to the head this CI gate checked: a moved head, a live base that is ahead of that head, or any doubt is `stale`, so do **not** merge — record `left_open`, leave the PR open, add the issue to the session skip list, and continue to the next eligible issue. Patch-id equality never stands in for a fresh verdict here either. Only when all four gates pass — merge floor, dependency, CI and merge identity — may the flow proceed to Step 2b.
 
 **Step 2b — Merge (only when aggressive + merge_partial: true and all four gates passed):** <!-- a:ap-step2b-merge -->
 

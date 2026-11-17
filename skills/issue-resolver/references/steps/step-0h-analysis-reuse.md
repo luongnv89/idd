@@ -9,10 +9,8 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 re-derive — extraction, affected files, options, recommendation, complexity and
 risk — pinned to the commit it ran against. This gate decides whether that
 artifact is still true, so an analyze-then-resolve sequence on an unchanged tree
-researches the codebase **once** instead of twice. Every other mention of a
-*fresh* analysis in this skill — `references/report-templates.md` (*Lifting the
-Decision Record*) and the bug-repro mirror in *Step 3* (`references/steps/step-3-implement.md`) — defers to this
-section. Do not restate or re-derive a freshness rule anywhere else.
+researches the codebase **once** instead of twice. Wherever this skill calls an
+analysis *fresh*, it means fresh by this predicate and by no other test.
 
 Runs after *0g — Complexity gate*, before *Step 1 — Research*. It sets exactly
 one state variable:
@@ -132,8 +130,3 @@ Decision Record's *Options rejected* carries the analysis's own reasons, and
 option-less direct plan — and its silent approval gate — applies only to a
 `light` run **without** a `fresh` analysis. Step 1 runs the narrower of the two
 passes. Both keep the *Verify not already resolved* phase in full.
-
-Because the gate reads only an on-disk artifact and this run's own base, it
-needs no change from a caller: `/auto-pilot`'s explicit-list mode, which runs
-`/issue-analysis` and then `/issue-resolver` back to back on the same tree, gets
-the reuse purely by having written the file.

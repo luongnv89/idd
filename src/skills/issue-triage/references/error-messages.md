@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Authentication & Setup
 
@@ -94,7 +94,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### No merged PRs found for fix-scan
 ```
-○ No merged PRs found in the last 3 months — skipping already-fixed detection.
+○ No merged PRs found — skipping already-fixed detection.
 ```
 **Trigger:** `gh pr list --state merged` returns an empty array. This is expected for new repos.
 **Note:** This is an informational message, not an error. The triage continues without fix-scanning.

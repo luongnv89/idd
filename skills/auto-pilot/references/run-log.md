@@ -140,7 +140,7 @@ iteration and writes its one `failed` line as usual — the quarantine is decide
 from that line, so no second line is written for it. `skipped_reason:
 quarantined` belongs to the **later** run that skips the issue because it carries
 `autopilot.quarantine_label`, which is an ordinary skip before resolution
-started. One line per processed issue, unchanged.
+started. One line per processed issue.
 
 **Which later run writes that line, and which writes none.** In **explicit list
 mode** the user named the issue, so it gets an `[Issue {i}/{total}]` slot and its

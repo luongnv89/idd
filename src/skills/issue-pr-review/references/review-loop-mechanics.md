@@ -54,8 +54,8 @@ The plain `{branch_name}` placeholder still appears in this skill's **display
 templates** and in **spawn-variable lists** — neither is a shell word, and
 substituting there would only make the output wrong.
 
-This is the same rule already applied at the `gi-secscan` and `gi-branch` call
-sites; the head-ref name is the one untrusted value this skill cannot hand
+The `gi-secscan` call sites bind `base` the same way, with command
+substitution; the head-ref name is the one untrusted value this skill cannot hand
 straight to a script.
 
 ## Depth gate (adaptive review depth)
@@ -141,38 +141,18 @@ class as an exit-3 invalid input, and unlike the missing-`python3` case, which
 has a working second path and therefore degrades.
 
 **When `review.require_acceptance_criteria_check` is `false`, the stop still applies.** <!-- a:rvm-verification-flag-false -->
-The paragraphs above are written for the default configuration, and on the
-opt-out path their reasoning does not hold on its own terms — so this branch is
-decided here rather than left as an unstated consequence. With that flag
-`false`, `references/verification-checks.md` (*Acceptance-criteria
-verification*) skips per-criterion verification entirely and reports
-`○ acceptance_criteria: disabled`, so the hard-block cited
-above never runs. That does not leave the record unread. It still feeds the
-Depth gate signals this same refresh supplies — the `Effort` band taken out of
-`linked_issue_snapshot`, and the labels fetched alongside it — and those do
-fail safe on their own, a missing or ambiguous signal winning → `profile =
-full`. It also still feeds `issue_context`, the linked issue's details and
-acceptance criteria, which both the fixer spawn below and the ui-reviewer spawn
-in `references/ui-review-mechanics.md` receive; neither is gated on this flag,
-and the field is specified as *empty if none*. An unread issue therefore
-reaches them looking exactly like a PR that links no issue — the conflation the
-scope rule at the top of this section exists to prevent. The stop is kept, for
-three reasons:
-
-- **The flag governs reporting, not reading.** It is an opt-out from *verifying*
-  acceptance criteria, not a statement that the linked issue no longer matters
-  to the review. Whether the review boundary's read succeeded is a different
-  question from how one dimension is reported, and no flag answers it.
-- **It keeps the disabled note truthful.** `○ acceptance_criteria: disabled` names
-  exactly one reason the criteria went unverified: the operator switched the
-  check off. Continuing past an unreadable record would print that note while a
-  second, unchosen reason also applied, crediting a deliberate opt-out for a gap
-  nobody opted into. Stopping is what makes the note's single stated cause the
-  whole cause — the consistency `references/verification-checks.md` requires.
-- **The scope distinction is about the read, not the config.** This fail-safe
-  separates *nothing to read* (no linked issue — proceed) from *the read failed*
-  (stop). A configuration flag does not move a PR between those two states, so
-  it is not the thing that decides this branch.
+The flag governs reporting, not reading. With it `false`,
+`references/verification-checks.md` (*Acceptance-criteria verification*) skips
+per-criterion verification and reports `○ acceptance_criteria: disabled`, so the
+hard-block cited above never runs — but the record is still read. It feeds the
+Depth gate's `Effort` band and labels (which fail safe on their own: a missing
+or ambiguous signal → `profile = full`), and `issue_context`, which the fixer
+spawn below and the ui-reviewer spawn in `references/ui-review-mechanics.md`
+receive ungated and which is specified as *empty if none*. An unread issue would
+reach them looking exactly like a PR that links no issue. Continuing would also
+print the `disabled` note while a second, unchosen cause applied, crediting a
+deliberate opt-out for a gap nobody opted into. No flag moves a PR between
+*nothing to read* (no linked issue — proceed) and *the read failed* (stop).
 
 **Placeholder binding at the Depth gate.** SKILL.md's two review-boundary <!-- a:rvm-placeholder-binding -->
 command lines take `{linked_issue}` — the linked issue's number — because `{N}`
@@ -181,30 +161,11 @@ body edit and the Step 3 gate bullet that states it take `{linked_issue}` for
 the same reason: each names a number that gets written into the PR body, and
 `{N}` there would write the PR's own.
 
-The binding is decided per file, not once for the skill, so read every `{N}`
-against the document it sits in. Below, `{N}` means an issue or PR number; the
-counting uses that share the braces — `{N} tests passed`, `{N} checks failed`,
-`Cycle {N}` — are a different placeholder and are not catalogued here.
-
-- `references/verification-checks.md` — the linked issue throughout. That
-  uniformity is exactly why the one string the file hands outward, traceability
-  check 1's suggested fix, has to break with it and say `{linked_issue}`: the
-  fixer receives that string inside `findings_json`, where `{N}` is the PR.
-- `references/ui-review-mechanics.md` and
-  `references/prepass-tests-ci-mechanics.md` — the PR throughout.
-- This file, `references/error-messages.md`, and
-  `references/report-templates.md` — both bindings, mixed. The first two say so
-  where the issue-bound use appears (the rendered stop above; the *Linked issue
-  unreadable* entry's **Placeholders** paragraph).
-  `references/report-templates.md` does not: its `Closes #{N}` and
-  `no commit references #{N}` rows are the issue while `gh pr merge {N}` is the
-  PR, and only the surrounding line distinguishes them. None of it is the
-  suggested-fix payload the fixer receives — these are the report's rendered
-  lines plus the merge command, each read beside the row that names its number
-  — so the ambiguity costs a reader a moment, not a false-passing gate.
-- SKILL.md — the PR, with one prose exception: the *Review Loop*'s restatement
-  of the hard-block, "a missing `Closes #N`". It names the condition, not a
-  command or a fix string, so nothing downstream substitutes it.
+Elsewhere, read each `{N}` from its own line: a PR command (`gh pr …`,
+`/issue-pr-review …`) takes the PR number; a closing keyword, a `Refs` line,
+a commit reference or a `gh issue …` command takes the linked issue. The
+counting uses — `{N} tests passed`, `{N} checks failed`, `Cycle {N}` — are a
+different placeholder.
 
 **What `light` changes in the loop:**
 
@@ -519,7 +480,7 @@ check, never restored (`references/progress-record-mechanics.md`).
 To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.
 
 - **Cycle 1:** Spawn a new reviewer agent (cold start — reads diff, files, context).
-- **Cycles 2-3:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
+- **Cycles 2+:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
 - **Confirmation pass:** After the fixer reports all issues resolved, spawn a **fresh confirmation reviewer** (separate agent, no memory of prior cycles) for an unbiased final check. This is the only fresh spawn after cycle 1.
 
 This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.

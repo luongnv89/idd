@@ -185,7 +185,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T5 (AC1): batch run-log fan-out compressed but rule-complete
 # ───────────────────────────────────────────────────────────
-fanout_len=$(awk '/^#### Run-log fan-out for the batch/{f=1} f{n++} f&&/^For non-batched issues/{print n; exit}' "$AP_LIST")
+fanout_len=$(awk '/^#### Run-log fan-out for the batch/{f=1} f{n++} f&&/^A non-batched issue runs/{print n; exit}' "$AP_LIST")
 if [ -n "$fanout_len" ] && [ "$fanout_len" -lt 60 ]; then
   pass "T5.1: fan-out section compressed to $fanout_len lines (was 86)"
 else

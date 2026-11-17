@@ -1,6 +1,6 @@
 # /auto-pilot — Explicit List Mode
 
-Detail of the explicit `--issues` mode, extracted from SKILL.md to keep the main file focused. Read this when the user passes `--issues`.
+Read this when the user passes `--issues`.
 
 ## Explicit List Mode
 
@@ -210,8 +210,7 @@ appended de-duplicated at each end-of-iteration checkpoint
 in-memory copies stay the working set — every lookup above reads them — but a
 resumed run seeds them from the state file, which is the only reason a crash
 mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
-unavailable they degrade to exactly what they were before: in-memory sets that
-do not survive the run.
+unavailable they stay in-memory sets that do not survive the run.
 
 **Quarantine is honored in this mode too — and this loop is the single step that
 applies it.** Explicit list mode bypasses Phase 1 entirely, so nothing here
@@ -369,7 +368,7 @@ auto-pilot can populate them. Each append uses the same best-effort, non-fatal
 `mkdir -p .idd` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.
 
-For non-batched issues, the flow is identical to before:
+A non-batched issue runs the single-issue Resolver:
 
 ```
 ● [Issue 3/3] Resolving #{n3}...

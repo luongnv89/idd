@@ -68,7 +68,7 @@ check_block_has() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if grep -qE "$pattern" <<<"$block"; then
     pass "$label"
   else
     fail "$label"

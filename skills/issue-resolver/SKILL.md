@@ -83,7 +83,7 @@ Agent(
 
 ### Orchestrating the agents
 
-Name the role in `description`, size model/effort per `references/docs/agent-model-effort.md`, and read each return before advancing: a missing or blocking return stops (interactive) or takes the auto behavior (*Orchestrating the agents*).
+Name the role in `description`, size model/effort per `references/docs/agent-model-effort.md`, and read each return before advancing: a missing or blocking return stops (interactive) or takes the auto behavior (`references/pipeline-steps.md` → *Orchestrating the agents*).
 
 ### Bundled dependency precheck
 
@@ -196,7 +196,7 @@ Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels
 
 If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -->` marker (a legacy `gitissue:normalized` one counts):
 
-1. **Security label check (SPEC §1.4)** — before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
+1. **Security label check** — normalization rewrites the reporter's words, so a security-labelled issue is never rewritten without explicit operator confirmation. Before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
@@ -326,10 +326,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Update documentation
 
-1. List the user-visible names the diff changes (commands, flags, config keys, public functions, output strings).
-2. Search `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings for each name.
-3. Update each match describing the old behavior; add a `CHANGELOG` entry if that file exists.
-4. No match: record `docs: none found` in the Evidence row.
+Update every passage in `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings that describes a user-visible name the diff changes (a command, flag, config key, public function or output string), and add a `CHANGELOG` entry if that file exists. With nothing to update, record `docs: none found` in the Evidence row.
 
 ### Push branch and create PR
 

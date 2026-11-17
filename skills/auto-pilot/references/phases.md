@@ -3,8 +3,7 @@
 Full step-by-step specification of each loop phase. SKILL.md contains the
 overview; this file is the index, and each phase's full per-step guidance lives
 in its own file under `references/phases/` so an iteration reads only the phase
-it is in — never the whole loop. Read the phase file when
-implementing or debugging that phase.
+it is in — never the whole loop. Read a phase's file when the loop reaches it.
 
 ## Phase files
 

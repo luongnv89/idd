@@ -21,7 +21,7 @@ Closes #{issue_number}
 
 ## Decision Record
 
-- **Root cause:** {one-paragraph diagnosis from analysis Step 6}
+- **Root cause:** {one-paragraph diagnosis: a fresh analysis's `root_cause` (*Lifting the Decision Record*), else this run's Step 1 research}
 - **Options considered:** Option 1 — {name}; Option 2 — {name}; Option 3 — {name}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
@@ -173,6 +173,6 @@ in full.
 
 ### Lifting the Decision Record
 
-Analysis JSON is **fresh** exactly when the predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. That section is the single home of the definition: do not restate, tighten, or re-derive a freshness rule here. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
+Analysis JSON is **fresh** exactly when the predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
 
-If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, the half of the dual write this skill controls, from which squash-merge carries it into git history under the repo-setting condition stated at the top of this file.
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the `Reproduction` line comes from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, the half of the dual write this skill controls, from which squash-merge carries it into git history under the repo-setting condition stated at the top of this file.

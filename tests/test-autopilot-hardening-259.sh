@@ -766,7 +766,7 @@ expect_grep_re "AC1: the bundled config schema carries quarantine_label" \
 # joins the effective skip_labels set. Without this one sentence the label is
 # inert and quarantine does nothing across runs.
 expect_grep "AC1: the label is appended to the effective skip_labels set at config load" \
-  'append it to the effective `skip_labels` set as part of this config load' "$AP_SKILL"
+  'add it to the effective `skip_labels` at config load' "$AP_SKILL"
 expect_grep "AC1: phases.md states quarantine is honored through that set, not a second gate" \
   'Quarantine is honored here, and only because the label is in the set.' "$AP_PHASES"
 

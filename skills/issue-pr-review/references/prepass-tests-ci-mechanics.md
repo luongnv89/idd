@@ -290,9 +290,7 @@ A CI verdict is a statement about **one commit**, not about a PR. Record
 second `gh pr view` for it: Step 1's PR read fetched that field, and the
 *Re-evaluation after a push* rule re-reads it after every push this skill makes
 (Step 2's auto-fix commit as much as any fixer push), so the value held when the
-wait starts is this skill's current head. `/auto-pilot`'s Step 5.1a is held to
-the same rule — one widened read, no standalone `headRefOid` call — and the two
-must not diverge. The one case a reused value misses is a head moved by
+wait starts is this skill's current head. The one case a reused value misses is a head moved by
 something other than this skill; that costs the caller a stale SHA, which
 re-verifies as `absent` and re-polls, never a wrong merge. Report the outcome to
 the caller as `ci_status` = `passed@<sha40>` or `failed@<sha40>`. Full

@@ -1,7 +1,7 @@
 # Preflight — dependency detection and failure blocks
 
 Everything Phase 0 needs: how to probe `gh` for real readiness, how to detect each dependency, and the exact block to print when one is
-missing. Read this when a check fails — or when you are unsure how to check one.
+missing. Read this at the start of Phase 0, and before sync mode's reduced preflight.
 
 **One report, not one stop per failure.** Run every check in all five groups — **env**, **gh**,
 **skill**, **bundled**, **input** — collect the failures, then print every failure block together and
@@ -393,7 +393,7 @@ On success, one line per check, then continue:
   Repo writable:      √ pass (luongnv89/skills · issues on · ADMIN)
   API budget:         √ pass (4905 remaining, ~324 needed · 1240 items)
   Skills installed:   √ pass (issue-creator 0.8.0)
-  Bundled files:      √ pass (22/22)
+  Bundled files:      √ pass (24/24)
   Input resolved:     √ pass (file MODERNIZATION_PLAN.md — 50 tasks, 6 phases)
   ____________________________
   Result:             PASS

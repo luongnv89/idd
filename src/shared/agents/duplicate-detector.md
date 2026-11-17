@@ -5,7 +5,7 @@
 
 Use semantic judgement only where deterministic evidence is suggestive but not decisive. The scorer has already done the arithmetic; never recompute it.
 
-The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Contract
 

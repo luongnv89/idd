@@ -22,12 +22,9 @@ existing authorization; a recommendation does not authorize implementation.
    such as reviewing the recommended option or rerunning an incomplete scan.
    Do not request implementation approval merely to finish this analysis.
 
-Default to a concise summary and a static table comparing the 2–3 options; keep
-the detailed sections below when useful or requested. A small diagram may explain
-architecture relationships when the output supports it; otherwise use text.
-These bounded comparisons do not need an interactive report. Honor a requested
-format while retaining result, evidence, uncertainty, and decision. Print `Saved:`
-only after the new file was verified; a retained old cache is not a successful save.
+Render the Step 8 sections below in order. Honor a requested format while
+retaining result, evidence, uncertainty, and decision. Print `Saved:` only after
+the new file was verified; a retained old cache is not a successful save.
 
 ## Validate analysis data
 
@@ -485,7 +482,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `analysis.type_specific` | string | `"root_cause"` (bug), `"architecture_fit"` (feature), `"current_impl"` (improvement) |
 | `analysis.summary` | string | One-paragraph analysis summary |
 | `analysis.details` | string | Full multi-paragraph analysis |
-| `options[]` | array | 2-3 implementation approaches |
+| `options[]` | array | Implementation approaches, usually 2–3; one when only one is justified |
 | `options[].number` | integer | Option number (1-indexed) |
 | `options[].name` | string | Short label |
 | `options[].summary` | string | One-sentence description |

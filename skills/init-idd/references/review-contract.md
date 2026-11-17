@@ -72,11 +72,8 @@ answered before the report (auto mode answers it with cancel). Name the remainin
 
 ## Format rule
 
-The default format is the static terminal block in SKILL.md *Step 4 — Report*:
-one config file and about ten rows, inspectable at once. An interactive report
-does not apply — there is nothing to filter, and project convention forbids
-terminal animation; the written `.idd.yml` is the inspectable artifact. If
-the user asks for another format (for example a Markdown table or a diff against
+The default format is the static terminal block in SKILL.md *Step 4 — Report*.
+If the user asks for another format (for example a Markdown table or a diff against
 the previous file), produce it from the same values and keep the `Result`,
 `Evidence`, `Uncertainty`, and `Decision` rows. If the host cannot render the
 requested format, say so and print the terminal block.

@@ -1,6 +1,6 @@
 # Review contract — /idd-doctor
 
-Read this before printing the *Summary footer*. It defines the four rows that
+Read this before printing the *Summary footer*. It defines the three rows that
 follow the `Result:` line and the format rule. The doctor is report-only: it
 authorizes no change, so it never asks for approval.
 
@@ -17,10 +17,10 @@ on every run that reached the summary footer:
 ```
 
 The `Result:` line itself stays the one line a wrapper script
-greps (see *Exit codes* in SKILL.md). The rows are additive human-facing
-output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
+greps (see *Exit codes* in SKILL.md). The rows are human-facing output and
+never carry `PASS`, `WARN`, or `FAIL` as a status token.
 
-1. **Result.** The existing `Result:` line states the status first. `PASS`
+1. **Result.** The `Result:` line states the status first. `PASS`
    means every check that **ran** passed; it does not mean a skipped check
    passed. The `Uncertainty` row carries that distinction.
 2. **Evidence.** Name what the run actually observed:
@@ -33,8 +33,8 @@ output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
      line. Do not repeat findings here.
 3. **Uncertainty.** List each item that applies, separated by `; `:
    - `check {N} not verified ({reason})` for each skipped check.
-   - `check 4 binding unverified` when Check 4 printed its unreadable-source
-     warn line.
+   - `check 4 binding unverified` when a Check 4 line printed `{value}` as
+     `unread` (the message source could not be read).
    - `checks 1-3 are text heuristics` — always printed when any of Checks 1–3
      ran. Check 1 is a per-line substring match with a negation guard, so a
      claim worded differently is missed and a negation on the same line hides
@@ -62,8 +62,3 @@ summary rows.
 - **Unsupported request:** when the user asks for a format the host cannot
   produce (for example an HTML dashboard), print one `⚠` line naming the
   limitation, then print the default terminal layout.
-
-**Interactive report: not applicable.** The doctor emits at most four check
-lines plus their findings and one summary section. A reader inspects the whole
-report without filtering, and every finding already carries its
-`{path}:{line_number}` source.

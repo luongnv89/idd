@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 Phase 0's per-probe failure blocks — `gh` too old, token scope, permission, ambiguous remote, API budget, input resolution — live beside the probes in `references/preflight.md`. This file holds the install-level and configuration errors every idd skill shares.
 
