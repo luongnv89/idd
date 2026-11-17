@@ -140,7 +140,7 @@ autopilot:
   max_iterations: 10
   # Resolver-only concurrency for one independent triage group (1..8). Review,
   # merge, run-log, state/cache writes, and cleanup always remain serialized.
-  # The default 1 preserves the original in-place sequential path exactly.
+  # The default 1 runs the sequential in-place path.
   max_parallel: 1
   review_cycles: 3
   auto_merge: true

@@ -11,10 +11,10 @@
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46821
+        "measured": 46795
       },
       "budget": 449835,
-      "measured": 448912,
+      "measured": 448880,
       "skill_md": {
         "budget": 26986,
         "measured": 26921
@@ -27,7 +27,7 @@
         "measured": 0
       },
       "budget": 144377,
-      "measured": 143471,
+      "measured": 143443,
       "skill_md": {
         "budget": 25753,
         "measured": 24729
@@ -43,7 +43,7 @@
         "measured": 34918
       },
       "budget": 167538,
-      "measured": 167325,
+      "measured": 167319,
       "skill_md": {
         "budget": 24943,
         "measured": 23919
@@ -51,7 +51,7 @@
     },
     "issue-creator": {
       "always_read": {
-        "budget": 43174,
+        "budget": 43135,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 42150
+        "measured": 42111
       },
       "budget": 185306,
-      "measured": 184372,
+      "measured": 184327,
       "skill_md": {
         "budget": 26487,
         "measured": 25463
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 126682
+        "measured": 126732
       },
       "budget": 323839,
-      "measured": 322911,
+      "measured": 322955,
       "skill_md": {
         "budget": 32125,
         "measured": 32050
@@ -99,7 +99,7 @@
         "measured": 11025
       },
       "budget": 434150,
-      "measured": 433169,
+      "measured": 433163,
       "skill_md": {
         "budget": 33856,
         "measured": 33527
@@ -115,7 +115,7 @@
         "measured": 28298
       },
       "budget": 139822,
-      "measured": 139761,
+      "measured": 139755,
       "skill_md": {
         "budget": 25696,
         "measured": 24672

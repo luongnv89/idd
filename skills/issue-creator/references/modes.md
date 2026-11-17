@@ -365,7 +365,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
    gh issue edit {parent} --body "{updated_parent_body}"
    python3 references/scripts/gi-issue.py {parent} --invalidate   # mandatory: body just changed
    ```
-4. **Verify by re-reading** (`references/docs/platform-github.md` driver rule 2 — mutations are verified by re-reading, established for tracker edits in #218). Confirm each created child appears as a `- [ ] #N —` line:
+4. **Verify by re-reading** (`references/docs/platform-github.md` driver rule 2 — mutations are verified by re-reading). Confirm each created child appears as a `- [ ] #N —` line:
    ```bash
    gh issue view {parent} --json body --jq '.body'
    ```

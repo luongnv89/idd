@@ -140,7 +140,7 @@ IDD's unit of work is the issue, but larger efforts need one level above it: whe
 
 **Decomposing a design document.** A PRD or design doc decomposes top-down: one epic per feature area, then independently resolvable children — each with its own acceptance criteria small enough for a single atomic PR. In IDD Stack, `/issue-creator`'s **batch mode** is the hook: feed it a PRD section or planning list and it creates the children in one pass; add the `Part of #N` markers and the parent checklist to bind them. The intent–code boundary applies at every level: the epic captures the *why* of the effort, the children capture the *what* of each slice, and no level predicts affected files.
 
-Skills treat the marker conservatively today: `/issue-triage` may group children under their epic as a display signal, and `/auto-pilot`'s merge gate remains driven by `Depends on #N` alone.
+Skills treat the marker conservatively: `/issue-triage` may group children under their epic as a display signal, and `/auto-pilot`'s merge gate remains driven by `Depends on #N` alone.
 
 ## Maintainer Control and Safety
 

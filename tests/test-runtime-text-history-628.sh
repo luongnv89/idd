@@ -13,7 +13,8 @@
 #        autopilot.auto_merge,
 #        so this test never bans the bare word.
 #
-# Scope: every Markdown file a skill reads at run time — the authored sources
+# Scope: every Markdown file and YAML template a skill reads at run time — the
+# authored sources
 # (src/skills, src/internal-skills, src/shared/agents, src/shared/references,
 # the bundled runtime docs) and the built skills/ tree. Human-only files are
 # excluded: each skill's docs/README.md, skills/README.md and evals/.
@@ -52,7 +53,7 @@ TARGETS=(
 
 # scan <ERE> — print every runtime-text line matching the pattern.
 scan() {
-  grep -rnE --include='*.md' -- "$1" "${TARGETS[@]}" 2>/dev/null \
+  grep -rnE --include='*.md' --include='*.yml' -- "$1" "${TARGETS[@]}" 2>/dev/null \
     | grep -vE '/docs/README\.md:|/evals/|^'"$ROOT"'/skills/README\.md:' || true
 }
 
@@ -79,10 +80,12 @@ none "T4: no acceptance-criterion tags standing in for a reason" \
   '\bAC[0-9]+ (holds|work)\b|\(AC[0-9]+\)|criterion [0-9]+ forbids|acceptance criterion [0-9]+'
 none "T5: no ticket numbers as merge-gate provenance (#516, #605, #564)" \
   '\(#(516|564|605|606|515|276|548|1541)[,)]'
+none "T5b: no ticket cited as where a rule came from (adopted in #N, '; #N)')" \
+  '\b(adopted|established|introduced|added|landed|decided) (per host |for [a-z ]+ )?in #[0-9]+|; #[0-9]+\)'
 
 # ── #629: comparison with a version the reader never saw ────────
 none "T6: no 'today's pipeline / behavior / path' comparisons" \
-  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b|as today\b|runs today\b|identical to today|as it (is|does|runs) today"
+  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b|as today\b|runs today\b|identical to today|as it (is|does|runs) today|[a-z]+ly today\b|\btoday:"
 none "T7: no 'as before' comparisons" \
   '(behaves?|skips it,|result|scope|pipeline|--init.) (exactly )?as before|= (behave )?as before|as before this'
 none "T8: no 'no new config key' asides" \
@@ -90,7 +93,7 @@ none "T8: no 'no new config key' asides" \
 none "T9: no 'before this gate/mechanism existed' or 'Reduced from N' history" \
   'before this (gate|mechanism|contract)|Reduced from [0-9]+|used to skip|now also requires'
 none "T10: the shipped max_parallel = 1 path is never called legacy or original" \
-  '[Ll]egacy (sequential|in-place|sequence|behavior|batch array|writers|callers|only)|[Ll]egacy .--append|original path|byte-for-byte (as before|today|legacy)|byte-identically'
+  '[Ll]egacy (sequential|in-place|sequence|behavior|batch array|writers|callers|only)|[Ll]egacy .--append|original (path|in-place|sequential)|preserves the original|byte-for-byte (as before|today|legacy)|byte-identically'
 
 # ── The renamed rules resolve at their homes ─────────────────────
 has() { # has <file> <ERE> <label>
