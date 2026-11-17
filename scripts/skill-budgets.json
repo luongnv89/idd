@@ -13,8 +13,8 @@
         ],
         "measured": 46893
       },
-      "budget": 451160,
-      "measured": 451158,
+      "budget": 450913,
+      "measured": 449889,
       "skill_md": {
         "budget": 26986,
         "measured": 26938
@@ -26,24 +26,24 @@
         "files": [],
         "measured": 0
       },
-      "budget": 145114,
-      "measured": 144785,
+      "budget": 144505,
+      "measured": 143481,
       "skill_md": {
-        "budget": 25914,
-        "measured": 24890
+        "budget": 25753,
+        "measured": 24729
       }
     },
     "issue-analysis": {
       "always_read": {
-        "budget": 36932,
+        "budget": 35942,
         "files": [
           "references/output-and-persist.md",
           "references/subagent-steps.md"
         ],
-        "measured": 36040
+        "measured": 34918
       },
-      "budget": 168660,
-      "measured": 167636,
+      "budget": 167538,
+      "measured": 166514,
       "skill_md": {
         "budget": 24945,
         "measured": 23921
@@ -51,7 +51,7 @@
     },
     "issue-creator": {
       "always_read": {
-        "budget": 44706,
+        "budget": 43269,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 43682
+        "measured": 42245
       },
-      "budget": 186712,
-      "measured": 186196,
+      "budget": 185783,
+      "measured": 184759,
       "skill_md": {
         "budget": 26490,
         "measured": 25466
@@ -71,7 +71,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 128693,
+        "budget": 127913,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 127838
+        "measured": 126889
       },
       "budget": 324334,
-      "measured": 324329,
+      "measured": 323380,
       "skill_md": {
         "budget": 32125,
         "measured": 32123
@@ -98,8 +98,8 @@
         ],
         "measured": 11025
       },
-      "budget": 435601,
-      "measured": 435100,
+      "budget": 434920,
+      "measured": 433896,
       "skill_md": {
         "budget": 33856,
         "measured": 33527
@@ -107,15 +107,15 @@
     },
     "issue-triage": {
       "always_read": {
-        "budget": 30412,
+        "budget": 29332,
         "files": [
           "references/detection.md",
           "references/output-and-persist.md"
         ],
-        "measured": 29388
+        "measured": 28308
       },
-      "budget": 140902,
-      "measured": 139878,
+      "budget": 139822,
+      "measured": 138798,
       "skill_md": {
         "budget": 25696,
         "measured": 24672

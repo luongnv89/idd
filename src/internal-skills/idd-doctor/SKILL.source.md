@@ -335,7 +335,7 @@ It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo vi
 
 ## Testing
 
-`tests/test-idd-doctor.sh` (pure bash, exit 0 on pass) asserts this spec against itself — structure, both pattern catalogs, check order, read-only guarantee, `gh` field selections, skips, exit codes, and the run-log summary. Run `bash tests/test-idd-doctor.sh`. Those assertions check correctness only; grade a real report's readability against the *Understanding criteria* in `references/review-contract.md`.
+`tests/test-idd-doctor.sh` (pure bash, exit 0 on pass) asserts this spec against itself — structure, both pattern catalogs, check order, read-only guarantee, `gh` field selections, skips, exit codes, and the run-log summary. Run `bash tests/test-idd-doctor.sh`.
 
 ---
 

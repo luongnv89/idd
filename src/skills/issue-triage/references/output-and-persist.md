@@ -65,23 +65,6 @@ Markdown table), produce it from the same payload and keep the `Result`,
 `Evidence`, `Uncertainty` and `Decision` rows. If the host cannot render the
 requested format, say so and print the terminal table.
 
-### Evaluate report understanding
-
-Grade actual outputs against these criteria as well as ordering correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states the status and the suggested start without reading the table or logs. |
-| Facts and assumptions are separate | Observed checks (fetch, script exit, persisted file) are distinct from inferred edges, `maybe-fixed` flags and cached data. |
-| Claims are traceable | Each `maybe-fixed` flag links its commit or PR; each blocked status names its blocker; `PARTIAL` names the failed check. |
-| Next decision is clear | The output says `No approval needed.` and names the remaining user actions. |
-
-When running behavioral evaluations, include a full update, a cached view, a
-degraded scan and a failed write, and grade each report against all four rows.
-Ask human reviewers the matching four questions and record their answers in the
-eval case's `human_review` block. Missing, blank, or nonresponsive feedback leaves
-human understanding unconfirmed; agent inspection cannot confirm it.
-
 ## Step 8 — Output
 
 

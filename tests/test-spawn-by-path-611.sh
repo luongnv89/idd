@@ -161,7 +161,7 @@ size="$(wc -c <"$SF" | tr -d ' ')"
 [ "$size" -lt 14645 ] && pass "T6.1: summary-format.md is below main's 14,645 bytes ($size)" \
   || fail "T6.1: summary-format.md did not shrink ($size)"
 has "$SF" '## Review contract' "T6.2: the common file keeps the Review contract"
-for sec in '## Budget and rate-limit stops' '## Batch mode' '## Other formats' '## Evaluate report understanding'; do
+for sec in '## Budget and rate-limit stops' '## Batch mode' '## Other formats'; do
   has "$SV" "$sec" "T6.3: summary-variants.md has '$sec'"
   lacks "$SF" "$sec" "T6.4: summary-format.md no longer carries '$sec'"
 done

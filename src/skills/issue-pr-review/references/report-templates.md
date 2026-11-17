@@ -75,21 +75,6 @@ Markdown table to paste into a PR comment), render it from the same results and
 keep the `Result`, `Evidence`, `Uncertainty`, and `Decision` rows. When the host
 cannot render the requested format, say so and print the terminal summary.
 
-### Report-understanding criteria
-
-Grade a Step 7 summary on these, alongside correctness:
-
-| Criterion | Observable check |
-|-----------|------------------|
-| Main result is findable | The first row states `Result:` with its status and main finding; no scrolling or log reading is needed. |
-| Facts and assumptions are separated | `Evidence` names checks that ran here; inherited, skipped, or model-judged items appear under `Uncertainty`. |
-| Claims are traceable | Each finding names its dimension and `file:line`; each pass names the check and commit; a step `PASS` never stands in for a merge. |
-| Next decision is clear | `Decision:` and `Next action:` state whether approval is needed and what the user does next. |
-
-Behavioral evals apply these to actual summaries. Ask human reviewers the same
-four questions and record their answers in the eval's feedback; absent, blank,
-or nonresponsive feedback leaves human understanding unconfirmed.
-
 ## Summary — Clean PR
 
 ```
