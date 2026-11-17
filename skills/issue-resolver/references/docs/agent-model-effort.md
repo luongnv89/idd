@@ -22,13 +22,17 @@ suggestion by the `issue-creator` skill (its `model-suggestion` reference and th
 `complexity_mapping` table in its bundled `model-data` snapshot). Do **not**
 invent a parallel scale.
 
-| Tier | Effort band (issue Metadata) | Thinking / effort | OpenAI model (advisory) | Anthropic model (advisory) |
-|------|-------------|-------------------|--------------------------|----------------------------|
-| XS | XS | low | GPT-5.6 Sol Low | Opus 5 Low |
-| S | S | low–medium | GPT-5.6 Sol Medium | Opus 5 Low |
-| M | M | medium | GPT-5.6 Sol High | Opus 5 Medium |
-| L | L | high (extra-high) | GPT-5.6 Sol Extra High | Opus 5 Extra High |
-| XL | XL | max | GPT-5.6 Sol Max | Fable 5.1 Max |
+| Tier | Effort band (issue Metadata) | Thinking / effort |
+|------|-------------|-------------------|
+| XS | XS | low |
+| S | S | low–medium |
+| M | M | medium |
+| L | L | high (extra-high) |
+| XL | XL | max |
+
+This table sets the thinking effort only. When an issue carries an advisory
+OpenAI and Anthropic model, it is the issue's own `**Suggested model:**` line in
+`## Metadata`, written by `/issue-creator`.
 
 The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
 maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator

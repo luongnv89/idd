@@ -462,11 +462,11 @@ fi
 
 # The bands are what the rendering rule needs, with per-model costs that are
 # never summed — the two picks are alternatives.
-if [ "$(printf '%s' "$out" | jkey 'bands.M.openai')" = "GPT-5.6 Sol High" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic')" = "Opus 5 Medium" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.openai_cost')" = "2.79" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic_cost')" = "3.29" ] \
-   && [ "$(printf '%s' "$out" | jkey data_version)" = "3.2" ]; then
+if [ "$(printf '%s' "$out" | jkey 'bands.M.openai')" = "GPT-5.6 Luna Max" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic')" = "Sonnet 5.5 Extra High" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.openai_cost')" = "1.03" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic_cost')" = "2.81" ] \
+   && [ "$(printf '%s' "$out" | jkey data_version)" = "4.0" ]; then
   pass "AC4: the effort bands carry both picks and each pick's own cost"
 else
   fail "AC4: the band mapping is wrong (got: $out)"

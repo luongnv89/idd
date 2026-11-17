@@ -276,7 +276,7 @@ Resolve the template directory from `issue.template`: `"default"` → this skill
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
   Images:   2 uploaded ✓
-  ⚡ Model:  GPT-5.6 Sol High (~$2.79/task) · Opus 5 Medium (~$3.29/task)
+  ⚡ Model:  GPT-5.6 Luna Max (~$1.03/task) · Sonnet 5.5 Extra High (~$2.81/task)
   Labels:   bug, auth, mobile
   Criteria: 3 acceptance criteria generated (medium)
 

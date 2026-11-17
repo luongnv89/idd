@@ -29,13 +29,13 @@ written to the cache root and the older dated copies are pruned.
 
 Output on stdout, one JSON object:
 
-    {"state": "fresh", "cache_file": "…/idd/model-data-2026-09-02.json",
+    {"state": "fresh", "cache_file": "…/idd/model-data-2026-11-17.json",
      "cache_dir": "…/idd", "persisted": true,
-     "last_fetched": "2026-09-02T00:00:00Z", "data_date": "2026-09-02",
-     "data_version": "3.2", "source": "CursorBench 3.2",
+     "last_fetched": "2026-11-17T08:17:15Z", "data_date": "2026-11-17",
+     "data_version": "4.0", "source": "CursorBench 4.0",
      "age_days": 3, "stale": false, "ttl_days": 7, "pruned": [],
-     "bands": {"M": {"openai": "GPT-5.6 Sol High", "openai_cost": 2.79,
-                     "anthropic": "Opus 5 Medium", "anthropic_cost": 3.29}}}
+     "bands": {"M": {"openai": "GPT-5.6 Luna Max", "openai_cost": 1.03,
+                     "anthropic": "Sonnet 5.5 Extra High", "anthropic_cost": 2.81}}}
 
 `state` is one of `fresh`, `stale`, `seeded`, or `installed`. `stale` is also
 returned as its own boolean, because a freshly *seeded* cache can be stale too —
@@ -533,7 +533,7 @@ def render_bands(payload: dict) -> dict[str, dict]:
 
 
 def data_version(payload: dict) -> str | None:
-    """The version portion of `source` — `3.2` from `CursorBench 3.2`.
+    """The version portion of `source` — `4.0` from `CursorBench 4.0`.
 
     Scanned backwards in one pass instead of matched with
     `([0-9]+(?:\\.[0-9]+)*)\\s*$`. That pattern is nested quantification against
