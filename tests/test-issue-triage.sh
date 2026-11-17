@@ -201,7 +201,7 @@ lacks "$EXAMPLES" "Issues may have changed." "T11: no update-suggestion wording 
 # The issue column is the first one after the row number; #9 also appears in
 # #5's Blocks column, which must not count as #9's own row.
 row9="$(grep -E '^ *[0-9]+ +│ #9 ' "$EXAMPLES" || true)"
-if [ -n "$row9" ] && ! printf '%s\n' "$row9" | grep -qv "blocked #5"; then
+if [ -n "$row9" ] && ! grep -qv "blocked #5" <<<"$row9"; then
   pass "T11: #9 is shown blocked by #5 in the circular-dependency example"
 else
   fail "T11: #9 row is not 'blocked #5' while #5 blocks it: $row9"

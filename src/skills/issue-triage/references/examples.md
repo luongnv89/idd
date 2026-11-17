@@ -29,7 +29,7 @@ One full run per mode.
   ✓ Triage saved to .idd/triage.json
 
 ◆ Issue Triage — 4 issues analyzed
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE — start with #12 (P1)
 
   Fetch issues:      ✓ pass (4 open issues)
@@ -47,7 +47,7 @@ One full run per mode.
   Suggested start:   #12 — Fix auth redirect
   Next action:       /issue-resolver 12
 
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Run stats   elapsed 1m 08s · agents 1
 ```
 
@@ -72,7 +72,7 @@ One full run per mode.
     Run /issue-triage update for fresh analysis.
 
 ◆ Issue Triage — cached
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            CACHED — start with #12 (P1)
   Cache load:        ✓ pass (age: 3d 2h)
   Issues:            4 analyzed
@@ -83,7 +83,7 @@ One full run per mode.
   Suggested start:   #12 — Fix auth redirect
   Next action:       /issue-triage update
 
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Run stats   elapsed n/a · agents 0
 ```
 
@@ -98,7 +98,7 @@ One full run per mode.
 
   ○ Cached report is up to date. No changes detected since last triage.
 
-  ... (cached Final Report and footer, as above) ...
+  ... (cached Final Report, age 2h, next /issue-resolver 12, and footer) ...
 ```
 
 ---
@@ -136,7 +136,7 @@ One full run per mode.
 
   ✓ Triage saved to .idd/triage.json
 
-  ... (Final Report, Already-fixed: ✓ pass (1 potentially fixed), and footer) ...
+  ... (Final Report, Already-fixed: ✓ pass (1 potentially fixed), footer) ...
 ```
 
 ---
@@ -151,7 +151,7 @@ One full run per mode.
   ○ No open issues found. Nothing to triage!
     Create issues with /issue-creator to get started.
 
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Run stats   elapsed 4s · agents 0
 ```
 
@@ -186,7 +186,7 @@ One full run per mode.
 
   ✓ Triage saved to .idd/triage.json
 
-  ... (Final Report and footer, as in the first run) ...
+  ... (Final Report for these 2 issues, start #5, and footer) ...
 ```
 
 ---

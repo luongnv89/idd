@@ -111,8 +111,10 @@ Full example runs (happy path, view mode, closed issue).
   ◆ Decision Record
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Root cause:         handleRedirect() no longer exempts the login route
-    Options considered: Option 1 — Minimal fix; Option 2 — Route-based auth config; Option 3 — Session-aware redirect
-    Options rejected:   Option 2 — config migration; Option 3 — adds session state
+    Options considered: Option 1 — Minimal fix;
+                        Option 2 — Route-based auth config;
+                        Option 3 — Session-aware redirect
+    Options rejected:   Option 2 — config change; Option 3 — session state
     Selected option:    Option 1 — Minimal fix
     Residual risk:      other public routes may need the exemption
 
@@ -138,7 +140,7 @@ Full example runs (happy path, view mode, closed issue).
   Recommended: Option 1 — Minimal fix
   Saved: .idd/analysis-42.json
 
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Run stats   elapsed 2m 41s · agents 2
 ```
 
@@ -160,7 +162,7 @@ Full example runs (happy path, view mode, closed issue).
 
   ○ Cached report. Run /issue-analysis 42 for fresh analysis.
 
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Run stats   elapsed n/a · agents 0
 ```
 
