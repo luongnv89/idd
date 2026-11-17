@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md` — with the *Closing Summary* `BLOCKED` block (`references/closing-blocked.md`) printed between the two. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md` — with the *Closing Summary* `BLOCKED` block (`references/closing-blocked.md`) printed between the two. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Authentication & Setup
 
@@ -346,7 +346,7 @@ Not confirmations: auto mode keeps every one of these.
 ### Security-labeled issue (skip)
 ```
 ⚠ Issue #N has a security label ({label}). Skipping auto-normalization.
-  Rewriting security-sensitive issues requires explicit operator confirmation (SPEC §1.4).
+  Rewriting security-sensitive issues requires explicit operator confirmation.
 
   To normalize first: /issue-creator N   (or /issue-creator N --force after review)
 ```

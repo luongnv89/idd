@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** (`references/run-stats.md`). A stop before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Setup
 
@@ -84,7 +84,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Check:   do you have write access? ls -la .
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** File write to `.idd.yml` fails (permission denied, disk full, read-only filesystem).
+**Trigger:** File write to `.idd.yml` fails (permission denied, disk full, read-only filesystem, or a repo root that does not allow file creation).
 
 ### Could not update .gitignore
 ```
@@ -96,16 +96,6 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Check:   ls -la .gitignore
 ```
 **Trigger:** the *Ignore Rule* snippet printed an error (permission denied, read-only file). A warning, not a stop: the config result stands, and the `.gitignore:` row shows `⚠ warn (write failed)`.
-
-### Directory not writable
-```
-✗ Repository root is not writable
-
-  To fix:  check permissions: ls -la .
-  Check:   is this a read-only mount?
-  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
-```
-**Trigger:** The repo root directory does not allow file creation.
 
 ### Generated config failed validation
 ```

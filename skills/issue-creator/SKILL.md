@@ -276,7 +276,7 @@ Resolve the template directory from `issue.template`: `"default"` → this skill
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
   Images:   2 uploaded ✓
-  ⚡ Model:  GPT-5.6 Luna Max (~$1.03/task) · Sonnet 5.5 Extra High (~$2.81/task)
+  ⚡ Model:  {openai_model} (~${openai_cost}/task) · {anthropic_model} (~${anthropic_cost}/task)
   Labels:   bug, auth, mobile
   Criteria: 3 acceptance criteria generated (medium)
 
@@ -368,5 +368,5 @@ A successful create prints Step 6's `◆ Issue Created` block; Normalize and Bat
 - **Duplicate detection** — a close match is raised before filing (Step 3).
 - **Screenshot-only input** — the image is described in text, drafted, attached.
 - **Ambiguous batch input** — unclear boundaries get a parsed preview first.
-- **GitHub API rate limit** — creation stops at the last successful issue, reporting the partial result with a resume hint.
+- **GitHub API rate limit** — a secondary limit is retried, then the item is skipped; primary exhaustion stops with the *Rate limited* error (`references/modes.md`, Batch Create Step 5).
 - **Empty body** — created with only a title, `(needs review)` in Metadata.

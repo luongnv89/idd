@@ -73,7 +73,7 @@ Steps 2-5 yourself. A delegated run never reads that file.
 When the Agent tool is available, spawn the synthesizer subagent to handle Steps 6-7. Pass the following context:
 
 - Issue data: number, title, body, labels, type, state, author, createdAt
-- Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
+- Exploration findings: the full structured JSON returned by the explorer subagent
 - Mode: `"auto"` when `IDD_AUTO_MODE=1` or invoked by `/auto-pilot`; otherwise `"interactive"`
 - Criteria: the numbered list above, when `gi-ready.py` produced one
 

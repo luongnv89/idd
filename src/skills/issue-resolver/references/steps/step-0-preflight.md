@@ -36,7 +36,7 @@ run that never captures it reports `elapsed: n/a` rather than a wrong number.
 
 ## Step 0e — Workspace
 
-Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
+Full procedure for the worktree offer described in SKILL.md *0e — Workspace (interactive only)*.
 **Interactive mode only** — ordinary auto mode is skipped. The offer and local
 creation procedure remain interactive; `--auto` / `IDD_AUTO_MODE=1` uses the
 in-place path (Repo Sync + *0f — Create branch*).
@@ -167,7 +167,7 @@ rules in `docs/naming-conventions.md` by hand — `"auto"` gives
 `{type}/{N}-{short-description}`, and any other `resolve.branch_prefix` is used
 verbatim as `{configured-prefix}{N}-{short-description}`.
 
-Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, before the user answers:
+Present the prompt from SKILL.md (*0e — Workspace (interactive only)*). It must state, before the user answers:
 
 - the derived **branch** name (`{branch_name}`),
 - the **worktree path** (the naming convention below), and

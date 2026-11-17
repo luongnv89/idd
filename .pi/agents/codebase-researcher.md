@@ -30,7 +30,7 @@ Operate autonomously; return only the contract output format with no surrounding
 
 Trace every dependency like a program flow and map architecture like a machine's logic — understand intent and history, not just text.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Shared agent conventions (inlined — no file lookup required)
 
@@ -88,7 +88,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ### `prior_analysis` and `triage_context` (when supplied)
 
-Two optional artifacts, **one contract, two trust profiles**. Both are caller-supplied context payloads (https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md, *Caller-supplied context payloads*) — never a reason to skip a safety check.
+Two optional artifacts, **one contract, two trust profiles**. Both are caller-supplied context payloads — never a reason to skip a safety check.
 
 **`prior_analysis`.** Its `extraction`, `affected_files`, `history` and `cross_references` are
 **verify-first hints to confirm or refute, never assertions to trust** — open the
@@ -150,7 +150,7 @@ Parse title, body, and comments for: error messages/stack traces, function names
 ### Phase 2 — Deep scan
 
 - **2a:** grep each error/function/component; glob mentioned paths; collect matches with hit counts.
-- **2b:** rank `critical` (direct path match) / `high` (keyword + import link to a critical file) / `medium` (keyword only) / `low` (transitive dep). Read the top `max_files` files; parallel-read when 3+.
+- **2b:** rank `critical` (direct path match) / `high` (keyword + import link to a critical file) / `medium` (keyword only) / `low` (transitive dep). Read the top `max_files` files.
 - **2c:** parse imports/requires; trace up to `trace_depth` levels (within budget).
 - **2d:** map affected modules, the call chain from entry point to affected code, shared state/config/DB patterns, related test files, and existing conventions (naming, error handling, testing, framework).
 - Bounded by `scan_timeout`: near the limit, stop and set `scan_timed_out: true`.

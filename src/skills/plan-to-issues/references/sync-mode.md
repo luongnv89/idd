@@ -52,9 +52,8 @@ Sync is **source-agnostic**: it re-renders the map of an existing epic and never
 so an epic bound with `<!-- plan-to-issues:conversation=<slug> -->` syncs by the same five steps as
 one bound with `<!-- plan-to-issues:plan=<path> -->`. Two deltas:
 
-**Step 2 — identify the source.** Read the epic body and branch on which marker it carries. An epic
-with neither is not this skill's epic — **stop**, as step 1 already does for a missing sentinel
-pair. An epic carrying *both* is corrupt: stop and report it rather than picking one, since the
+**Step 1 — identify the source.** In the fetched epic body, branch on which marker it carries. An
+epic with neither is not this skill's epic — **stop**, as for a missing sentinel pair. An epic carrying *both* is corrupt: stop and report it rather than picking one, since the
 Phase 3 mutual-exclusion probe (`references/epic-identity.md`) should have made it impossible.
 
 **Step 4 — re-detect unmapped tasks.** On the file path this re-parses the plan. There is no file on

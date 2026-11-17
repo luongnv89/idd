@@ -189,7 +189,7 @@ Check these files:
 
 - `references/agents/codebase-researcher.md` — Codebase Researcher subagent prompt (Steps 2-5)
 - `references/agents/synthesizer.md` — Synthesizer subagent prompt (Steps 6-7)
-- `references/subagent-steps.md` — per-step prompts and tool budgets
+- `references/subagent-steps.md` — subagent delegation payloads and return handling
 - `references/inline-fallback.md` — Steps 2-7 without the Agent tool
 - `references/output-and-persist.md` — report rendering spec and JSON schema
 - `references/run-stats.md` — run-stats footer contract
@@ -213,7 +213,7 @@ Check these files:
 
 ## Pipeline Overview
 
-The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter, one line per step, in the format shown under *Expected Output*. Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure.
+The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter, one new line per step, `✓` on success or `✗` on failure, in the format `references/examples.md` shows. Lines are printed, never redrawn in place.
 
 ---
 
@@ -278,7 +278,7 @@ Stop.
 ```
 ⚠ Issue #N is closed. Analyzing anyway for reference.
 ```
-Unlike issue-resolver, analysis does NOT stop on closed issues — reviewing what was done is a valid use case. Print the warning and continue.
+Print the warning and continue: reviewing what was done is a valid use of analysis.
 
 **No guards:** analysis is read-only and non-destructive, so no assignment guard or blocking-label guard is needed — no work can be duplicated and no block violated.
 
@@ -301,14 +301,14 @@ After fetch:
 
 ## Steps 2-7 — Explorer & Synthesizer
 
-Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payload, the return handling, and the tool budgets every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is read **only** when the Agent tool is unavailable.
+Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payloads and the return handling every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is read **only** when the Agent tool is unavailable.
 
 Quick summary — **2** extract keywords & file refs from the issue · **3** codebase scan (grep/glob, read up to `analysis.max_files` files, default 30) · **4** git history scan (related commits, prior fix attempts) · **5** cross-reference related issues & PRs · **6** root cause synthesis · **7** implementation options & complexity/risk scoring.
 
 ---
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.idd/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout, color codes, truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
+Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.idd/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout and truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
 
 Summary:
 - Terminal report: the sections under *Step 8 — Output (Terminal Report)* in `references/output-and-persist.md`, in that order.
@@ -321,7 +321,7 @@ Summary:
 1. **`git_state`** — the branch and commit SHA the analysis ran against, under the exact keys `git_state.commit_sha` (never `sha`) and `git_state.captured_at`. It pins the analysis to a point in time, so reviewers can check the recommendation against the code it was made on and `/issue-resolver`'s *Step 0h — Analysis reuse gate* can test whether the pin still holds — capture every value by running the commands in `references/output-and-persist.md`, never by inventing one.
 2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause` (from the `analysis` block's `summary`), `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues may carry an optional sixth `reproduction` field that no skill writes — `/issue-resolver`'s post-fix bug-verification checkpoint produces that evidence in the PR body; see `references/output-and-persist.md`.
 
-These add two JSON keys and a *Decision Record* section to the terminal report; nothing else changes. Exact schema and rendering: `references/output-and-persist.md`.
+Exact schema and rendering, including the report's *Decision Record* section: `references/output-and-persist.md`.
 
 ---
 
@@ -362,7 +362,7 @@ If the issue may already be resolved, the same block marks the research row and 
 ```
   Research:          ⚡ may already be fixed by {sha7}
   ...
-  Result:            DONE (verify if already resolved)
+  Result:            DONE (verify already resolved)
 ```
 
 ## Self-Improve
@@ -377,28 +377,7 @@ Optional, propose-only. With no user present to approve (a subagent, unattended,
 
 ## Expected Output
 
-A successful analysis prints the 8-step tracker and a condensed report, then persists the full result to `.idd/analysis-<N>.json`:
-
-```
-  ◆ Analysis Pipeline
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/8] Fetch          ✓ issue #42 loaded (bug)
-  [2/8] Extract        ✓ 8 keywords, 2 file refs
-  [3/8] Research       ✓ read 18 files, traced 12 deps
-  [4/8] History        ✓ 5 related commits, 1 prior fix attempt
-  [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
-  [6/8] Analysis       ✓ root cause identified
-  [7/8] Options        ✓ 3 approaches proposed
-  [8/8] Report         ✓ analysis complete
-
-  Root cause:      {short summary}
-  Affected files:  {count} files, {count} modules
-  Complexity:      M (estimated)
-  Risk:            medium (touches auth middleware)
-  Recommendation:  {one-sentence next step}
-```
-
-View mode renders the same report from the JSON without re-running the pipeline.
+A successful analysis prints the `[N/8]` tracker, the Step 8 report, the save line and the *Final Report*; `references/examples.md` shows a full run. View mode renders the same report from the JSON without re-running the pipeline.
 
 ## Edge Cases
 

@@ -83,9 +83,7 @@ as absent — the researcher reads the triage graph itself. `resolve.adaptive_ef
 
 ### Early exit: already resolved — or already in flight
 
-These are **two different answers and two different exits.** They shared one
-branch once, and that is how an issue got closed behind a PR nobody had reviewed
-or merged.
+These are **two different answers and two different exits.**
 
 **`already_resolved: true` — closing evidence.** The researcher may set this only
 when the evidence *closes* the issue: a **merged** PR (Phase 0b reports each
@@ -124,9 +122,7 @@ this issue. Return `status: pr_in_progress` with its `pr_number` and
 `branch_name` and stop — and **never close the issue**. An unreviewed, unmerged
 PR is not a resolution; closing the issue behind it loses the tracking while the
 work is still in flight, and if that PR is later closed unmerged the bug is
-simply gone from the backlog. This aligns the researcher's path with the
-resolver's own *Step 0b* guard in SKILL.md, which already stops rather than
-closes when `gh pr list` finds a PR whose body carries `Closes #N`.
+simply gone from the backlog.
 
 ```
 ○ Issue #N already has an open PR — not closing the issue
@@ -135,7 +131,7 @@ closes when `gh pr list` finds a PR whose body carries `Closes #N`.
 ```
 
 - Auto mode: return `status: pr_in_progress` with `pr_number` / `branch_name` and
-  stop. A caller that can review — `/auto-pilot` Phase 2.3 — routes it into
+  stop. A caller that can review, such as `/auto-pilot`, routes it into
   review of that PR instead of skipping the issue.
 - Interactive mode: inform the user and stop.
 
@@ -198,9 +194,6 @@ Beyond `prior_analysis` the delegation payload is unchanged; say in the spawn
 prompt which phases the prior analysis already covers, so the researcher applies
 its own `prior_analysis` contract and skips exactly the work item 3 names instead
 of re-running it.
-
-The saving is real but bounded, and worth stating plainly: the codebase is
-researched once and *verified* once, rather than researched twice.
 
 ### Inline fallback <!-- a:rs-research-fallback -->
 

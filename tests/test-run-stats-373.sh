@@ -137,8 +137,6 @@ check_has  "$SPEC" '^\| .agents. \|'  "AC6: agents is a defined field"
 check_flow "$SPEC" 'Fixed, in this order' "AC6: field order is pinned"
 check_flow "$SPEC" 'No skill adds, reorders, or renames one' \
   "AC6: adding, reordering, or renaming a field is forbidden"
-check_flow "$SPEC" 'authored once in .src/shared/references/.' \
-  "AC6: the contract states its single-source rule"
 check_flow "$SPEC" 'the leading unit is unpadded and every unit after it is zero-padded' \
   "AC6: the elapsed rendering is pinned, so two skills cannot format one duration differently"
 check_flow "$SPEC" 'Drop zero-valued \*leading\* units, never interior or trailing ones' \
@@ -303,7 +301,7 @@ for d in "${SKILL_DIRS[@]}"; do
   cat="$REPO_ROOT/$d/references/error-messages.md"
   check_flow "$cat" 'block here that stops the run is followed by the run-stats footer' \
     "AC2: $name's error catalog binds every stopping block to the footer"
-  check_flow "$cat" 'prints .elapsed n/a., which is the contract working' \
+  check_flow "$cat" 'before the run clock was captured prints .elapsed n/a.' \
     "AC2/AC5: $name's error catalog covers a stop before the clock was captured"
   check_flow "$cat" 'warns and continues is not a terminal outcome' \
     "AC2: $name's error catalog excludes non-terminal warnings"

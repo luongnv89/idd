@@ -52,8 +52,8 @@ worktree, writes no `lanes[]` entries, and sets no `IDD_CALLER_WORKTREE`.
 
 ## Subagent architecture
 
-In explicit-list mode the analyzer still runs once before the loop. The ordinary
-path remains one resolver followed by one reviewer. The parallel path is bounded
+In explicit-list mode the analyzer runs once before the loop. The sequential
+path is one resolver followed by one reviewer. The parallel path is bounded
 fan-out/fan-in followed by a serialized drain:
 
 ```
@@ -89,17 +89,8 @@ fan-in and one at a time; `--no-merge` preserves Phase 5 as the sole merge site.
   `returned`, `review`, `fix`, `merge`, `cleanup`, `log_pending`, `logged`,
   `completed`, `failed`, and `blocked_dirty`; `shared/scripts/gi-state.py`
   defines them and the transitions between them.
-  The existing singleton `current` remains the compatibility seam for the one
-  lane currently draining.
+  The singleton `current` holds the one lane currently draining.
 - On `--resume`, reconcile every lane against GitHub and git before acting:
   validate its conventional branch, locate an open PR for it, and resume at the
   earliest safe phase. Any doubt re-runs or re-checks work; it never assumes a
   merge, a run-log append, or a completed cleanup.
-
-## Measuring the body-snapshot budget
-
-SKILL.md → *Caller-supplied context* names the three freshness boundaries
-(resolution, mutation, review). Measure body-returning reads by issue and by
-boundary/reason, never by total `gh` calls: the resolver's non-body
-`state,comments,updatedAt` probe preserves its 0a stops and 0h freshness check
-and is not a body read.

@@ -1,6 +1,6 @@
 # Summary Report Templates
 
-Templates for the Step 7 summary report and the expected inline pipeline output. SKILL.md keeps the contract short; this file holds the full templates.
+Templates for the Step 7 summary report and the step completion reports; SKILL.md's *Pipeline Overview* shows the inline tracker. SKILL.md keeps the contract short; this file holds the full templates.
 
 The Step 7 summary always shows the **five review dimensions** explicitly so reviewers can see, at a glance, that a PR is being judged on more than just tests. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are reported with their own status line.
 
@@ -405,24 +405,6 @@ When `--no-merge` is set (in any mode): skip the merge step entirely and report 
 
 When the *Merge rule* does not allow the merge (`review.auto_merge: false`, or the PR is not clean): skip the merge step and report status only.
 
-## Expected Inline Output
-
-A clean review prints the 7-step tracker and a summary:
-
-```
-  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42), depth: full
-  [2/7] Script Pre    ✓ 3 lint fixes applied
-  [3/7] Review        ✓ spec[ac:pass correctness:pass safety:pass]
-                        standards[trace:pass maint:pass]
-                        0 fixable, 1 noted
-  [4/7] Tests         ✓ 12 passed
-  [5/7] CI            ✓ all checks green
-  [6/7] Fix           ○ skipped — nothing to fix
-  [7/7] Summary       ✓ PR passed review — 1 note to check before merging
-
-  ✓ PR #87 passed review (soft-pass: 1 medium note)
-```
-
 ## Step Completion Reports
 
 Every step ends with a completion report — the checkable bar that separates *the
@@ -430,7 +412,7 @@ step ran* from *the step succeeded*. Emit it right after the step's `[N/7]`
 tracker line:
 
 ```
-  [4/7] Tests        ✓ 128 passed, 0 failed
+  [4/7] Test         ✓ 128 passed, 0 failed
     √ Suite passed   × Build clean
     Result: FAIL
 ```
@@ -473,7 +455,7 @@ fix loop exhausting `review.max_cycles` with only non-blocking findings left (St
 evaluates neither of that step's checks and so renders
 
 ```
-  [4/7] Tests        ○ tests skipped (qa handoff @ {commit_sha_short})
+  [4/7] Test         ○ tests skipped (qa handoff @ {commit_sha_short})
     × Suite passed   × Build clean
     Result: PARTIAL
 ```

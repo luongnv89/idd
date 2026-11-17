@@ -1,6 +1,6 @@
 # Spawning subagents — /auto-pilot
 
-**CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool. `issue-resolver`, `issue-pr-review` and `issue-analysis` are
+**Never set `subagent_type`.** Every subagent below is spawned with the default general-purpose agent, so pass no `subagent_type` parameter to the Agent tool. `issue-resolver`, `issue-pr-review` and `issue-analysis` are
 **skills** the prompt invokes, not agent types (`Agent type 'issue-resolver'
 not found`). Pass `description` and `prompt` only, plus the role's override per
 `docs/agent-overrides.md` (`agents.model.<role>` / `agents.effort.<role>`;
@@ -15,7 +15,7 @@ not found`). Pass `description` and `prompt` only, plus the role's override per
 
 ## Spawn form <!-- a:ap-spawn-form -->
 
-**On Claude Code, spawn by path** (provisional).
+**On Claude Code, spawn by path**.
 Never read the prompt file yourself: send this short prompt, where
 `{prompt_path}` is the absolute path `$SKILL_DIR/<prompt file>` and
 `{skill_dir}` is `$SKILL_DIR`:

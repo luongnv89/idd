@@ -30,8 +30,7 @@ Never substitute a null `resume_at` into the first form — `after null` names n
 instant anyone could wait for. The `✗ Insufficient API rate budget` block in
 `references/error-messages.md` splits on the same value for the same reason.
 
-`RATE LIMITED` covers **both** call sites of that block, which is why it is its
-own value rather than a reading of one of the other four. Mid-run the stop lands
+`RATE LIMITED` covers **both** call sites of that block. Mid-run the stop lands
 between units of work and the counts are whatever completed. At **Prerequisite
 8** nothing ever started, so the report is a `0/{max}` summary with every count
 at zero and no iteration rows — and `COMPLETED` (nothing was done), `PAUSED` (no

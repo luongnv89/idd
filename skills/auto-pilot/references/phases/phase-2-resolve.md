@@ -210,7 +210,7 @@ choose the next `returned`/`failed` lane in original triage order and copy it
 into singleton `current`. A returned lane advances to `review`. A failed lane
 advances to `cleanup` only when its deterministic path is still registered by
 `git worktree list --porcelain`; otherwise log/checkpoint the terminal failure
-without a cleanup attempt. Only then apply the existing result handling below.
+without a cleanup attempt. Only then apply the result handling below.
 Finish this lane before choosing the next one.
 
 Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`, `skipped_reason`. For a parallel lane, require the returned `branch_name` to equal its validated planned branch and verify `gh pr view {pr_number} --json headRefName,state` reports that same head and `OPEN` before queuing review. Bind both returned values to shell variables rather than pasting them. A mismatch is a failed lane and never reaches review or merge.
@@ -273,8 +273,8 @@ other PR.
 ○ #{issue_number} already has PR #{pr_number} — reviewing the existing PR
 ```
 
-If the report-back carries no `pr_number` (an older resolver, or a PR it could
-not identify), there is nothing to review: record `skipped` with
+If the report-back carries no `pr_number` (the resolver could not identify
+the PR), there is nothing to review: record `skipped` with
 `skipped_reason: pr_in_progress`, leave the issue **open**, and continue.
 
 **On a gate decline — `failure` carrying `skipped_reason`:** an auto-mode gate

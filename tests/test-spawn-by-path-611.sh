@@ -76,7 +76,7 @@ if [ -n "$b_ln" ] && [ -n "$f_ln" ] && [ -n "$o_ln" ] && [ "$b_ln" -lt "$f_ln" ]
 else
   fail "T2.7: short prompt order is bindings ${b_ln:-?} < blocks ${f_ln:-?} < operative ${o_ln:-?}"
 fi
-has "$SP" '**CRITICAL — never set `subagent_type`:**' "T2.8: spawning.md carries the subagent_type prohibition"
+has "$SP" '**Never set `subagent_type`.**' "T2.8: spawning.md carries the subagent_type prohibition"
 
 # ── T3: binding coverage ────────────────────────────────────────────────────
 for p in $PROMPTS; do
@@ -116,7 +116,7 @@ for p in resolver batch-resolver; do
   rule "$p" '- skipped_reason:' "the skipped_reason field"
 done
 rule resolver 'Use --auto mode' "--auto"
-rule resolver 'AUTONOMY: Make every decision yourself.' "autonomy"
+rule resolver 'AUTONOMY: On an ambiguous choice, pick the safer, simpler option.' "autonomy"
 rule resolver 'resume: {resume}' "the resume binding"
 rule resolver 'run_id: {run_id}' "the run_id binding"
 rule resolver '{parallel_lane}' "the parallel_lane block"

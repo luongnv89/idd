@@ -307,7 +307,7 @@ autopilot:
   # LEGACY: kept for backwards compatibility. Ignored when autopilot.mode is set.
   # When mode is unset and auto_merge is not explicitly present in the file, effective mode is balanced.
   # When mode is unset but auto_merge is explicitly present, legacy interpretation applies:
-  #   auto_merge: true  ≈ mode: aggressive + merge_partial: true (preserves prior 2.1.x behavior)
+  #   auto_merge: true  ≈ mode: aggressive + merge_partial: true
   #   auto_merge: false ≈ mode: conservative
   auto_merge: true
 

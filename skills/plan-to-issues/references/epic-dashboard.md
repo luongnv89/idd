@@ -131,7 +131,7 @@ stdout. It is deterministic: same input, same bytes.
       "milestone": { "id": "ME", "exit": "CLAUDE.md and AGENTS.md exist" },
       "tasks": [
         { "task_id": "Pre.1", "title": "Make the project environment agent-runnable",
-          "issue": 101, "state": "closed", "depends_on": [], "unknown_deps": [] }
+          "issue": 101, "depends_on": [], "unknown_deps": [] }
       ]
     }
   ],
@@ -141,9 +141,8 @@ stdout. It is deterministic: same input, same bytes.
 }
 ```
 
-`issue` is `null` for a task that was not filed. `state` is **accepted and ignored** — it is retained
-in the schema so an older render input still validates, but nothing reads it: the map encodes no
-status. Do not add a consumer for it.
+`issue` is `null` for a task that was not filed. Leave out `state`: the renderer accepts and ignores
+it because the map encodes no status, so fetching issue state for the render input wastes calls.
 `synced` is supplied by the caller (`date -u +%Y-%m-%d`) — the renderer never reads the clock, so its
 output stays reproducible.
 

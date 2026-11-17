@@ -76,8 +76,7 @@ When done, report back ONLY these fields:
   every fanned-out run-log line
 - profile: the adaptive-effort pipeline profile the batch resolve selected ("light"
   or "full"), shared on every fanned-out run-log line like complexity; omit/null
-  when resolve.adaptive_effort is false. (A batch of several issues is rarely
-  trivial, so this is usually "full".)
+  when resolve.adaptive_effort is false.
 - agent_overrides: "applied", "partial" or "fallback" — whether the configured
   agents.* overrides reached the batch's spawns; like qa_cycles it is attributed
   to the primary issue's line only. Omit when no spawned role had one configured

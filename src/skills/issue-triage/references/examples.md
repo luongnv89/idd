@@ -1,6 +1,6 @@
 # /issue-triage — Examples
 
-One full run per mode.
+One full run per mode. After the first run, examples leave out the `[N/9]` step completion reports for brevity; every real run prints them.
 
 ## Example: First run (no cache exists)
 
@@ -10,8 +10,19 @@ One full run per mode.
   ○ No cached triage found — running first analysis...
 
   ● Fetching 4 open issues...
+  [1/9] Fetch  ✓ 4 open issues
+    √ Issues fetched   √ Config applied
+    Result: PASS
   ● Scanning commit history for already-fixed issues...
   ● Scanning codebase for issue dependencies...
+  [1b-2/9] Scan  ✓ 1 batch, 1 dependency
+    √ Scanner returned   √ Dependencies mapped
+    Result: PASS
+  [3-7/9] Ordering  ✓ 4 issues ordered, 1 stale
+    √ Order computed   √ No cycle left unreported
+    √ Disjoint sets identified   √ Threshold applied
+    √ Every open issue scored   √ Every issue ranked
+    Result: PASS
 
   ◆ Issue Triage
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -27,6 +38,9 @@ One full run per mode.
   ○  Suggested order: #12 → #8 → #3 → #15
 
   ✓ Triage saved to .idd/triage.json
+  [8-9/9] Output  ✓ report rendered, cache saved
+    √ Report rendered   √ .idd/triage.json written
+    Result: PASS
 
 ◆ Issue Triage — 4 issues analyzed
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -162,9 +176,9 @@ One full run per mode.
 
 **User says:** `/issue-triage update`
 
-**2 open issues whose keyword scans overlap:**
-- #5 "Fix login flow" (bug; login auth session)
-- #9 "Refactor session management" (improvement; session auth refactor)
+**2 open issues whose keyword scans overlap (the overlap edge runs from the older #5 to #9), while #5's body says `Depends on #9`:**
+- #5 "Fix login flow" (bug, older)
+- #9 "Refactor session management" (improvement)
 
 ```
   ● Fetching 2 open issues...

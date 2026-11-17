@@ -48,8 +48,9 @@ Rules that make the report worth reading:
 | 4 — QA | `Review clean` · `Tests pass` · `Build clean` · `AC verified` |
 | 5 — Deliver | `Tests green` · `Branch pushed` · `PR opens with Closes #N` |
 
-`PARTIAL` is legitimate in exactly three places: *Step 0 — Preflight* when only
-`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); *Step 4 — QA* when the loop hits
+Besides the two cases above (a check that could not be evaluated, and Step 2's
+`Options produced`), `PARTIAL` is legitimate on *Step 0 — Preflight* when only
+`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); on *Step 4 — QA* when the loop hits
 its cycle cap with residual non-blocking findings (delivered with known
-issues), and *Step 5 — Deliver* when the PR is created but an optional extra
-(project-board sync, run-log append) failed. Anywhere else a `×` is blocking.
+issues); and on *Step 5 — Deliver* when the PR is created but an optional extra
+(project-board sync, run-log append) failed. Any other `×` is blocking.

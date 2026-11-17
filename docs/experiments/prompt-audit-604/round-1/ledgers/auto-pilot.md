@@ -1,0 +1,23 @@
+# Ledger: src/skills/auto-pilot
+
+| # | Location | Finding (short) | Confidence | Outcome | Detail |
+|---|----------|-----------------|------------|---------|--------|
+| H1 | references/phases/phase-5-merge.md:254 | Skip-list rationale cites resolver "abort" guard that no longer exists | High | fixed | Verified against prompts/resolver.md:26-31 and phase-2-resolve.md:256-270. Rationale now says resolver reports `pr_in_progress`, loop reviews/gates same PR again, second run-log line. Skip-list rule itself unchanged. |
+| H2 | SKILL.source.md:182 | Fallback defaults list misses `triage_cache_max_age_minutes`, `retriage_every` | High | fixed | Added `autopilot.triage_cache_max_age_minutes: 60` · `autopilot.retriage_every: 0` (never), values verified at docs/config-schema.md:340,343,715-716. |
+| H3 | SKILL.source.md:308 | Quick-table BLOCKED message diverges from full statement | High | fixed | Now `… cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged`, matching error-messages.md:494, phase-5-merge.md:231, examples.md:411 (a shortened copy brought up to the full statement; gate not weakened). |
+| H4 | references/phases/phase-3-4-review.md:7 | "replaces the former inline review-fix loop" history | High | fixed | Sentence removed. |
+| M1 | references/phases/phase-2-resolve.md:276 | "an older resolver" | Medium | fixed | Now "(the resolver could not identify the PR)". |
+| M2 | references/phases/phase-1-triage-pick.md:208 | "and never did" | Medium | fixed | Phrase dropped. |
+| M3 | references/explicit-list-mode.md:213 | "degrade to exactly what they were before" | Medium | fixed | Now "they stay in-memory sets that do not survive the run." |
+| M4 | references/phases/phase-5-merge.md:524 | "the original stash-first sync … byte-for-byte" | Medium | fixed | Now "run the stash-first sync below exactly as written"; stash requirement intact. |
+| M5 | references/phases/phase-5-merge.md:216 | Pinned `gh` version "pre-2.45" | Medium | fixed | Now "If the read does not return `closedByPullRequestsReferences` (the installed `gh` does not know the field)". |
+| M6a | references/phases/phase-3-4-review.md:125 | Unresolvable "SPEC §2 requires these checks" | Medium | kept | Safety gate: needs maintainer decision. The sentence is the partial-merge merge-gate rule (four gates); brief forbids rewording merge gates. Proposed: "SPEC §2 requires these checks before **any** automated merge" → "These checks run before **any** automated merge". |
+| M6b | references/phases/phase-5-merge.md:136 | Unresolvable "SPEC §2 MUST-ignore for cross-repo" | Medium | kept | Safety gate: needs maintainer decision (dependency merge gate parsing rule). Proposed: "(SPEC §2 MUST-ignore for cross-repo)" → "(a cross-repo reference never gates a merge)". Same SPEC § pattern exists in other skills. |
+| M7 | references/phases/phase-0-lock-resume.md:114 | Vague pointer "`references` in `/issue-resolver`" | Medium | fixed | Now "`/issue-resolver`'s `references/steps/step-3-implement.md` → *Step 3 — Propose relevant skills* → *Teardown*" (headings verified at step-3-implement.md:7,202). |
+| M8 | references/phases/phase-1-triage-pick.md:440 | Maintainer note "a new skip-list writer adds a row here" in bundle | Medium | fixed | Clause dropped from runtime text; tests/test-autopilot-triage-cache-258.sh: G3 comment now carries the maintainer rule, T11.29b pin removed. |
+| L1 | references/spawning.md:3 | "CRITICAL — never set subagent_type" emphasis | Low | kept | Justified emphasis for a known failure; pinned by test-agent-overrides-455.sh:209, test-spawn-by-path-611.sh:79. |
+| L2 | phase-1-triage-pick.md:19, 30-35; phase-5-merge.md:619-620, 639-641, 699-700 | Maintainer-facing argument | Low | kept | Low confidence, no edit proposed; 30-35 pinned by T13.11. |
+| L3 | prompts/reviewer.md:13-22; phase-3-4-review.md:9-19 | Restated /issue-pr-review pipeline | Low | kept | Auditor found them consistent in substance; no edit proposed. |
+| L4 | prompts/analyzer.md:37-40 | Model does dependency ordering | Low | kept | Needs new script: follow-up. |
+| L5 | SKILL.source.md:164 vs preflight.md:333-335 | Unclear who runs `git stash pop` | Low | kept | Intent not determinable from repo; needs maintainer decision. |
+| L6 | tests/test-runtime-text-history-628.sh | Wording check misses "former", "never did", "before", "older", "pre-X.Y" | Low | out-of-scope | Test outside target and not a pin of changed wording. Proposed: extend the history regex near line 96 with `\bformer\b|and never did|what they were before|older resolver|pre-[0-9]+\.[0-9]+` (orchestrator to verify no false positives across src/). |

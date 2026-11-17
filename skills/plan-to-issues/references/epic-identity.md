@@ -2,7 +2,8 @@
 
 The full mechanics behind SKILL.md's *Phase 3 — Create the epic*. Read this when running Create mode.
 
-An epic is an ordinary issue that parents the others (IDD SPEC §2.1) — not a new artifact type. Its
+An epic is an ordinary issue that parents the others
+([SPEC.md](https://github.com/luongnv89/idd/blob/main/SPEC.md) §2.1) — not a new artifact type. Its
 identity rests on one thing: the **plan-binding marker** `<!-- plan-to-issues:plan=<plan_path> -->`.
 Everything here exists to make that marker exact, present, and singular.
 
@@ -91,11 +92,10 @@ adopts it after a confirm. Design for the interruption; do not claim it is impos
 
    Match on the binding marker, **not** on the `plan-dashboard:start` sentinel: the sentinel carries
    no plan path, so it cannot tell *this* plan's epic from another plan's epic in the same repo.
-   (Both are written by step 4, so neither is "the later one".)
 
    **Fallback — an unmarked epic.** Unmarked means **neither** source-marker kind: no
    `plan-to-issues:plan=` **and** no `plan-to-issues:conversation=`. A run interrupted between
-   step 2 and step 4, or a pre-1.5.0 run, leaves an epic with no marker. Skip any issue that
+   step 2 and step 4 leaves an epic with no marker. Skip any issue that
    already carries `conversation=` — adopting it would bind both markers and file this plan
    into the wrong epic. Before concluding that none exists, scan the same fetched list for
    an **open issue that carries neither source marker** and either has the `epic`

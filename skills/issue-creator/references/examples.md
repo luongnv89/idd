@@ -81,7 +81,8 @@ Here are the items from our sprint planning:
 
    Create 3 issues? [A]ll / [e]dit / [c]ancel
    ```
-5. On "All" → create each → `✓ 3/3 issues created`
+5. On "All" → create each, with per-item progress → the `◆ Batch Create — 3/3 issues`
+   report (`references/modes.md`, Batch Create Step 6), then the review contract and run-stats footer
 
 ---
 
@@ -99,10 +100,12 @@ Here are the items from our sprint planning:
    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
      Type:     bug (high)
      Title:    Fix checkout page broken on Safari
+     ⚡ Model:  {openai_model} (~${openai_cost}/task) · {anthropic_model} (~${anthropic_cost}/task)
      Labels:   bug, checkout
      Criteria: 3 acceptance criteria generated (medium)
 
    Create issue? [Y/n]
    ```
-6. On confirmation → `gh issue create` → `✓ Created issue #15`
+6. On confirmation → `gh issue create` → the `◆ Issue Created` block (Step 6),
+   then the review contract and run-stats footer
 

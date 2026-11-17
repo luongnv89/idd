@@ -44,7 +44,7 @@ Print the section with DESIGN.md symbols:
     ○ Run-log summary           last {n} of {total} runs · {m} malformed skipped
         Resolve rate:    {resolved}/{n} ({pct}%)
         Median QA cycles: {median}
-        Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
+        Top skip reasons: {reason1} ({c1}), {reason2} ({c2}), {reason3} ({c3})
         Agent overrides:  {applied} applied · {partial} partial · {fallback} fallback
         Slowest phase:    {phase} (median {median}s · {runs} runs)
         Skill improvements: {p} pending approval — review .idd/improvement-proposals.jsonl
@@ -56,8 +56,8 @@ one pending proposal. When no runs are
 recorded, SKILL.md step 1's single graceful-degradation line replaces the
 whole block.
 
-A read heuristic for the input (no new dependency — `tail` plus a JSON-aware
-pass):
+A read heuristic for the input — `tail` plus a JSON-aware pass, nothing
+beyond the shell:
 
 ```bash
 [ -s .idd/runs.jsonl ] && tail -n 50 .idd/runs.jsonl

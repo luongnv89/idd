@@ -177,12 +177,12 @@ Load config once with `python3 references/scripts/gi-config.py`:
 ○ First run — using default config. Run /init-idd to customize.
 ```
 
-Never re-read the config. **The run clock is `run_state.started_at`**; the run-stats footer measures `elapsed` from it.
+Never re-read the config. **The run clock is `run_state.started_at`**; it anchors the footer's `elapsed`.
 
-Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
+Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.triage_cache_max_age_minutes: 60` · `autopilot.retriage_every: 0` (never) · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
 
-- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` takes the sequential path.
-- **Quarantine label:** append it to the effective `skip_labels` set as part of this config load, so the pick skips quarantined issues.
+- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` runs sequentially.
+- **Quarantine label:** add it to the effective `skip_labels` at config load, so picks skip quarantined issues.
 
 ### Merge Modes
 
@@ -305,7 +305,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
 | Merge blocked (CI/conflicts) or merge floor unmet | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
-| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (`blocked_by_dependency`, *loop continues*) |
+| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged` (`blocked_by_dependency`, *loop continues*) |
 | Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (nothing mutated) |
 | Runtime budget reached (`autopilot.max_runtime_minutes`) | `○ Runtime budget reached ({max} min) — stopping cleanly` (*Runtime budget check*); the final summary is persisted with `--report`, and the lock is released |
 | API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`; the summary is persisted with `--report` and reports `Result: RATE LIMITED` |

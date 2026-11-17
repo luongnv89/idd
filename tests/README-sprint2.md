@@ -358,7 +358,7 @@ git rm .idd.yml && git commit -m "remove config" && git push
 - [ ] Output shows `Create 3 issues? [A]ll / [e]dit / [c]ancel`
 - [ ] On "All": each issue created sequentially with progress `● Creating issue 1/3...`
 - [ ] Each created issue has full template structure with `<!-- idd:normalized v1 -->` marker
-- [ ] Final output shows `✓ 3/3 issues created` with all issue numbers and URLs
+- [ ] Final output shows the `◆ Batch Create — 3/3 issues` report with all issue numbers and URLs
 
 **Verify:**
 ```bash

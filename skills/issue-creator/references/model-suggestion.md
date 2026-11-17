@@ -41,13 +41,12 @@ directory, an `asm install` replaces the copy, and `claude --plugin-dir .` point
 the skill folder at a git checkout, where a written cache would be an untracked
 file. `{cache_dir}` sits outside all of them.
 
-> **Upgrade note.** Because the cache lives outside the skill folder, it
-> survives plugin updates and reinstalls. An upgrade can ship a newer bundled
-> seed, so the lifecycle compares the two by `last_fetched`: when the seed's
-> date is **newer** than the cache's, the seed wins and is written to
-> `{cache_dir}` (pruning the older copy); otherwise — including a tie — the
-> cache is kept. A refreshed cache is therefore never overwritten by an older
-> seed, and a weekly seed refresh still reaches every install.
+Because the cache lives outside the skill folder, it survives plugin updates
+and reinstalls, and a reinstall can ship a newer bundled seed. The lifecycle
+compares the two by `last_fetched`: when the seed's date is **newer** than the
+cache's, the seed wins and is written to `{cache_dir}` (pruning the older copy);
+otherwise — including a tie — the cache is kept, so a refreshed cache is never
+overwritten by an older seed.
 
 The cache file mirrors the `triage.json` / `analysis-<N>.json` JSON conventions:
 a top-level ISO-8601 (`Z`) `last_fetched` timestamp, JSON formatted for readable
@@ -66,7 +65,7 @@ diffs, and a full overwrite on refresh (never append).
     "anthropic": { "families": ["Fable 5.2", "Opus 5.5", "Sonnet 5.5", "Fable 5.1", "Haiku 5.5", "Opus 5", "Sonnet 5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
   },
   "complexity_mapping": {
-    "XS": { "label": "trivial", "openai": "GPT-5.6 Luna High", "anthropic": "Haiku 5.5 Extra High" }
+    "XS": { "label": "trivial", "openai": "...", "anthropic": "..." }
   }
 }
 ```
@@ -76,8 +75,8 @@ picks (one OpenAI, one Anthropic) — you pick one, not both. It therefore carri
 **no** cost field of its own: a single summed figure would misrepresent the cost
 of either pick (roughly doubling it). Per-task cost is instead rendered
 **per-model**, sourced from each named model's own `cost_per_task_usd` in the
-`providers` block. So the M band's cost is `GPT-5.6 Luna Max` → `$1.03` and
-`Sonnet 5.5 Extra High` → `$2.81`, shown as two independent figures — never their sum.
+`providers` block, so a band shows two independent figures — one per pick,
+never their sum.
 
 ## Cache lifecycle (runs once at skill start, after config load)
 
@@ -119,11 +118,6 @@ When `{cache_dir}` is unusable (unwritable, a symlink, not a directory, or no
 absolute `$HOME`), nothing is written: the seed is served from memory for this
 run, the script exits 0 with `persisted: false` and `cache_file: null`, and
 prints a `⚠` line. Suggestions keep working; only the cache is skipped.
-
-> **Per-repo legacy cache.** A `.idd/model-data.json` in the repo is
-> **ignored** — the skill neither reads nor writes it, and model suggestions
-> never depend on it. It is stale project
-> state, safe to delete; the skill does not touch or migrate it.
 
 ### States
 
@@ -176,9 +170,8 @@ proceeds normally. The flag is honored even under `IDD_AUTO_MODE=1` (an explicit
 request overrides the no-prompt-no-fetch default); a failed forced refresh
 degrades to a warning and the existing cache, like any other refresh.
 
-A weekly CI job opens or updates a pull request when the bundled seed is stale;
-a run sees it only after a release and a skill reinstall, so the procedure below
-is how a run gets fresher data.
+The bundled seed changes only when the skill is reinstalled, so the procedure
+below is how a run gets fresher data.
 
 ### Refresh procedure
 
@@ -210,11 +203,11 @@ On any failure (network, parse, empty result), warn with
 `Model data refresh failed` from `references/error-messages.md` and keep the
 existing cached/seeded data and its dated file.
 
-> WebFetch is the only network call this skill makes, and only on explicit
-> opt-in or `--refresh-model-data`. The bundled seed guarantees the feature
+> WebFetch is the only call this skill makes outside GitHub, and only on
+> explicit opt-in or `--refresh-model-data`. The bundled seed guarantees the feature
 > works offline and on first run.
 
-## Complexity classification (AC #4)
+## Complexity classification
 
 The suggestion is keyed off the **effort** estimate the skill already produces
 for the `## Metadata` section — the existing **XS / S / M / L / XL** scale. Do
@@ -222,9 +215,11 @@ for the `## Metadata` section — the existing **XS / S / M / L / XL** scale. Do
 `trivial…complex` scale.
 
 When effort has not yet been decided, estimate it from the issue using these
-signals, then pick the highest band any signal reaches:
+signals, then pick the highest band any signal reaches. Count only the
+requirements the reporter stated, not the 3–5 criteria Step 4 generates —
+those would put every issue at M or above:
 
-| Effort | Description length | Acceptance criteria | Scope signals |
+| Effort | Description length | Stated requirements | Scope signals |
 |--------|--------------------|--------------------|----------------|
 | XS | one line | 0–1 | typo, config, single value |
 | S  | a short paragraph | 2–3 | one component, no new surface |
@@ -232,7 +227,7 @@ signals, then pick the highest band any signal reaches:
 | L  | detailed, multi-part | 5–8 | new capability, several subsystems |
 | XL | very large / multi-feature | 8+ | new subsystem, cross-cutting, migration |
 
-## Complexity → model mapping (AC #5)
+## Complexity → model mapping
 
 The picks are the effort band's `openai` and `anthropic` entries in the cache's
 `complexity_mapping`; render both per *the two-model rendering rule* under
@@ -243,21 +238,21 @@ not copied here because a refresh replaces them, so always read them from the
 cache file. If the cache omits a band, fall back to the nearest lower band and
 note `(needs review)`.
 
-## Rendering the suggestion (AC #6)
+## Rendering the suggestion
 
 **The two-model rendering rule (single home).** The suggestion appears in **two**
 places — the Step 5 ephemeral preview and the durable issue-body `## Metadata`
 line. In both, it **always names exactly two models — one OpenAI model and one
-Anthropic model — joined by ` · ` (OpenAI first)** — e.g. `GPT-5.6 Luna Max · Sonnet
-5.5 Extra High`. The two names are read from the effort band's `openai` and
+Anthropic model — joined by ` · ` (OpenAI first)** — `{openai_model} · {anthropic_model}`.
+The two names are read from the effort band's `openai` and
 `anthropic` entries in the cache. Both providers are always present; **never**
 collapse it to a single model or a single provider. Every mention of this rule
 elsewhere points here.
 
 In the **ephemeral preview** (Step 5), append each model's own per-task cost in
 parentheses immediately after it, read from that model's `cost_per_task_usd` in
-the `providers` block — e.g. `GPT-5.6 Luna Max (~$1.03/task) · Sonnet 5.5 Extra
-High (~$2.81/task)`. The two costs are independent (the picks are alternatives) and
+the `providers` block — `{openai_model} (~${openai_cost}/task) · {anthropic_model}
+(~${anthropic_cost}/task)`. The two costs are independent (the picks are alternatives) and
 are **never** added together. The durable `**Suggested model:**` body line omits
 costs (it stays a lean, dated advisory of the two names).
 
@@ -271,7 +266,7 @@ Add a `⚡ Model:` line to the `◆ Issue Preview` block:
   Type:     feature (high)
   Title:    Add dark mode toggle to settings
   Effort:   M
-  ⚡ Model:  GPT-5.6 Luna Max (~$1.03/task) · Sonnet 5.5 Extra High (~$2.81/task)
+  ⚡ Model:  {openai_model} (~${openai_cost}/task) · {anthropic_model} (~${anthropic_cost}/task)
   Labels:   feature, settings
   Criteria: 4 acceptance criteria generated (medium)
 ```
@@ -282,7 +277,7 @@ Add a `**Suggested model:**` line after `**Effort:**` in the body. It is
 **dated and labelled advisory** so its staleness is self-documenting:
 
 ```markdown
-**Suggested model:** GPT-5.6 Luna Max · Sonnet 5.5 Extra High _(CursorBench 4.0, 2026-11-17 — advisory)_
+**Suggested model:** {openai_model} · {anthropic_model} _(CursorBench {data_version}, {data_date} — advisory)_
 ```
 
 The template placeholders fill from the cache: `{openai_model}` and
@@ -295,10 +290,9 @@ into the body (**Output Contract** in `SKILL.md`): it is advisory metadata, like
 effort, and its date label shows how stale it is.
 
 When the feature is disabled, omit the `**Suggested model:**` line entirely and
-do not render the preview `⚡ Model:` line — neither the body nor the preview
-changes from the pre-feature behaviour.
+do not render the preview `⚡ Model:` line.
 
-## Configuration (AC #7)
+## Configuration
 
 ```yaml
 # Suggest a cost-effective model + thinking level per issue (CursorBench data)

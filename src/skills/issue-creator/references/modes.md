@@ -14,7 +14,7 @@ python3 shared/scripts/gi-issue.py {N} \
 
 Read `.issue` from the JSON envelope. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments`.
 
-**This mode rewrites the issue body**, and the cache is repo-wide — `/issue-resolver` reads the same issue with the same field list, so a stale entry outlives this skill. Every `gh issue edit` below is therefore followed by a **mandatory** `python3 references/scripts/gi-issue.py {N} --invalidate`, and every verify-after-write read goes straight to `gh` rather than through the cache. Verifying a write against a cached pre-write body proves nothing.
+**This mode rewrites the issue body**, and the cache is repo-wide — `/issue-resolver` reads the same issue with the same field list, so a stale entry outlives this skill. Every `gh issue edit` below is therefore followed by a **mandatory** `python3 shared/scripts/gi-issue.py {N} --invalidate`, and every verify-after-write read goes straight to `gh` rather than through the cache. Verifying a write against a cached pre-write body proves nothing.
 
 If not found:
 ```
@@ -79,7 +79,7 @@ Classify type from the existing issue content, then resolve templates from `issu
 
 ◆ Normalization Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  + Type:        bug (high confidence)
+  + Type:        bug (high)
   + Criteria:    3 acceptance criteria (medium)
   + Labels:      +bug, +auth
   = Original:    preserved in Reporter Context block
@@ -87,7 +87,7 @@ Classify type from the existing issue content, then resolve templates from `issu
 Apply normalization? [Y/n/dry-run]
 ```
 
-`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for criteria. Low-confidence fields get `(needs review)` in the issue body.
+`+` = added field, `=` = preserved field. Confidence markers follow the preview and issue-body columns of `references/confidence-scoring.md`.
 
 Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
 
@@ -145,7 +145,7 @@ gh issue edit {N} --body "{normalized_body}"
 # list, so a surviving pre-normalization body makes it re-normalize an
 # already-normalized issue (a second backup comment, and the normalized body
 # nested inside a second Reporter Context block).
-python3 references/scripts/gi-issue.py {N} --invalidate
+python3 shared/scripts/gi-issue.py {N} --invalidate
 ```
 
 Re-read the body and confirm `<!-- idd:normalized v1 -->` is the first line. Read it straight from `gh`, never from the cache — verifying a write against a cached pre-write body proves nothing:
@@ -173,7 +173,7 @@ If `issue.labels_auto_suggest` is true and new labels were suggested:
 
 ```bash
 gh issue edit {N} --add-label "{label1},{label2}"
-python3 references/scripts/gi-issue.py {N} --invalidate   # mandatory: labels just changed
+python3 shared/scripts/gi-issue.py {N} --invalidate   # mandatory: labels just changed
 ```
 
 ### Step 12 — Report
@@ -363,7 +363,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
 3. **Write** it back:
    ```bash
    gh issue edit {parent} --body "{updated_parent_body}"
-   python3 references/scripts/gi-issue.py {parent} --invalidate   # mandatory: body just changed
+   python3 shared/scripts/gi-issue.py {parent} --invalidate   # mandatory: body just changed
    ```
 4. **Verify by re-reading** (`docs/platform-github.md` driver rule 2 — mutations are verified by re-reading). Confirm each created child appears as a `- [ ] #N —` line:
    ```bash

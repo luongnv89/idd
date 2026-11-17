@@ -111,6 +111,7 @@ recorded per-phase timing (`n/a` when none did).
 | `../references/review-contract.md` | Summary rows (evidence, uncertainty, decision) and format rule |
 | `../references/run-log-summary.md` | Run-log summary metrics and output layout |
 | `../references/run-stats.md` | Shared run-stats footer contract (bundled by the build from `src/shared/references/`) |
+| `tests/test-idd-doctor.sh` (repo) | Asserts the spec: structure, pattern catalogs, check order, read-only guarantee, `gh` fields, skips, exit codes, run-log summary. Run `bash tests/test-idd-doctor.sh` |
 
 ## Related Skills
 

@@ -206,7 +206,7 @@ RLM="$OUT/issue-pr-review/references/review-loop-mechanics.md"
 [ "$(grep -cF -- '# do NOT set subagent_type — default general-purpose agent, not a custom "code-reviewer" type' "$RLM")" -eq 2 ] \
   && pass "T5d loop mechanics: both reviewer comments" || fail "T5d reviewer prohibition comments changed"
 has "T5e loop mechanics: fixer comment" "$RLM" '# do NOT set subagent_type — default general-purpose agent, not a custom "fixer" type'
-has "T5f auto-pilot CRITICAL paragraph" "$AP" '**CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool.'
+has "T5f auto-pilot prohibition paragraph" "$AP" '**Never set `subagent_type`.** Every subagent below is spawned with the default general-purpose agent, so pass no `subagent_type` parameter to the Agent tool.'
 # #611: the four prompt files carry no Agent-tool parameters at all, so none can set one.
 n_prompts="$(ls "$OUT/auto-pilot/references/prompts/"*.md 2>/dev/null | wc -l | tr -d ' ')"
 [ "$n_prompts" -eq 4 ] && ! grep -qF 'subagent_type' "$OUT/auto-pilot/references/prompts/"*.md \

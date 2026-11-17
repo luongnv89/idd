@@ -5,7 +5,7 @@
 
 Explore distinct paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
 
-The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Contract
 

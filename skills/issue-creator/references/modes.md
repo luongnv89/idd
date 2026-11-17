@@ -79,7 +79,7 @@ Classify type from the existing issue content, then resolve templates from `issu
 
 ◆ Normalization Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  + Type:        bug (high confidence)
+  + Type:        bug (high)
   + Criteria:    3 acceptance criteria (medium)
   + Labels:      +bug, +auth
   = Original:    preserved in Reporter Context block
@@ -87,7 +87,7 @@ Classify type from the existing issue content, then resolve templates from `issu
 Apply normalization? [Y/n/dry-run]
 ```
 
-`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for criteria. Low-confidence fields get `(needs review)` in the issue body.
+`+` = added field, `=` = preserved field. Confidence markers follow the preview and issue-body columns of `references/confidence-scoring.md`.
 
 Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
 
