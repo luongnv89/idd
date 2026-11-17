@@ -3,7 +3,7 @@
 Look up a term here only when SKILL.md leaves it unclear.
 
 - **input** — what is being converted: a **plan file** at any path, or **conversational intent**
-  from the user's turns. Resolution rules: `references/input-resolution.md`.
+  from the user's turns or from a requirements document the user chose to draft from. Resolution rules: `references/input-resolution.md`.
 - **task** — one atomic unit of work: a `Task <id>: <title>` block in a plan file, or one confirmed
   row of a conversation draft. One task, one issue.
 - **worklist** — the structured parse of the input: phases → sprints → tasks, plus milestones,
