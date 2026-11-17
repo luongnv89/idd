@@ -54,7 +54,7 @@ has "$IR" "Choose [1/2/3]" "three options are offered"
 has "$IR" "### Requirements-document candidates" "candidates section exists"
 has "$IR" "case-insensitively" "candidate names match case-insensitively"
 has "$IR" 'Exact names win: `prd.md`,' "exact names take precedence over globs"
-has "$IR" "Never guess between them." "several hits are listed, never guessed"
+has "$IR" "number them all in the one rule 6 prompt. Never guess." "several hits are listed, never guessed"
 
 echo "┄ AC2 draft from the document"
 has "$IR" "### Drafting from a requirements document" "drafting section exists"
@@ -66,7 +66,8 @@ has "$IR" "One exception: a requirements document the user picked under rule 6 i
 has "$IR" "**Coverage check, before the gate:**" "coverage check runs before the gate"
 has "$IR" '**Milestone M<phase id>:**' "exit criteria persist as phase milestones"
 has "$IR" '`**Unplaced**:`' "unplaced criteria persist in ## Source"
-has "$IR" 'A stored `**Unplaced**:` list restores' "resume restores unplaced criteria"
+has "$IR" 'Stored `**Unplaced**:` criteria are each again' "resume restores unplaced criteria"
+has "$REF/plan-parsing.md" '`**Unplaced**:` then `- [ ] <text>` lines; ends the last task' "parser grammar keeps unplaced criteria off the last task"
 
 echo "┄ AC3 no user present"
 has "$IR" "subagent, unattended, or test run), skip this rule." \

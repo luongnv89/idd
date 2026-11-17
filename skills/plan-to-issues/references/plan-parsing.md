@@ -35,6 +35,7 @@ Anchored on line starts. Everything else in the document is ignored for the work
 | Plan task | `^#{3,4} Task <id>: <title>` | task id (`Pre.1`, `0.1`, `2.4`, `1.1`), title |
 | Task field | `**<Field>**: <value>` | `Description`, `Closes`, `Dependencies`, `Effort`, `Verify`, `PRD Reference` |
 | Acceptance criteria | `**Acceptance Criteria**:` then `- [ ] <text>` lines | one criterion per line |
+| Unplaced criteria | `**Unplaced**:` then `- [ ] <text>` lines; ends the last task | criteria no task owns |
 | Dependency table | rows under `## Dependency table` | task, depends on, blocks, wave |
 | Milestones table | rows under `## Milestones` | id, phase, exit condition, verify with |
 | Critical path | `**Critical path:** <chain>` or the chain under `## Critical Path` | ordered task ids |

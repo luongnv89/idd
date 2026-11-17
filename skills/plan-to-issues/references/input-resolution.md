@@ -76,8 +76,7 @@ the conversation: an unparseable file is an error to report, not a reason to inv
 
 Search the repo root, then `docs/`, matching names case-insensitively. Exact names win: `prd.md`,
 `requirements.md`. Only with no exact hit try `*prd*.md`, `*requirements*.md`, `spec.md`,
-`*-spec.md`. Two or more hits → number them all inside the one rule 6 prompt and let the user
-pick one or stop. Never guess between them.
+`*-spec.md`. Two or more hits → number them all in the one rule 6 prompt. Never guess.
 
 ## What counts as actionable conversational intent
 
@@ -187,7 +186,7 @@ This is the supported resume. It is still Create mode (it files remaining issues
 5. Continue Create mode as an **idempotent re-run**: Phase 3 binds to `#<n>` (skip slug
    search); Phase 4 files only tasks the epic does not already list.
 
-A stored `**Unplaced**:` list restores as unplaced criteria, each again a `⚠` report row.
+Stored `**Unplaced**:` criteria are each again a `⚠` report row.
 
 *Completion criteria:* every restored task has an id, a title, ≥ 1 acceptance criterion, a
 `Dependencies` value, and an effort; `## Source` parsed; no confirm was asked. Then created +
