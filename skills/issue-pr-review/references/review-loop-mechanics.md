@@ -31,7 +31,7 @@ the *Bundled dependency precheck*, against the skill's directory.
 | `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
 | `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
 
-The traceability flags default to the values shown, so both hard-blocks are on unless an exemption or an intentional reference applies.
+The traceability flags default to the values shown, so both hard-blocks are on; the cases that excuse a missing `Closes #N` are listed once, under check 1 in `references/verification-checks.md` (*Traceability checks*).
 
 ## Binding the head-ref name
 
