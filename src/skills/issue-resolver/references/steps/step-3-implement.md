@@ -116,7 +116,7 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
 
 #### Accept, record, install
 
-- **All / subset / none (default none)** as today → `selected_skills`.
+- **All / subset / none (default none)** → `selected_skills`.
 - **Record intent *before* installing.** Write the whole list (replace, do not
   append) via `gi-state.py --update` — each entry
   `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`, with `borrowed`

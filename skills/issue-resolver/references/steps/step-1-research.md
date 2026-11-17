@@ -65,8 +65,7 @@ field may gate duplicated work, never a safety gate (references/docs/shared-agen
 *Caller-supplied context payloads*).
 
 Degrade: anything unparsable, or a row whose issue number is not `N`, is treated
-as absent — the researcher reads the triage graph itself, exactly as
-today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
+as absent — the researcher reads the triage graph itself. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
 
 ```
 ○ Triage context: supplied (4 affected files) — hints verified, not trusted

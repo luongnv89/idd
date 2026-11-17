@@ -105,7 +105,7 @@ A missing key, a short or unknown SHA, an unparsable timestamp, a `git` command
 that errors for any reason, or any condition that cannot be evaluated ⇒ `stale`
 ⇒ the full pipeline. The gate may only skip work it has
 positively proven redundant. This default is what keeps a wrong answer cheap:
-the fallback is the pipeline that runs today.
+the fallback is the full pipeline.
 
 Surface the decision as one line so the saving is auditable:
 

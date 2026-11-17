@@ -40,7 +40,7 @@ Never put a branch name, an issue or PR title, or any issue/PR text in it: that 
 
 ## Re-entry after a compaction
 
-`/auto-pilot`, `/issue-resolver` and `/issue-pr-review` carry a re-entry rule before *Prerequisites* in SKILL.md, the part the host re-injects. It re-reads durable state and the current step, never re-spawns an in-flight subagent, live-checks with `gh … --json` before repeating a push, PR, comment, label or merge, and takes the existing cap path when a loop counter is lost. Any doubt: run the current step in full.
+`/auto-pilot`, `/issue-resolver` and `/issue-pr-review` carry a re-entry rule before *Prerequisites* in SKILL.md, the part the host re-injects. It re-reads durable state and the current step, never re-spawns an in-flight subagent, live-checks with `gh … --json` before repeating a push, PR, comment, label or merge, and takes the existing cap path when a loop counter is lost. Any doubt takes the cautious branch: an unreturned spawn is in flight, a lost loop counter is the cap, and no effect repeats before a live `--json` read.
 
 ## User-side knobs
 

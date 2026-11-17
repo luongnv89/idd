@@ -14,7 +14,7 @@
         "measured": 46821
       },
       "budget": 449835,
-      "measured": 448816,
+      "measured": 448912,
       "skill_md": {
         "budget": 26986,
         "measured": 26921
@@ -27,7 +27,7 @@
         "measured": 0
       },
       "budget": 144377,
-      "measured": 143358,
+      "measured": 143471,
       "skill_md": {
         "budget": 25753,
         "measured": 24729
@@ -43,7 +43,7 @@
         "measured": 34918
       },
       "budget": 167538,
-      "measured": 167212,
+      "measured": 167325,
       "skill_md": {
         "budget": 24943,
         "measured": 23919
@@ -51,7 +51,7 @@
     },
     "issue-creator": {
       "always_read": {
-        "budget": 43197,
+        "budget": 43174,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 42173
+        "measured": 42150
       },
       "budget": 185306,
-      "measured": 184282,
+      "measured": 184372,
       "skill_md": {
         "budget": 26487,
         "measured": 25463
@@ -71,7 +71,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 127723,
+        "budget": 127706,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 126699
+        "measured": 126682
       },
       "budget": 323839,
-      "measured": 322815,
+      "measured": 322911,
       "skill_md": {
         "budget": 32125,
         "measured": 32050
@@ -99,7 +99,7 @@
         "measured": 11025
       },
       "budget": 434150,
-      "measured": 433126,
+      "measured": 433169,
       "skill_md": {
         "budget": 33856,
         "measured": 33527
@@ -115,7 +115,7 @@
         "measured": 28298
       },
       "budget": 139822,
-      "measured": 139648,
+      "measured": 139761,
       "skill_md": {
         "budget": 25696,
         "measured": 24672
@@ -130,7 +130,7 @@
         "measured": 5062
       },
       "budget": 171356,
-      "measured": 171115,
+      "measured": 171228,
       "skill_md": {
         "budget": 26657,
         "measured": 25660

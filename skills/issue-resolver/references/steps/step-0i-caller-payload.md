@@ -29,15 +29,15 @@ issue_payload = supplied | partial | absent
 | State | When | Effect |
 |-------|------|--------|
 | `supplied` | the prompt carries a compact-JSON `issue_payload` inside matching complete-line `BEGIN_UNTRUSTED_issue_payload_<nonce>` / `END_UNTRUSTED_issue_payload_<nonce>` boundaries, where `<nonce>` is 32 lowercase hex, and it holds every field 0a requests **except `comments`** — `number`, `title`, `body`, `labels`, `assignees`, `state`, `updatedAt` — with `number` equal to `N` | 0a uses it in place of its read, plus the one live read below |
-| `partial` | it parses but a required field is missing, empty, or `number` does not match `N` | 0a fetches, as today |
-| `absent` | no block, or it does not parse | 0a fetches, as today |
+| `partial` | it parses but a required field is missing, empty, or `number` does not match `N` | 0a fetches |
+| `absent` | no block, or it does not parse | 0a fetches |
 
 **`comments` is the one field of 0a's list a payload never carries**, by design:
 the caller's single-issue fetch deliberately does not request it, because the
 live re-verify below — which this gate mandates anyway, for `state` — picks it up
 in the same call at no extra cost. So *Step 1*'s delegation payload — whose
 researcher parses title, body **and comments** for error text, stack traces and
-paths — is unchanged in shape.
+paths — keeps its shape.
 
 `updatedAt` is **required and load-bearing**. The caller's fetch may be
 TTL-cached, so under `supplied`, parse it and the mandatory probe's live

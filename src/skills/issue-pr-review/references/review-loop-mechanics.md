@@ -439,8 +439,7 @@ below — it runs only "after the fix cycle reports zero fixable issues"), so an
 unmarked clean PR already gets exactly one cold-start pass and no confirmation.
 What `trusted` changes is *which* single pass a clean PR gets — the unbiased,
 cold-memory one — not how many. The measured saving is the two duplicated local
-test legs. If the pass returns fixable findings they go to the fixer exactly as
-today; the fixer's commit then moves the head, so the next re-evaluation turns
+test legs. If the pass returns fixable findings they go to the fixer; the fixer's commit then moves the head, so the next re-evaluation turns
 the verdict `stale` and the remaining cycles are the full pipeline again.
 
 ### Re-evaluation after a push <!-- a:rvm-reeval-push -->

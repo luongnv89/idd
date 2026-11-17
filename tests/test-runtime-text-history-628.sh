@@ -9,7 +9,8 @@
 #  #629  Behaviour is described as the only behaviour: no "today's pipeline",
 #        "as before", "no new config key is introduced", "Reduced from 10",
 #        and no "legacy" for the shipped max_parallel = 1 path. `legacy` stays
-#        right for the pre-rename .gitissue names and autopilot.auto_merge,
+#        right for the pre-rename config, marker and directory names and
+#        autopilot.auto_merge,
 #        so this test never bans the bare word.
 #
 # Scope: every Markdown file a skill reads at run time — the authored sources
@@ -81,7 +82,7 @@ none "T5: no ticket numbers as merge-gate provenance (#516, #605, #564)" \
 
 # ── #629: comparison with a version the reader never saw ────────
 none "T6: no 'today's pipeline / behavior / path' comparisons" \
-  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b"
+  "today's (full )?(pipeline|behavior|path|wait|ordering|0a fetch|guess)|exactly (as )?today|does today\b|as today\b|runs today\b|identical to today"
 none "T7: no 'as before' comparisons" \
   '(behaves?|skips it,|result|scope|pipeline|--init.) (exactly )?as before|= (behave )?as before|as before this'
 none "T8: no 'no new config key' asides" \
@@ -104,8 +105,8 @@ has "$ROOT/src/skills/auto-pilot/references/phases/phase-2-resolve.md" '^#### Se
 has "$ROOT/src/skills/auto-pilot/references/orchestration.md" '^## Sequential branch \(`max_parallel = 1`\)$' \
   "T14: orchestration names the same branch the sequential branch"
 # The compatibility paths that still run keep their legacy name.
-has "$ROOT/src/skills/issue-resolver/SKILL.source.md" 'legacy `\.gitissue\.yml`' \
-  "T15: the pre-rename .gitissue.yml config keeps its legacy name"
+has "$ROOT/src/skills/issue-resolver/SKILL.source.md" 'legacy `\.git[i]ssue\.yml`' \
+  "T15: the pre-rename config file keeps its legacy name"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Passed: $PASS"

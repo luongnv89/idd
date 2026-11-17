@@ -304,7 +304,7 @@ Apply all four eligibility checks independently to every proposed member, then
 run *Step 1.2b* for each. A rejected member is removed before any spawn; another
 eligible member of the same group may fill the slot. A group with fewer than two
 survivors degrades to one ordinary issue without creating a parallel worktree.
-Explicit-list batch resolution is unchanged and does not consume triage
+Explicit-list batch resolution does not consume triage
 `parallel_groups`.
 
 Before preparing any worktree, derive every branch/path from the synced base and
