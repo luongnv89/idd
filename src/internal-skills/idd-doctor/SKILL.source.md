@@ -305,7 +305,7 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
    exactly as `references/run-log-summary.md` defines them. When a
    `.idd/improvement-proposals.jsonl` ledger exists, that reference's
    optional *Skill improvements* line also reports pending correction-guard
-   proposals (issue #524) — still informational, still read-only.
+   proposals — still informational, still read-only.
 
 ---
 

@@ -15,7 +15,7 @@ not found`). Pass `description` and `prompt` only, plus the role's override per
 
 ## Spawn form <!-- a:ap-spawn-form -->
 
-**On Claude Code, spawn by path** (adopted per host in #561, provisional).
+**On Claude Code, spawn by path** (provisional).
 Never read the prompt file yourself: send this short prompt, where
 `{prompt_path}` is the absolute path `$SKILL_DIR/<prompt file>` and
 `{skill_dir}` is `$SKILL_DIR`:

@@ -31,7 +31,7 @@ the *Bundled dependency precheck*, against the skill's directory.
 | `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
 | `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
 
-The traceability flags default to the values shown, preserving the issue #36 contract.
+The traceability flags default to the values shown, so both hard-blocks are on; the cases that excuse a missing `Closes #N` are listed once, under check 1 in `references/verification-checks.md` (*Traceability checks*).
 
 ## Binding the head-ref name
 
@@ -94,7 +94,7 @@ rather than a failed read, and this fail-safe **never** stops it. It proceeds to
 Step 3 like any other PR, where `references/verification-checks.md` already
 answers for it: `acceptance_criteria` reports `○ pass — none defined; manual
 review recommended`, traceability check 1 **fails** on the missing `Closes #N`
-(issue #36's canonical case — Step 6 fixes it by editing the PR body) unless the
+(the canonical traceability failure — Step 6 fixes it by editing the PR body) unless the
 *Refactor/chore exemption* applies, and check 2 reports `n/a — no linked issue`.
 Stopping those PRs would suppress the exact finding they exist to produce.
 
@@ -120,7 +120,7 @@ written down:
 
 - **Never proceed with an empty `linked_issue_snapshot` for a PR that links an
   issue.** Step 3 verifies acceptance criteria against that variable, and
-  `acceptance_criteria` is one of the two issue #36 hard-blocks. A dimension
+  `acceptance_criteria` is a hard-block. A dimension
   whose input is empty reports no failed criterion, so it renders as `pass` —
   turning a hard-block into a no-op while the report still shows five green
   dimensions. That `pass` is *correct* for a PR that defines no criteria and a
@@ -223,7 +223,7 @@ value (default 3): on the `light` path the effective cap is still **1**, never t
 overridden 3. The cap governs **only** the loop iteration count; the cold-start
 reviewer, the fixer, and the fresh confirmation pass below all still apply — a
 `light` review is one review pass + at most one fix + confirmation, not a skipped
-review. The two #36 hard-blocks (`acceptance_criteria: fail`, missing
+review. The AC and traceability hard-blocks (`acceptance_criteria: fail`, missing
 `Closes #N`) are never relaxed by the profile — a trivial PR that fails them still
 blocks soft-pass and does not merge.
 
@@ -255,19 +255,18 @@ whoever opened the PR, so any author can write this marker. Binding `head=` does
 **not** authenticate it either — an author can read their own head SHA and paste
 a matching one. The verdict may gate **only duplicated work** — a second run of
 a check that already ran, unchanged, on this exact commit — and **never a safety
-gate**. Issue **#274** ("A PR can disable the secret-scanning gate via its
-own `.idd.yml`") is the standing proof that this repo can lose a security
-gate to repo-controlled input; that is the failure this design refuses to
-repeat. An edit that lets the marker suppress a secret scan, a CI wait, an
+gate**. A PR that rewrites the `.idd.yml` a secret scan reads can disable that
+scan: repo-controlled input reaching a safety gate is the failure this design
+refuses. An edit that lets the marker suppress a secret scan, a CI wait, an
 acceptance-criteria check, or a traceability check converts a token optimization
 into a bypass. Do not make it.
 
-"Only duplicated work" is not enough by itself (issue #515). A skip is a
+"Only duplicated work" is not enough by itself. A skip is a
 duplicate only if the first run really happened, and the marker cannot show
 that. A forged marker with `tests=<n>@<head>`, plus any unrelated green check
-in the rollup (`ci_leg_runnable` asks only that one exists), used to skip both
+in the rollup (`ci_leg_runnable` asks only that one exists), would skip both
 local test legs, the code UI review and cycle 1 on a commit no suite had ever
-run on. So `trusted` now also requires a **revision receipt**: a record the
+run on. So `trusted` also requires a **revision receipt**: a record the
 resolver writes outside the PR author's reach, for this exact SHA
 (*Verifying the receipt*). A forged marker with no receipt is `stale`, so
 forging the marker buys nothing.
@@ -309,7 +308,7 @@ grep -oE '<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->' <<<"$body"
   SHA verifies and agrees with the marker (*Verifying the receipt*). Any doubt
   ⇒ `stale`.
 
-`stale` and `absent` run today's pipeline **byte-identically** — no step
+`stale` and `absent` run the full pipeline — no step
 shortened, no cycle cap lowered, no pass skipped. A human-authored PR never
 carries the marker, so it is `absent` and is therefore unaffected by this gate in
 every particular.
@@ -378,7 +377,7 @@ is `true` AND that rollup is non-empty; otherwise false (`review.check_ci:
 false`, or an empty/absent/unreadable rollup — the early `no_ci`). An empty
 rollup is ambiguous (just-pushed vs no CI) and fail-safes to RUN the suite.
 When `ci_leg_runnable` is false, ignore `tests=` and run both local test legs
-as if the PR were unmarked. No new config key; Step 5's CI wait stays ungated.
+as if the PR were unmarked. Step 5's CI wait stays ungated.
 
 **`review.ignore_ci_billing_failures` does not enter this predicate — it is
 unchanged by that key, in either direction.** `ci_leg_runnable` asks whether CI
@@ -440,8 +439,7 @@ below — it runs only "after the fix cycle reports zero fixable issues"), so an
 unmarked clean PR already gets exactly one cold-start pass and no confirmation.
 What `trusted` changes is *which* single pass a clean PR gets — the unbiased,
 cold-memory one — not how many. The measured saving is the two duplicated local
-test legs. If the pass returns fixable findings they go to the fixer exactly as
-today; the fixer's commit then moves the head, so the next re-evaluation turns
+test legs. If the pass returns fixable findings they go to the fixer; the fixer's commit then moves the head, so the next re-evaluation turns
 the verdict `stale` and the remaining cycles are the full pipeline again.
 
 ### Re-evaluation after a push <!-- a:rvm-reeval-push -->
@@ -496,7 +494,7 @@ profile, for any marker, at any cycle:
 
 - **Step 2's `gi-secscan` pre-commit scan.** It guards a commit *this skill* is
   about to make from a checked-out untrusted branch. It is a safety gate, and
-  #274 is what happens when repo-controlled input reaches one.
+  repo-controlled input must never reach one.
 - **Step 2's lint/format auto-fix.** It mutates the working tree, so skipping it
   changes the PR's content, not merely the review's cost.
 - **Step 5's CI wait.** CI runs on the remote against the merge result; nothing
@@ -508,7 +506,7 @@ profile, for any marker, at any cycle:
 - **The four traceability checks.** Same reason: they check the body, and the
   body is the untrusted input.
 
-Both #36 hard-blocks — `acceptance_criteria: fail` and a missing `Closes #N` —
+Both hard-blocks — `acceptance_criteria: fail` and a missing `Closes #N` —
 keep blocking soft-pass and merge under `trusted`, exactly as they do under
 `light`.
 

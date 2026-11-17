@@ -39,7 +39,7 @@ run that never captures it reports `elapsed: n/a` rather than a wrong number.
 Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
 **Interactive mode only** — ordinary auto mode is skipped. The offer and local
 creation procedure remain interactive; `--auto` / `IDD_AUTO_MODE=1` uses the
-in-place path (Repo Sync + *0f — Create branch*) byte-for-byte as before.
+in-place path (Repo Sync + *0f — Create branch*).
 The worktree prompt never appears in auto mode. The sole exception is a worktree
 auto-pilot already created for a parallel resolver lane; that caller-managed
 path validates and adopts the workspace below, without showing a prompt or
@@ -130,13 +130,12 @@ root and wrap each Bash repository operation in one command beginning
 may read, edit, stage, test, or commit through the ambient checkout. Do not
 invent Agent `cwd` or environment parameters — every spawn remains canonical
 `Agent(description, prompt)`. On every non-caller-managed path set both
-`workspace_contract = null` and `expected_lane_identity = null`, preserving
-ordinary behavior byte-for-byte.
+`workspace_contract = null` and `expected_lane_identity = null`.
 
 This handoff is structural, not a safety-gate waiver. The already-resolved
 checks, live issue re-verification, both secret scans, QA, final tests, and push
 still run in full. On auto-pilot's default single-lane path the signal is
-absent, so this section is unreachable and ordinary auto mode is unchanged.
+absent, so this section is unreachable there.
 
 ### Why a worktree
 

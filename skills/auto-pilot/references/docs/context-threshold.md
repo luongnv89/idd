@@ -6,7 +6,7 @@ https://github.com/luongnv89/idd/blob/main/docs/decisions/context-threshold-dura
 
 ## Disabled
 
-`compaction.enabled: false` turns every rule below off: no check, no `/compact` line, no pause, no re-entry rule, no extra checkpoint. Every skill then behaves exactly as before this contract.
+`compaction.enabled: false` turns every rule below off: no check, no `/compact` line, no pause, no re-entry rule, no extra checkpoint.
 
 ## Signal rule
 
@@ -40,7 +40,7 @@ Never put a branch name, an issue or PR title, or any issue/PR text in it: that 
 
 ## Re-entry after a compaction
 
-`/auto-pilot`, `/issue-resolver` and `/issue-pr-review` carry a re-entry rule before *Prerequisites* in SKILL.md, the part the host re-injects. It re-reads durable state and the current step, never re-spawns an in-flight subagent, live-checks with `gh … --json` before repeating a push, PR, comment, label or merge, and takes the existing cap path when a loop counter is lost. Any doubt: behave as before this contract.
+`/auto-pilot`, `/issue-resolver` and `/issue-pr-review` carry a re-entry rule before *Prerequisites* in SKILL.md, the part the host re-injects. It re-reads durable state and the current step, never re-spawns an in-flight subagent, live-checks with `gh … --json` before repeating a push, PR, comment, label or merge, and takes the existing cap path when a loop counter is lost. Any doubt takes the cautious branch: an unreturned spawn is in flight, a lost loop counter is the cap, and no effect repeats before a live `--json` read.
 
 ## User-side knobs
 

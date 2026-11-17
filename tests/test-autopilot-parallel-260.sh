@@ -35,9 +35,9 @@ has "$SCHEMA" 'autopilot\.max_parallel.*`1`|max_parallel: 1' \
   "AC4: schema defines max_parallel with default 1"
 has "$TEMPLATE" '^[[:space:]]+max_parallel: 1$' \
   "AC4: init template emits max_parallel: 1"
-has "$PHASES" 'Legacy sequential path \(`max_parallel = 1`\)' \
-  "AC4: phases keep an explicit legacy sequential branch"
-has "$PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\).*legacy in-place path exactly' \
+has "$PHASES" '#### Sequential path \(`max_parallel = 1`\)' \
+  "AC4: phases keep an explicit sequential branch"
+has "$PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\).*use the in-place path exactly' \
   "AC4: value 1 keeps the ordinary in-place resolver prompt"
 
 # Resolver-only concurrency and worktree ownership.

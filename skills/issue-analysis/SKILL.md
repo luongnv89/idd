@@ -127,7 +127,7 @@ Analysis settings and defaults (full semantics in `references/docs/config-schema
 | `analysis.max_files` | `30` | Max files to read during deep analysis |
 | `analysis.trace_depth` | `3` | How many levels of import dependencies to trace |
 | `analysis.scan_timeout` | `120` | Max seconds for the full codebase scan phase |
-| `compaction.enabled` | `true` | Context-threshold check below; `false` = as before |
+| `compaction.enabled` | `true` | Context-threshold check below; `false` = no check |
 | `compaction.threshold.issue-analysis` | `40` | % of context remaining that triggers it |
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
@@ -166,7 +166,7 @@ Read `references/agents/codebase-researcher.md` and `references/agents/synthesiz
 
 If the Agent tool is available, use subagents as described above. If not (e.g.
 Claude.ai), read `references/inline-fallback.md`, which holds the full Steps 2-7
-procedure for that path; no delegated run needs it. Step 8 is unchanged
+procedure for that path; no delegated run needs it. Step 8 is the same
 either way.
 
 ### Bundled dependency precheck

@@ -1,6 +1,6 @@
 # Step 3.5 — Clarify Ambiguous Intent
 
-This step makes intent capture **active** rather than passive: before drafting, the skill resolves genuine ambiguity by asking — but only when confidence is genuinely low, and only in interactive Create mode. When confidence is high, this step is a silent no-op and the one-shot path (Step 3 → Step 4) is unchanged.
+This step makes intent capture **active** rather than passive: before drafting, the skill resolves genuine ambiguity by asking — but only when confidence is genuinely low, and only in interactive Create mode. When confidence is high, this step is a silent no-op: Step 3 goes straight to Step 4.
 
 ## When this step runs
 
@@ -23,7 +23,7 @@ A question is only worth the user's attention if the repo cannot answer it. Befo
 For each remaining low-confidence field (at most one or two — do not interrogate):
 
 1. Ask **one question at a time**, each phrased to capture intent, never implementation.
-2. Offer a **recommended default** — and make that default exactly the assumption the one-shot path would have made today (the `(needs review)` guess). This is the unifying rule: high confidence skips the question; low-confidence interactive asks with today's guess as the default; non-interactive takes that same default silently.
+2. Offer a **recommended default** — and make that default exactly the assumption the one-shot path makes (the `(needs review)` guess). This is the unifying rule: high confidence skips the question; low-confidence interactive asks with that guess as the default; non-interactive takes that same default silently.
 3. Use the project's plain `[Y/n]`-style prompt idiom with the default shown in the line — never a special UI widget (the skill must also run on Claude.ai). Wait for the answer before asking the next question.
 
 ```
@@ -44,4 +44,4 @@ After at most two questions, proceed to Step 4 regardless — this is targeted d
 
 ## Non-interactive contexts (never block)
 
-In Batch mode and any auto/non-interactive context (auto mode is detected per `references/docs/auto-mode.md`), **skip this step entirely**. Proceed straight to Step 4, draft with the defaulted assumptions, and mark those fields `(needs review)` in the body exactly as today. The skill never pauses for input outside interactive Create mode.
+In Batch mode and any auto/non-interactive context (auto mode is detected per `references/docs/auto-mode.md`), **skip this step entirely**. Proceed straight to Step 4, draft with the defaulted assumptions, and mark those fields `(needs review)` in the body. The skill never pauses for input outside interactive Create mode.

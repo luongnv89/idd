@@ -34,7 +34,7 @@ when nothing local would be lost; otherwise stop, discarding nothing:
 
 ```bash
 git rebase --abort
-# Empty-range guard (#548): reset only on 0 and a clean tracked tree.
+# Empty-range guard: reset only on 0 and a clean tracked tree.
 ahead="$(git rev-list --count "origin/{default_branch}..HEAD")" || ahead=""
 if [ "$ahead" = "0" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] &&
   git reset --hard "origin/{default_branch}"; then
@@ -61,9 +61,9 @@ only `description` and `prompt` — do NOT set `subagent_type`. The resolver is 
 **skill** invoked from inside the prompt (via `{{skill:issue-resolver}}`), not an
 agent type; passing `subagent_type: "issue-resolver"` fails.
 
-#### Legacy sequential path (`max_parallel = 1`)
+#### Sequential path (`max_parallel = 1`)
 
-Run the original path exactly:
+Run this path exactly:
 
 ```
 ● [Iteration {i}/{max}] Resolving #{issue_number}...
@@ -78,7 +78,7 @@ result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is
 created.
 
 **Pre-spawn checkpoint.** <!-- a:ctx-prespawn-resolve --> Only when
-`compaction.enabled` is true; `false` skips it, exactly as before. Before this
+`compaction.enabled` is true; `false` skips it. Before this
 spawn, record the issue with the *Step 1.0b* checkpoint procedure:
 
 ```json
@@ -150,9 +150,9 @@ workspace authority.
 Before fan-out, capability-gate the host: parallel mode requires workers whose
 Read/Edit/Write tools accept absolute paths and whose Bash tool can execute one
 quoted command at a time. If either capability is unavailable, print
-`⚠ Parallel resolver absolute-path isolation unavailable — using the legacy
+`⚠ Parallel resolver absolute-path isolation unavailable — using the
 sequential path`, remove only the unstarted worktrees this batch created, clear
-the planned batch, and execute the byte-for-byte legacy path. This fallback is
+the planned batch, and execute the sequential path. This fallback is
 permitted only before any worker starts.
 
 A parallel worker may not use its ambient root for any repository operation.
@@ -205,7 +205,7 @@ or worktree cleanup overlaps another lane's.
 
 ### Step 2.3 — Process Resolver Result
 
-On the sequential path, process the sole result as before. On the parallel path,
+On the sequential path, process the sole result. On the parallel path,
 choose the next `returned`/`failed` lane in original triage order and copy it
 into singleton `current`. A returned lane advances to `review`. A failed lane
 advances to `cleanup` only when its deterministic path is still registered by
@@ -226,7 +226,7 @@ checkpoint procedure:
 For a parallel drain, the same atomic patch also advances that issue's lane:
 `"lanes": [{"issue": 42, "phase": "review"}]`. At `max_parallel=1` omit it.
 
-This is the checkpoint that makes AC1 work: a run interrupted anywhere in Phase
+This is the checkpoint that makes resume work: a run interrupted anywhere in Phase
 3-5 resumes onto **this** branch and **this** PR instead of re-resolving the
 issue and opening a second one.
 
@@ -315,7 +315,7 @@ that line is appended is off by one. Ensure the failed line is durable **before*
 
 - **Sequential path (`max_parallel = 1`):** the failed line is already appended
   by SKILL.md → *Run-log entry* (`gi-runlog.py --append`) before this subsection
-  runs. Leave that path unchanged.
+  runs, so add nothing.
 - **Parallel path (`max_parallel > 1`):** failed lanes do **not** wait for Step
   5.3's success-path drain. **Before** the streak check below, run the same
   exactly-once log transition Step 5.3 documents (*Parallel lane — exactly-once

@@ -32,7 +32,7 @@ lets an ambient parent checkout become that lane's implicit workspace.
 `analysis_reuse = fresh` — with the parsed `.idd/analysis-<N>.json` (its
 `extraction`, `affected_files`, `history` and `cross_references` blocks are the
 useful part). On every other
-path pass `null` or omit the key, so the payload is byte-for-byte today's.
+path pass `null` or omit the key.
 
 ### `triage_context` (when supplied) <!-- a:rs-triage-context -->
 
@@ -65,8 +65,7 @@ field may gate duplicated work, never a safety gate (references/docs/shared-agen
 *Caller-supplied context payloads*).
 
 Degrade: anything unparsable, or a row whose issue number is not `N`, is treated
-as absent — the researcher reads the triage graph itself, exactly as
-today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
+as absent — the researcher reads the triage graph itself. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
 
 ```
 ○ Triage context: supplied (4 affected files) — hints verified, not trusted

@@ -128,7 +128,7 @@ borrowed directory survives in the global `~/.claude/skills/` — the untracked
 orphan the resolver's marker rule exists to prevent, and one no later run
 can find. Tear down (or carry the failures back) before `--init` writes; a state
 object too damaged to read for `borrowed_skills` has nothing to tear down and
-proceeds to `--init` as before.
+proceeds to `--init`.
 The read-back rule above binds here too: skip any entry whose `name` does not
 match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
 `borrowed` before it reaches an `rm -rf`, and remove a directory only when it
@@ -314,8 +314,8 @@ matches is an ordinary cap stop.
 
 ### Context threshold check <!-- a:ctx-check -->
 
-Only when `compaction.enabled` is true; `false` skips this check entirely and
-the loop behaves exactly as before. The contract, including the signal rule, is
+Only when `compaction.enabled` is true; `false` skips this check entirely.
+The contract, including the signal rule, is
 `docs/context-threshold.md`. Evaluate it at the **top of every iteration** only,
 right after the *Open PR cap check*, against
 `compaction.threshold.auto-pilot` (default 15). It reads only a

@@ -16,7 +16,7 @@ on every run that reached the summary footer:
     Decision:    No approval needed — report-only, nothing changed. Next: apply the check 4 Fix hint, then re-run /idd-doctor
 ```
 
-The `Result:` line itself is unchanged and stays the one line a wrapper script
+The `Result:` line itself stays the one line a wrapper script
 greps (see *Exit codes* in SKILL.md). The rows are additive human-facing
 output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
 

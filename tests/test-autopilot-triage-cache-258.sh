@@ -230,8 +230,8 @@ check_block_has "$GATE_BLOCK" 'any doubt is .stale' \
   "T2.8: the gate degrades to a full triage on any doubt"
 check_block_has "$GATE_BLOCK" 'can only remove duplicated work, never change an outcome' \
   "T2.9: the gate states it can only remove duplicated work"
-check_block_has "$GATE_BLOCK" 'worst case is exactly today.s behavior' \
-  "T2.10: the gate names today's behavior as its worst case"
+check_block_has "$GATE_BLOCK" 'worst case is a full triage' \
+  "T2.10: the gate names a full triage as its worst case"
 
 # Step 1.1 must stop claiming a fresh triage every iteration.
 check_lacks "$SRC_PHASES" 'Run a fresh triage to get current priorities' \

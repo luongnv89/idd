@@ -97,7 +97,7 @@ classifier for the profile.
 | Profile | Effort band | Intent |
 |---------|-------------|--------|
 | **light** | XS, S | Trivial/small work — collapse optional phases, cap the review-fix loop to one cycle. |
-| **full**  | M, L, XL | Everything today runs unchanged — the current pipeline in full. |
+| **full**  | M, L, XL | The full pipeline: every step, at full strength. |
 
 The profile is a **coarse** two-state switch, not one profile per band: a fast
 path for the long tail of trivial work. Model/effort selection already scales
@@ -165,8 +165,7 @@ downgrade:
 Each consuming skill exposes an explicit off-switch so a maintainer can force the
 full pipeline on every issue regardless of band: `resolve.adaptive_effort`
 (default `true`) for `/issue-resolver` and `review.adaptive_depth` (default
-`true`) for `/issue-pr-review`. When the switch is `false`, the skill behaves
-exactly as it did before this mechanism existed — the profile is pinned to
+`true`) for `/issue-pr-review`. When the switch is `false`, the profile is pinned to
 `full`. Defaults are **on** so zero-config users get the fast path for trivial
 work automatically; the switch exists for maintainers who prefer uniform
 full-treatment (see [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md)).

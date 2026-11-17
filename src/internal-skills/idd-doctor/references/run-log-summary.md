@@ -26,7 +26,7 @@ already skipped):
   seconds of each phase name (skip a non-object `phases` and any entry that is
   not a non-negative integer). Print the phase with the highest median, its
   median, and how many runs recorded it. `n/a` when no run carries the field.
-- **Skill improvements** (optional; issue #524) — when
+- **Skill improvements** (optional) — when
   `.idd/improvement-proposals.jsonl` exists, the count of keys whose
   **latest** event is `proposed` (pending approval). Parse it with the same
   tolerance as the run log: skip malformed lines; a key's status is its last

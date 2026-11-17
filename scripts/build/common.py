@@ -233,8 +233,8 @@ _CONFIG_EXCERPT_NOTICE = (
 # keeping the size accounting executable instead of burying it in comments.
 DOC_DIGEST_EXPECTED_BYTES: dict[str, tuple[int, int]] = {
     # document: (authored document, emitted runtime digest)
-    "platform-github.md": (6396, 5994),
-    "pre-commit-security.md": (28397, 19839),
+    "platform-github.md": (6376, 5980),
+    "pre-commit-security.md": (28382, 19824),
 }
 
 DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {

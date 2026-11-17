@@ -1,6 +1,6 @@
 # Progress Record Mechanics — /issue-pr-review
 
-The single home of this skill's progress record (issue #542), read from SKILL.md's *Progress record*. It mirrors the resolver's Step 0j for the seven review steps.
+The single home of this skill's progress record, read from SKILL.md's *Progress record*. It mirrors the resolver's Step 0j for the seven review steps.
 
 ## Progress record <!-- a:rvm-progress -->
 
