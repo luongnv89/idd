@@ -384,8 +384,8 @@ def _text(value, limit: int, name: str, nullable: bool = False) -> None:
 
 
 def _closed(value, keys, name: str, allow=frozenset()) -> dict:
-    """`allow` names forbidden keys this object may still carry — an option's
-    own `number` is plan data, not the record's measured `number`."""
+    """`allow` names forbidden keys this object owns: an option's `number`,
+    an effect key's PR-head `branch` — data, never the measured ones."""
     if not isinstance(value, dict):
         raise InvalidInput(f"{name} must be a JSON object")
     for key in value:
@@ -447,7 +447,7 @@ def _effect(value, skill: str) -> None:
     if value.get("state") not in ("intent", "done"):
         raise InvalidInput("effect.state must be 'intent' or 'done'")
     key = value.get("key", {})
-    _closed(key, {"sha", "branch", "pr"}, "effect.key")
+    _closed(key, {"sha", "branch", "pr"}, "effect.key", allow={"branch"})
     if "sha" in key:
         _sha(key["sha"], "effect.key.sha")
     if "branch" in key:
