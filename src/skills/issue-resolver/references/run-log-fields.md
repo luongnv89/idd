@@ -40,8 +40,9 @@ These derivations are the resolver's own:
   (`gi-runlog.py` exits 3 without it); omit otherwise.
 - **`verification`** — set only when `outcome` is `success`. Its value is
   `full`, `partial` or `disabled` — never the outcome — by the
-  `docs/run-log-schema.md` rule applied to the PR's AC table: any row not
-  `pass` → `partial`, deferred rows excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
+  `docs/run-log-schema.md` rule
+  applied to the PR's AC table: any row not `pass` → `partial`, deferred rows
+  excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
   so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
 
 - **`tokens`, `agents`, `duration_s`** — the row and the *Run Stats Footer*
