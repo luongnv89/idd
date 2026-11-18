@@ -80,7 +80,8 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 | `../references/run-log-fields.md` | Run-log field derivation and suppression |
 | `../references/report-examples.md` | Expected pipeline output and format rule |
 | `../references/step-reports.md` | Step completion report rules and the per-step check table |
-| `../references/skill-index.md` | Progressive-disclosure index of the skill's reference files |
+| `../references/skill-index.md` | Catalog of optional luongnv89/skills skills the Step 3 propose sub-step can offer |
+| `../references/practice-*.md` | Practice-pack selection (`practice-packs.md`) and the per-domain checklists (tests, code, performance, security, frontend, CI/CD, CLI, docs) the implementer applies and the Step 4 reviewer checks |
 | `../references/error-messages.md` | Complete error catalog with triggers and exact output for every failure scenario |
 
 ## Output

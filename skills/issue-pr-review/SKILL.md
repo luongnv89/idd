@@ -4,7 +4,7 @@ description: "Review a PR end-to-end with CI checks, fix cycles, and optional au
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 2.10.1
+  version: 2.11.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
 ---
@@ -83,6 +83,8 @@ references/scripts/gi-criteria.py
 references/scripts/gi-runlog.py
 references/scripts/gi-sensitive.py
 ```
+
+The practice packs, checked the same way: `references/practice-packs.md`, `references/practice-tests.md`, `references/practice-code.md`, `references/practice-performance.md`, `references/practice-security.md`, `references/practice-frontend.md`, `references/practice-ci-cd.md`, `references/practice-cli.md`, `references/practice-docs.md`.
 
 ```text
 ✗ Missing bundled dependency: {missing_file}

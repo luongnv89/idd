@@ -79,13 +79,13 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 123385
+        "measured": 123675
       },
-      "budget": 319959,
-      "measured": 319024,
+      "budget": 336686,
+      "measured": 336686,
       "skill_md": {
-        "budget": 32125,
-        "measured": 32050
+        "budget": 32389,
+        "measured": 32389
       }
     },
     "issue-resolver": {
@@ -98,11 +98,11 @@
         ],
         "measured": 11103
       },
-      "budget": 430382,
-      "measured": 429455,
+      "budget": 449387,
+      "measured": 449387,
       "skill_md": {
-        "budget": 33856,
-        "measured": 33649
+        "budget": 35002,
+        "measured": 34068
       }
     },
     "issue-triage": {

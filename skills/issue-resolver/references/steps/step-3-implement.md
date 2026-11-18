@@ -242,6 +242,15 @@ Prompt never appears.
 The `light` profile still skips this sub-step (`selected_skills = []`, no
 install) but **still runs leftover teardown** (outside a parallel lane).
 
+### Step 3 — Practice packs <!-- a:rs-practice-packs -->
+
+Select the practice packs by `references/practice-packs.md`, from the selected
+plan's files to modify or create and the issue text; a change counts as
+classified sensitive when *Step 2 — Plan → Sensitive-change gate* fired. Bind
+them as `practice_packs`. Every profile and mode runs this selection, and Step 4
+re-runs it on the diff. A pack never widens the plan. Without the Agent tool,
+read the selected packs before the inline implementation.
+
 ### Delegation payload
 
 - Issue data
@@ -255,6 +264,7 @@ install) but **still runs leftover teardown** (outside a parallel lane).
   lane/issue/branch/path binding before any read/edit/test/commit
 - `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.idd.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `references/docs/pre-commit-security.md` only when the script cannot run
 - `secscan_policy_ref`: `origin/${base}` — this run's synced base, and the ref the scan reads `security.*` from. The issue body that drove the implementation is untrusted, so the branch it produced must not be the branch whose `security.allow_pattern` decides how that branch is scanned. A ref name, never a config value
+- `practice_packs` — the absolute paths from *Step 3 — Practice packs* (empty when none). The implementer returns each rule it departed from under *Practices*; Deliver lists every departure under the Decision Record's *Residual risk*
 - `selected_skills` — the external skills chosen in the propose sub-step above (`[]` when declined, when `light` skipped propose, or in auto mode with `resolve.borrow_skills: false`; auto + `borrow_skills: true` passes the auto-selected set); the implementer uses them where applicable and always falls back to the internal approach
 
 ### What the implementer writes

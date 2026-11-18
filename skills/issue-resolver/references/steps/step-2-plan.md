@@ -284,7 +284,7 @@ its `replan` sends you back to option selection.
 **3. Independent challenge.** Spawn a **fresh** code-reviewer
 (`references/agents/code-reviewer.md`) in challenge mode: `{review_mode}` = `challenge`;
 `{challenge_context}` = a `## Challenge brief` heading, then the selected option,
-the probe ledger and its results; `{pr_context}` empty; `{diff_command}` =
+the probe ledger and its results; `{pr_context}` and `{practice_packs}` empty; `{diff_command}` =
 `git diff --stat "origin/${base}"...HEAD` (no diff exists yet);
 `{confidence_threshold}` = `80`; and the same `workspace_contract` plus independent
 `expected_lane_identity` sibling Steps 1–2 received (both `null` on ordinary runs).

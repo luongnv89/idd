@@ -525,6 +525,7 @@ Pass to the reviewer:
 - `diff_command`: `gh pr diff {N}`
 - `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor, except a `constraints` finding, reported at any confidence; ui-reviewer keeps its own 75 floor
 - `review_mode`: `review` (`challenge_context` empty) — the PR body never selects challenge mode
+- `practice_packs`: the packs `references/practice-packs.md` selects from `gh pr diff {N}` and the linked issue, counting the change as classified sensitive when the *Depth gate*'s risk tier (its step 4) is `sensitive`; select once in cycle 1 and bind the same set in the confirmation pass
 
 ## Cycles 2+ — Re-review via SendMessage
 
