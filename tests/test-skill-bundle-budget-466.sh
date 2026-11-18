@@ -556,6 +556,34 @@ else
   fail "(u) --check on the pointer fixture: exit $RC, output: $OUT"
 fi
 
+# (u2) the "once" and "read the *Section* in" forms count (issue #587):
+#      p.md (11 bytes), q.md (22) and r.md (44) are pointed at; s.md, t.md,
+#      u.md and v.md are near-misses and must not count.
+G="$TMP/ptr-once"
+mkdir -p "$G/skills/gamma/references"
+cat > "$G/skills/gamma/SKILL.md" <<'EOF'
+# gamma
+
+Read `references/p.md` once at skill start.
+Terms are defined in `references/q.md`; read it once before Phase 0.
+Read the *Review contract* in `references/r.md` (*Closing Summary*), then print.
+Load config once at skill start with `references/s.md`.
+The step now reads `references/t.md` once.
+Read `references/u.md` when needed.
+Read the table in `references/v.md` before merging.
+EOF
+write_bytes "$G/skills/gamma/references/p.md" 11
+write_bytes "$G/skills/gamma/references/q.md" 22
+write_bytes "$G/skills/gamma/references/r.md" 44
+for n in s t u v; do write_bytes "$G/skills/gamma/references/$n.md" 9000; done
+python3 "$SCRIPT" --skills-dir "$G/skills" --budgets "$G/budgets.json" --ratchet >/dev/null
+if [ "$(sub "$G/budgets.json" gamma always_read files)" = "references/p.md references/q.md references/r.md" ] && \
+   [ "$(sub "$G/budgets.json" gamma always_read measured)" = "77" ]; then
+  pass "(u2) \"read … once\", \"read it once\" and \"read the *Section* in …\" are detected; near-misses are not counted"
+else
+  fail "(u2) once/section detection: $(cat "$G/budgets.json")"
+fi
+
 # (v) an always-read file growing past the budget fails; the bundle budget
 #     holds because c.md shrinks by as much.
 write_bytes "$F/skills/alpha/references/a.md" 2000
@@ -661,7 +689,8 @@ fi
 
 # ── AC2 / AC3 on the committed tree ───────────────────────────────────────
 # The pointer counts are the ones SKILL.md carries today. A PR that adds or
-# drops a "read … now" or "read … first" pointer on purpose updates this line with the ratchet.
+# drops a "read … now|first|once", "read it now|first|once" or "read the
+# *Section* in …" pointer on purpose updates this line with the ratchet.
 want_counts="auto-pilot=5 init-idd=0 issue-analysis=2 issue-creator=6 issue-pr-review=5 issue-resolver=3 issue-triage=2 plan-to-issues=1"
 got_counts="$(python3 -c '
 import json, sys
