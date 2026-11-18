@@ -10,7 +10,7 @@ Before merging, verify:
 
 1. **PR is mergeable** — no conflicts, CI passing (if configured)
 2. **No blocking reviews** — no "request changes" reviews from other humans
-3. **Merge floor met** — Step 3.2's `merge_floor` is `met` (*Step 5.1c* checks its binding). Its one home is the `{{skill:issue-pr-review}}` skill's *Merge floor*; never re-derive it. Anything else is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`. A missing `merge_floor` (no review ran this session) is `left_open` too, with its own reason: `⚠ PR #{pr_number} left open — merge floor not derived (resumed run)`
+3. **Merge floor met** — Step 3.2's `merge_floor` is `met@<head40>:<base40>` (*Step 5.1c* checks its shape and binding). Its one home is the `{{skill:issue-pr-review}}` skill's *Merge floor*; never re-derive it. Anything else is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`. A missing `merge_floor` (no review ran this session) is `left_open` too, with its own reason: `⚠ PR #{pr_number} left open — merge floor not derived (resumed run)`
 4. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
 
 ```bash
@@ -282,7 +282,9 @@ Bind `verified_head` first. It is the 40-hex `headRefOid` from **Step 5.1's own
 read**, the head that Step 5.1a's verdict or the wait after it is about. Never
 take it from a later read: the guard pins the commit that was checked, so a SHA
 read after the wait would pin whatever the head became. `{merge_floor}` is
-check 3's value, pasted only as `met@<40 hex>:<40 hex>`: the floor must have
+check 3's value. Before any block pastes it, confirm it matches
+`^met@[0-9a-f]{40}:[0-9a-f]{40}$` exactly — no quote, space or newline; any
+other value is `stale`, and the block never runs. The floor must have
 classified this head on this live base tip.
 
 Then one fresh read and one ancestry check. `{owner}` and `{repo}` are `gh api`'s

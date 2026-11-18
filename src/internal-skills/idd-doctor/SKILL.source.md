@@ -105,7 +105,7 @@ Expected output for a clean repo:
     ✓ [3/4] Autopilot mode        autopilot.mode = conservative
 
     ● [4/4] Merge method...
-    ✓ [4/4] Merge method           squash allowed · IDD's merge carries the PR body
+    ✓ [4/4] Merge method           squash allowed · squash_merge_commit_message: PR_BODY
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
