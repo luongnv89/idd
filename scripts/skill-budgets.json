@@ -127,13 +127,13 @@
         "files": [
           "references/reporting.md"
         ],
-        "measured": 5062
+        "measured": 5381
       },
-      "budget": 171356,
-      "measured": 170480,
+      "budget": 174493,
+      "measured": 174480,
       "skill_md": {
         "budget": 25900,
-        "measured": 24876
+        "measured": 25051
       }
     }
   }

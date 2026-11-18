@@ -248,8 +248,9 @@ grep -qFx '## Source' epic-body.md \
        printf '```\n' >> epic-body.md; }
 ```
 
-The draft is fenced, so a drafted line cannot inject a heading or a sentinel into the epic body
-(`references/security-boundary.md`).
+The draft is fenced, and its fence-breaking lines are indented (*Fence safety* in
+`references/input-resolution.md`), so a drafted line cannot inject a heading or a sentinel into the
+epic body (`references/security-boundary.md`).
 
 **Step 4 probes.** Same shape, conversation values, plus the mutual-exclusion probe — an epic is
 bound to exactly one input kind, never both:

@@ -40,8 +40,10 @@ preview, a `sync`, and an early stop. This skill files issues; it authorizes no 
      dropped label, a failed or unmapped task, sub-issues unavailable, a degraded script, an
      unknown dependency id, a repair that did not hold.
    - `BLOCKED` — the run stopped before the first mutation: a failed preflight group, an invalid
-     config, a missing bundled file or `issue-creator`, unresolvable input, a declined draft, or a
-     `sync` target with no sentinels.
+     config, a missing bundled file or `issue-creator`, unresolvable input, a declined draft, a
+     handoff to `/tasks-generator` or a stop at the requirements-document prompt, or a `sync`
+     target with no sentinels. On the handoff, `Next action` is `/tasks-generator <doc>` and
+     `Decision` carries the follow-up `/plan-to-issues <doc-dir>/tasks.md`.
    - `PREVIEW` — a `--dry-run`: the task table and map preview printed, nothing created.
 2. **Evidence.** Name what was verified by re-reading, not by exit code: the epic body's marker and
    sentinels, the children count from the `Part of #<epic>` filter, the `sub_issues` length, and
@@ -81,6 +83,7 @@ Never print `Result: DONE` with a `×` or `⚠` row above it.
 
 The `Source:` line is the only difference between input kinds: a plan file prints
 `file MODERNIZATION_PLAN.md (...)`; a conversation prints `conversation "Harden the ingest path"
-(1 phase, 6 tasks, draft confirmed)` and its `Next action` is the resume handle
+(1 phase, 6 tasks, draft confirmed)`, with `from docs/PRD.md` added inside the parentheses when
+drafted from a requirements document, and its `Next action` is the resume handle
 `/plan-to-issues --from-conversation --epic {epic}`. The run-stats footer
 (`references/run-stats.md`) follows this block.

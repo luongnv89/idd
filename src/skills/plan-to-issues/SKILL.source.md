@@ -4,7 +4,7 @@ description: "Convert any phased plan file, or a conversation about what to buil
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication (`gh auth status`), plus the sibling issue-creator skill from the same idd distribution."
 metadata:
-  version: 2.4.1
+  version: 2.4.2
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
   architecture: "orchestrator (resolve input → worklist → label set → epic → per-phase issue-creator batch → sub-issue registration → static map render → verify-by-re-read)"
@@ -62,6 +62,7 @@ any issue is filed — a half-created backlog is worse than one not started.
 | `python3` | tool, degradable | runs `shared/scripts/gi-config.py` and `shared/scripts/gi-plan-map.py`; each has a prose fallback beside its call |
 | **`issue-creator`** skill | **skill** | writes every issue body; no fallback path. Ships in the same idd distribution |
 | `codebase-modernizer` skill | skill, optional | one way to produce a plan file; never required — the conversation path needs no file |
+| `tasks-generator` skill | skill, optional | turns a PRD into a plan file; suggested, never run |
 | this skill's `references/` | bundled | a truncated install fails mid-run (*Bundled dependency precheck*) |
 
 `gh` gets six readiness probes rather than one `command -v`, because every way it can be
@@ -139,7 +140,7 @@ and every failure block: `references/preflight.md`.
 
 **Resolve the input here**, by the ordered rules in `references/input-resolution.md`: explicit path
 → `--from-conversation` → *both available, ask once* → plan discovery → conversational fallback →
-stop. Record `source.kind` and `source.value`; Phase 3 binds the epic to them. Never guess between
+requirements-document fallback (ask once; skipped with no user present) → stop. Record `source.kind` and `source.value`; Phase 3 binds the epic to them. Never guess between
 candidates, and never fall back from an unparseable plan file to the conversation.
 
 **Sync mode** runs a reduced preflight: env and gh only, budget 10 requests.
