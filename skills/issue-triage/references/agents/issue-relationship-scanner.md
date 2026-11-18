@@ -6,7 +6,7 @@
 
 Map the ecosystem of issues — how they connect through shared files, how commits relate through history, how PRs incidentally fix what they never targeted.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Shared agent conventions (inlined — no file lookup required)
 
@@ -20,7 +20,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or
@@ -112,13 +112,9 @@ Return a single JSON object (nothing outside the block):
 - `dependency_edges[].strength`: `"file"` (exact shared files) or `"directory"` (same directory).
 - `issues[N].timeout`: `true` if the per-issue scan exceeded `scan_timeout`.
 - `history_scan.potentially_fixed`: `[]` if none.
-- `history_scan.merged_prs`: merged PRs that reference an open issue; `referenced_issues` is retained for compatibility, while `references` preserves each reference's `source` (`body`, `title`, or `branch`) and `target_issues` identifies the PR's target issue numbers. `changed_files` holds `gh pr view --json files` paths. `files_available: false` means file-overlap detection must skip that PR.
+- `history_scan.merged_prs`: merged PRs that reference an open issue; `referenced_issues` lists every referenced issue number for traceability only, `references` preserves each reference's `source` (`body`, `title`, or `branch`), and `target_issues` identifies the PR's target issue numbers. `changed_files` holds `gh pr view --json files` paths. `files_available: false` means file-overlap detection must skip that PR.
 - `history_scan.potentially_fixed[].reference_source`: `"commit"` or `"body"`; only these sources are eligible. `target_issue` is the distinct issue the PR targeted.
 - For a skipped part, return its empty shape instead of omitting it: `scope: "history"` returns `dependency_scan: {"issues": {}, "dependency_edges": []}`; `scope: "dependency"` returns `history_scan: {"potentially_fixed": [], "merged_prs": [], "scanned_commits": 0, "scanned_prs": 0}`.
-
-## Parallel batching (orchestrator)
-
-For 10+ issues, the main agent splits into batches of ~5 and spawns one scanner per batch (same turn), normally with `scope: "both"`. Merge: concatenate the `issues` maps, `dependency_edges`, `potentially_fixed`, and `merged_prs` arrays, then run a second pass for cross-batch edges (issues from different batches sharing files). Do not spawn separate history and dependency scanners for the same batch.
 
 ## Constraints
 

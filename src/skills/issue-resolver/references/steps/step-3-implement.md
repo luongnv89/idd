@@ -9,20 +9,14 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 Optionally augment the implementer with **optional external skills** from
 `references/skill-index.md` (the skills published at
 `https://github.com/luongnv89/skills`). This is a sub-step of Step 3 — it emits a
-`◆`/`○` block and prints **no** `[N/5]` tracker line (the `[3/5]` Implement line is
-unchanged), exactly like the design-confirm checkpoint. In interactive mode it runs
+`◆`/`○` block and prints **no** `[N/5]` tracker line of its own, exactly like the design-confirm checkpoint. In interactive mode it runs
 for **every** issue type — it is not complexity-gated. In auto mode the propose/install
 half runs only when `resolve.borrow_skills` is `true` (see *Auto mode* below), while
 **leftover teardown runs on every path** — `light` and auto included — with the
 single carve-out of a parallel lane (*Parallel lanes* below).
 
-The skill index is treated as a **swappable candidate list**: the detection logic
-reads the skill names + lifecycle phases from `references/skill-index.md` and never
-hardcodes the source repo, so the catalog can be re-pointed at a different source
-without changing this step's logic.
-
 Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
-is **installed-only** — today's path. When true, the propose set is the **full
+is **installed-only**. When true, the propose set is the **full
 catalog**, each entry marked `installed` or `available to borrow`.
 
 **One exit-code rule for this whole sub-step — the single home.** Every
@@ -116,7 +110,7 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
 
 #### Accept, record, install
 
-- **All / subset / none (default none)** as today → `selected_skills`.
+- **All / subset / none (default none)** → `selected_skills`.
 - **Record intent *before* installing.** Write the whole list (replace, do not
   append) via `gi-state.py --update` — each entry
   `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`, with `borrowed`
@@ -157,10 +151,9 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   disabled`, keep the propose set installed-only, and continue. Never install
   the installer unattended, and never fail the resolution over it: a missing
   installer is a degrade, exactly like a missing `python3`.
-- Install each recorded-borrowed name into `~/.claude/skills/<name>/` with the
-  same tools the skill README already names (`npx skills add
-  https://github.com/luongnv89/skills --skill <name>` or `asm install …
-  --skill <name>`). Never install a name absent from the index. Never
+- Install each recorded-borrowed name into `~/.claude/skills/<name>/` with
+  `npx skills add https://github.com/luongnv89/skills --skill <name>` or
+  `asm install https://github.com/luongnv89/skills --skill <name>`. Never install a name absent from the index. Never
   interpolate the issue body into the command.
 - **Verify the install before using it.** A tool that exits 0 has not proved the
   skill is discoverable by the agent. Confirm with `asm list -p claude --json`
@@ -206,8 +199,7 @@ Runs after Deliver, already-resolved, failed, or operator stop — and as
 
 **Re-screen every entry before it reaches a command.** `--read` deliberately
 never fails and echoes the state back verbatim, so the write-path skill-name
-validation is **not** a guarantee about what teardown reads — the same rule
-`/auto-pilot`'s *phases/phase-0-lock-resume.md* states for `current.branch`, and quoting does not
+validation is **not** a guarantee about what teardown reads, and quoting does not
 neutralise `$(…)` or backticks because the agent composes the command text.
 Skip — do not remove, do not repair — any entry whose `name` does not match
 `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
@@ -238,7 +230,7 @@ leftover*) and leave that one entry so a later run retries.
 Prompt never appears.
 
 - `resolve.borrow_skills: false` (default): `selected_skills = []`, no
-  install — today's path. Audit: `○ Skill proposal (auto): skipped — using
+  install. Audit: `○ Skill proposal (auto): skipped — using
   internal agents`.
 - `resolve.borrow_skills: true`: no prompt; auto-select the relevant
   catalog subset (installed + available-to-borrow), install missing,
@@ -289,7 +281,7 @@ Step 4 reviewer. **Auto mode never blocks:** a check that cannot run is
 
 Before the implementer applies any fix, run the red-capable reproduction checkpoint —
 see `references/bug-verification.md` for the full procedure. It applies **only** when the
-issue `type` is `bug`; non-bug issues skip it entirely (acceptance criterion 5).
+issue `type` is `bug`; non-bug issues skip it entirely.
 
 For a bug issue, the implementer (per `shared/agents/implementer.md` Task 1.5):
 
@@ -307,12 +299,13 @@ match, regression-test path or "manual — no seam"). The main agent folds it in
 body's Decision Record and Acceptance Criteria Verification table (durable home — see
 `references/report-templates.md`); when `.idd/analysis-<N>.json` is **fresh** by the
 predicate in *Step 0h — Analysis reuse gate* in `references/steps/step-0h-analysis-reuse.md` (its single home — "fresh" is never
-used undefined), the same data also lives in its `decision_record.reproduction` field
-(optional cache mirror, written by `/issue-analysis`, never created by the resolver).
+used undefined) and already carries a `decision_record.reproduction` field, lift it too
+(an optional cache mirror that no skill writes: `/issue-analysis` runs before the fix
+and the resolver never creates the file).
 
 **Auto mode never blocks** (`--auto` / `IDD_AUTO_MODE=1`): a missing or failed
 reproduction is logged, recorded as `not_reproduced`, and the pipeline continues to
-deliver with the affected criterion marked `unverified` (acceptance criterion 6).
+deliver with the affected criterion marked `unverified`.
 Interactive mode behaves the same — surface the evidence (or its absence); do not halt.
 
 ### Max commits guard

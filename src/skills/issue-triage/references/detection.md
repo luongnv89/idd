@@ -1,6 +1,6 @@
 # /issue-triage — Already-Fixed & Dependency Detection
 
-Full spec for Step 1b (already-fixed detection via commit/PR history) and Step 2 (dependency analysis via file-overlap). SKILL.md keeps a summary; read this for the subagent prompts and confidence-scoring rules.
+Full spec for Step 1b (already-fixed detection via commit/PR history) and Step 2 (dependency analysis via file-overlap). SKILL.md keeps a summary; read this for the spawn and merge rules and confidence scoring.
 
 ## Step 1b — Detect Already-Fixed Issues
 
@@ -16,7 +16,7 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 1. Merge `history_scan.potentially_fixed`, `history_scan.merged_prs`, per-issue `affected_files`, and `dependency_edges` from all batches.
 2. For each open issue, compare its `affected_files` with each `history_scan.merged_prs[].changed_files`. Promote file overlap only when all conditions hold: the PR has a known `target_issues` value different from the open issue; `references` contains that open issue with `source: "body"` (or a correlated commit reference has `reference_source: "commit"`); and the files overlap. Do **not** use `referenced_issues` alone: it is compatibility/traceability metadata and loses source information. Never promote a title or branch reference, and never promote an issue that is itself a PR target. If fetching one PR's files failed, warn and skip only that PR's file-overlap signal.
-3. Convert undirected scanner edges to **directed** `blocks` / `blocked_by` using creation date (`createdAt`), blocking count, and type precedence (bug before feature/improvement) — same heuristics as the inline Step 2 procedure.
+3. Keep the scanner's edges undirected: write each `issue_a`/`issue_b` pair as `{"a": …, "b": …}` in the triage scan. Steps 3-7 direct them: the script, or the inline Step 2 heuristics on degrade.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
 
@@ -103,10 +103,11 @@ If any are found:
 
 **When the Agent tool is available:** Do **not** spawn another scanner for Step 2. Consume `dependency_scan` from the same full-scope (`scope: "both"`) result spawned for Step 1b. It contains the per-issue `affected_files` and `dependency_edges`; the input and output contract is defined in `shared/agents/issue-relationship-scanner.md`.
 
-**For 10+ issues:** Split the issues into batches of ~5 and spawn one full-scope issue-relationship-scanner subagent per batch (all in the same turn). After all subagents return, merge their results:
+**For 10+ issues:** Split the issues into batches of ~5 and spawn one full-scope issue-relationship-scanner subagent per batch (all in the same turn) — never separate history and dependency scanners for the same batch. After all subagents return, merge their results:
 1. Concatenate the `issues` maps from each batch into a single map
 2. Concatenate the `dependency_edges` arrays from each batch
-3. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add a dependency edge. Determine directionality using the same heuristics as the inline procedure: earlier creation date takes precedence, more blocking relationships take precedence, and bug type takes precedence over feature/improvement. If neither issue clearly precedes the other, mark them as co-dependent at the same level. This is a lightweight comparison the main agent does on the merged data.
+3. Concatenate the `history_scan.potentially_fixed` and `history_scan.merged_prs` arrays from each batch
+4. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add an undirected `{"a": …, "b": …}` edge; Steps 3-7 direct it. This is a lightweight comparison the main agent does on the merged data.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
 
@@ -206,10 +207,9 @@ If `triage.auto_priority` is true, assign a suggested priority to each issue bas
 - Improvements that block multiple (2+) issues
 
 **P3 (Low)**:
-- Features and improvements that do not block other issues
-- Stale issues with no dependencies (may be obsolete)
+- Everything no rule above places: features that block nothing, improvements that block fewer than two issues, and issues with no type
 
-Within each priority level, sort by: number of issues blocked (descending), then age (oldest first).
+The stale flag never changes a priority: a stale bug that blocks nothing is P2. Priority never changes the execution order from Step 4; the table stays in that order.
 
 If `triage.auto_priority` is false, set every priority to null, omit the Pri column from the table, and skip priority suggestions.
 

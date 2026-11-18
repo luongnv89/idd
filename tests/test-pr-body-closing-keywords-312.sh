@@ -60,7 +60,7 @@ expect_grep "T1: src squash/merge treats code span/blockquote keywords as merge-
 expect_grep "T1: src rebase keeps markdown-aware PR-body rules" \
   '`rebase`: evaluate the regex with \*\*markdown-aware\*\* PR-body rules' "$SRC_VERIFICATION"
 expect_grep "T1: src still hard-fails missing Closes #N (issue #36)" \
-  'issue #36 hard-fail' "$SRC_VERIFICATION"
+  'traceability hard-fail when absent' "$SRC_VERIFICATION"
 
 echo "T2: authored templates report the divergence, not under rebase"
 expect_grep "T2: src templates name issues that will close at merge" \

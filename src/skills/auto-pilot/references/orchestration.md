@@ -42,18 +42,18 @@ merge, `.idd/runs.jsonl`, `.idd/run-state.json`,
 `.idd/triage.json`, issue labels, and worktree cleanup have one writer: the
 main agent's serialized drain.
 
-## Compatibility branch (`max_parallel = 1`)
+## Sequential branch (`max_parallel = 1`)
 
-Value `1` is an explicit early branch, not a one-element use of the new
-scheduler. It runs the legacy sequence byte-for-byte: pick one issue, sync the
+Value `1` is an explicit early branch, not a one-element use of the parallel
+scheduler. It runs the sequential loop: pick one issue, sync the
 original checkout, spawn the ordinary in-place resolver prompt, wait, review,
 merge, log, checkpoint, update the cache, and loop. It creates no caller-managed
 worktree, writes no `lanes[]` entries, and sets no `IDD_CALLER_WORKTREE`.
 
 ## Subagent architecture
 
-In explicit-list mode the analyzer still runs once before the loop. The ordinary
-path remains one resolver followed by one reviewer. The parallel path is bounded
+In explicit-list mode the analyzer runs once before the loop. The sequential
+path is one resolver followed by one reviewer. The parallel path is bounded
 fan-out/fan-in followed by a serialized drain:
 
 ```
@@ -86,18 +86,11 @@ fan-in and one at a time; `--no-merge` preserves Phase 5 as the sole merge site.
 - A resolver failure does not cancel returned siblings. Its terminal telemetry is
   handled when that lane reaches the serialized drain.
 - `run-state.json.lanes[]` persists the lane phases `planned`, `resolve`,
-  `returned`, `review`, `fix`, `merge`, `cleanup`, `completed`, and `failed`.
-  The existing singleton `current` remains the compatibility seam for the one
-  lane currently draining.
+  `returned`, `review`, `fix`, `merge`, `cleanup`, `log_pending`, `logged`,
+  `completed`, `failed`, and `blocked_dirty`; `shared/scripts/gi-state.py`
+  defines them and the transitions between them.
+  The singleton `current` holds the one lane currently draining.
 - On `--resume`, reconcile every lane against GitHub and git before acting:
   validate its conventional branch, locate an open PR for it, and resume at the
   earliest safe phase. Any doubt re-runs or re-checks work; it never assumes a
   merge, a run-log append, or a completed cleanup.
-
-## Measuring the body-snapshot budget
-
-SKILL.md → *Caller-supplied context* names the three freshness boundaries
-(resolution, mutation, review). Measure body-returning reads by issue and by
-boundary/reason, never by total `gh` calls: the resolver's non-body
-`state,comments,updatedAt` probe preserves its 0a stops and 0h freshness check
-and is not a body read.

@@ -65,23 +65,6 @@ Markdown table), produce it from the same payload and keep the `Result`,
 `Evidence`, `Uncertainty` and `Decision` rows. If the host cannot render the
 requested format, say so and print the terminal table.
 
-### Evaluate report understanding
-
-Grade actual outputs against these criteria as well as ordering correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states the status and the suggested start without reading the table or logs. |
-| Facts and assumptions are separate | Observed checks (fetch, script exit, persisted file) are distinct from inferred edges, `maybe-fixed` flags and cached data. |
-| Claims are traceable | Each `maybe-fixed` flag links its commit or PR; each blocked status names its blocker; `PARTIAL` names the failed check. |
-| Next decision is clear | The output says `No approval needed.` and names the remaining user actions. |
-
-When running behavioral evaluations, include a full update, a cached view, a
-degraded scan and a failed write, and grade each report against all four rows.
-Ask human reviewers the matching four questions and record their answers in the
-eval case's `human_review` block. Missing, blank, or nonresponsive feedback leaves
-human understanding unconfirmed; agent inspection cannot confirm it.
-
 ## Step 8 — Output
 
 
@@ -204,7 +187,8 @@ SKILL.md, *Steps 3-7*):
     "stale_threshold_days": 14,
     "potentially_fixed_count": 0,
     "suggested_order": [12, 8, 15, 3],
-    "circular_deps": []
+    "circular_deps": [],
+    "co_dependent": []
   },
   "history": [
     {
@@ -253,12 +237,12 @@ SKILL.md, *Steps 3-7*):
 
 A full re-triage **overwrites the entire file** — it does not append to previous data. The `history` array contains exactly one entry per triage run (the current run).
 
-**Cross-skill incremental updates.** One other skill writes this file: `/auto-pilot`, in its *Step 1.6 — Update the triage cache after a merge* (its `references/phases/phase-5-merge.md`), which triages once per run and then keeps the payload current in place rather than re-triaging every iteration. That writer is bound by two invariants, and they are what let a second skill touch a file this one owns:
+**Cross-skill incremental updates.** One other skill writes this file: `/auto-pilot`, in its *Step 1.6 — Update the triage cache after a merge*, which triages once per run and then keeps the payload current in place rather than re-triaging every iteration. That step holds the full rule list; the writer is bound by two invariants, and they are what let a second skill touch a file this one owns:
 
-1. **Removal only, never a recomputation.** It deletes the merged issue's number from `issues[]`, from `summary.suggested_order`, from `summary.parallel_groups`, and from every remaining issue's `blocked_by` / `blocks` — plus the one derived consequence, flipping an issue whose `blocked_by` just emptied from `blocked` to `ready`. It never re-derives an order, because the persisted records carry `updated_at` and not `created_at`, and `created_at` is an input to the ordering. Removing one node from a valid topological order leaves a valid one; anything more goes through a full re-triage here.
-2. **Exactly one appended `history[]` entry per update**, with `source: "/auto-pilot"`. So `history` still reads as one entry per write, and a reader can tell a full re-triage from an incremental update by that `source` and by the entry's `changes` text.
+1. **Removal only, never a recomputation.** It removes the merged issue's number wherever the payload carries it, recounts the counts from the records that remain, and flips an issue whose `blocked_by` just emptied from `blocked` to `ready`. It never re-derives an order, because the persisted records carry `updated_at` and not `created_at`, and `created_at` is an input to the ordering. Removing one node from a valid topological order leaves a valid one; anything more goes through a full re-triage here.
+2. **Exactly one appended `history[]` entry per update**, with `source: "/auto-pilot"`, and the top-level `updated` moves to that entry's time. So `history` still reads as one entry per write, and a reader can tell a full re-triage from an incremental update by that `source` and by the entry's `changes` text.
 
-The schema is unchanged by this — no field is added, none is removed, and a payload an incremental update wrote is the same shape as one a full re-triage wrote.
+This keeps the schema — no field is added, none is removed, and a payload an incremental update wrote is the same shape as one a full re-triage wrote.
 
 ### Error handling
 
@@ -275,8 +259,8 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 ## Step Completion Reports
 
 Every step ends with a completion report — the checkable bar that separates *the
-step ran* from *the step succeeded*. Emit it right after the step's `[N/9]`
-tracker line:
+step ran* from *the step succeeded*. Print it when the step finishes, headed by a
+`[N/9]` tracker line naming the step and its headline result:
 
 ```
   [3-7/9] Ordering    ✓ 12 issues ordered, 4 stale

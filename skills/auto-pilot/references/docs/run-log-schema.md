@@ -17,7 +17,7 @@ Full field set; *Always present* is the required minimum:
 | Field | Type | Always present | Description |
 |-------|------|----------------|-------------|
 | `ts` | string (ISO 8601 UTC) | yes | When the run finished |
-| `event_id` | string | no | Idempotency key for a parallel lane, minted at scheduling. Used only with `--append-once`; legacy writers omit it. |
+| `event_id` | string | no | Idempotency key for a parallel lane, minted at scheduling. Used only with `--append-once`; other writers omit it. |
 | `issue` | integer | yes | Issue number the run processed |
 | `mode` | string | yes | Resolver rows: `interactive`/`auto`. Auto-pilot rows: its merge mode (`conservative`/`balanced`/`aggressive`) |
 | `skill` | string | yes | `issue-resolver`, `auto-pilot` or `issue-pr-review` — the writer |
@@ -55,7 +55,7 @@ reads the same clock as its `elapsed`. No footer value, no field.
 **Append rules:**
 - Create `.idd/` with `mkdir -p` if absent, then append one line ending in a
   single `\n`. Never rewrite or reorder existing lines.
-- Legacy `--append` writes are **best-effort and non-fatal**. A parallel lane's
+- Plain `--append` writes are **best-effort and non-fatal**. A parallel lane's
   `--append-once` failure instead leaves its durable state at `log_pending`; it
   never raw-appends, and resume retries the same event.
 - **No schema migration**: optional fields may appear over time, so readers must
@@ -72,7 +72,7 @@ are mutually exclusive. `--append` (default) creates `.idd/` and appends one
 validates identically, prints the line and **writes nothing**; `--append-once`
 requires `event_id`, locks its cross-process read/check/append/fsync transaction,
 reuses an identical event and exits `3` on conflict. Exits: `0` ok; `2` usage;
-`3` invalid/conflicting; `4` I/O failure — legacy callers may raw-append on `4`,
+`3` invalid/conflicting; `4` I/O failure — `--append` callers may raw-append on `4`,
 parallel lanes leave `log_pending` and retry.
 
 The one read: `--failure-streak N [--threshold F] [--log PATH]` prints

@@ -1,6 +1,6 @@
 # /auto-pilot — Explicit List Mode
 
-Detail of the explicit `--issues` mode, extracted from SKILL.md to keep the main file focused. Read this when the user passes `--issues`.
+Read this when the user passes `--issues`.
 
 ## Explicit List Mode
 
@@ -91,7 +91,7 @@ After validation, the auto-pilot analyzes all issues to find the smartest resolu
   ⟶ Spawning analyzer subagent...
 ```
 
-Spawn the **Analyzer Subagent** (see `references/subagent-prompts.md`) with the full list of validated issue numbers. The analyzer:
+Spawn the **Analyzer Subagent** (`references/prompts/analyzer.md`, per `references/spawning.md`) with the full list of validated issue numbers. The analyzer:
 
 1. **Runs `/issue-analysis` on each issue** — identifies affected files, root causes, complexity, and implementation approach
 2. **Builds a dependency graph** — issue A's fix may conflict with or depend on issue B's fix (e.g., both touch `auth.js`)
@@ -113,7 +113,7 @@ Spawn the **Analyzer Subagent** (see `references/subagent-prompts.md`) with the 
   The analyzer could not complete analysis for all issues.
   Proceeding with original order without batching optimization.
 ```
-Set `optimized_order` to the original validated list, `batches` to empty, and proceed to Confirmation. The auto-pilot still works — it just loses the optimization.
+Set `optimized_order` to the original validated list, `batches` to empty, and proceed to the *Execution Plan (auto-start)* section. The auto-pilot still works — it just loses the optimization.
 
 **On partial failure** (analyzer could not analyze a specific issue), output for each failed issue:
 ```
@@ -162,7 +162,7 @@ Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all bat
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  {valid_count} (of {original_count} provided)
   Review cycles:      {review_cycles}
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   Mode:               explicit list (analyzed + optimized)
   Batches:            {batch_count} (saving ~{saved_iterations} iterations)
 
@@ -210,8 +210,7 @@ appended de-duplicated at each end-of-iteration checkpoint
 in-memory copies stay the working set — every lookup above reads them — but a
 resumed run seeds them from the state file, which is the only reason a crash
 mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
-unavailable they degrade to exactly what they were before: in-memory sets that
-do not survive the run.
+unavailable they stay in-memory sets that do not survive the run.
 
 **Quarantine is honored in this mode too — and this loop is the single step that
 applies it.** Explicit list mode bypasses Phase 1 entirely, so nothing here
@@ -267,7 +266,7 @@ exactly one `i` and writes exactly one run-log line — never zero (silently
 resolved inside someone else's batch) and never two (skipped at the spawn *and*
 at its own turn).
 
-The write side is unchanged: a failure inside this mode runs the same *Quarantine
+On the write side, a failure inside this mode runs the same *Quarantine
 after repeated failures* procedure in `references/phases/phase-2-resolve.md`.
 
 When advancing to the next item in `optimized_order`:
@@ -283,7 +282,7 @@ When advancing to the next item in `optimized_order`:
 3. **If yes**: collect all co-batch issue numbers and **run the quarantine gate
    above over that whole set before spawning anything** — every quarantined
    number is dropped from `batch_map` and is never sent to the resolver. Then use
-   the **Batch Resolver Subagent** (see `references/subagent-prompts.md`) on what
+   the **Batch Resolver Subagent** (`references/prompts/batch-resolver.md`) on what
    is left, or step 4's single-issue Resolver if the drops left only one. Do NOT
    pre-mark issues as processed — wait for the resolver result (see "Processing
    batch resolver results" below) to determine which issues were actually
@@ -314,14 +313,14 @@ The batch resolver creates a single branch and PR that addresses all issues in t
 
 #### Run-log fan-out for the batch (one line per attempted issue)
 
-The Batch Resolver runs with `--no-run-log` (see *Batch Resolver Subagent* in
-`references/subagent-prompts.md`), so auto-pilot is the single writer here too.
+The Batch Resolver runs with `--no-run-log` (see
+`references/prompts/batch-resolver.md`), so auto-pilot is the single writer here too.
 A batch resolves N issues in one PR, but the contract is **one line per processed
 (attempted) issue**, not per PR or per batch — so auto-pilot fans the one returned
 result out. The **attempted set** is the issue numbers sent into the Batch Resolver
 (what `batch_map` holds at spawn); the invariant is keyed on that set and **never**
 on `issues_resolved` (success-only keying would drop processed-but-failed issues —
-the inverse under-count #156/#158 exist to kill).
+the inverse under-count this invariant exists to prevent).
 
 The invariant holds **across the whole auto-pilot run**, not at batch time: an
 attempted issue is logged here if it resolved here, and at its individual retry
@@ -336,7 +335,7 @@ otherwise. Never both (double-count) and never neither (drop).
 
 Writing a `failed` batch line for an unresolved issue **and** letting its
 individual retry log it would double-count it — the exact
-double-count this fix removes. It is strictly one-or-the-other, resolved by disposition:
+double-count this invariant forbids. It is strictly one-or-the-other, resolved by disposition:
 **resolved-here → logged here; unresolved → logged at its retry, never here.**
 
 **Re-queue every unresolved attempted issue — including the batch's primary
@@ -344,8 +343,7 @@ double-count this fix removes. It is strictly one-or-the-other, resolved by disp
 is easy to miss:** the primary sits at the batch's own slot in `optimized_order`,
 which has already been consumed, so without an explicit re-append to the end of
 `optimized_order` it has no later turn and would drop to **zero** lines (the
-inverse under-count criterion 5 forbids, and the failure the #158 Technical Notes
-name: "a failed batch drops fully-processed issues").
+inverse under-count: a failed batch would drop fully-processed issues).
 
 **An in-batch skip writes no run-log line.** The last table row is the **one
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
@@ -370,7 +368,7 @@ auto-pilot can populate them. Each append uses the same best-effort, non-fatal
 `mkdir -p .idd` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.
 
-For non-batched issues, the flow is identical to before:
+A non-batched issue runs the single-issue Resolver:
 
 ```
 ● [Issue 3/3] Resolving #{n3}...

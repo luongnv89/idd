@@ -115,6 +115,17 @@ evals/
 `expect_exit` is compared to the tool's exit code. Negative cases set
 `expect_exit: 1` (e.g. unstructured body fails lint).
 
+### Report understanding
+
+`grade` checks correctness. Whether a person can understand a skill's final
+report is graded separately, against four criteria: the result is findable,
+facts and assumptions are separate, claims are traceable, and the next decision
+is clear. A case records the human reviewer's answers in its optional
+`human_review` block, which `grade.py` does not read. The criteria, each
+skill's observable checks and scenarios, and the feedback rule are in
+[report-understanding.md](report-understanding.md). Skills do not read that
+file.
+
 ## Running real repo scripts
 
 A case may exercise a shared script itself instead of a stand-in by listing it

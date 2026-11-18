@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Authentication & Setup
 
@@ -55,7 +55,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Was on branch {branch} — auto-switched to {default_branch}
 ```
 **Trigger:** `git rev-parse --abbrev-ref HEAD` returns a branch that is not `main` or `master`.
-**Action:** Auto-switch with `git checkout {default_branch} && git pull --rebase origin {default_branch}`. Non-fatal — auto-pilot continues.
+**Action:** Auto-switch and sync with the stash-first block in `references/preflight.md` (*Auto-stash and branch sync*), never a bare `git pull --rebase`. Non-fatal — auto-pilot continues; a failed rebase or stash pop stops the run as that block prints.
 
 ### Rate budget exhausted — pausing until reset (non-fatal)
 ```
@@ -84,7 +84,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** `gi-ratelimit.py --verdict` returns `action: "stop"` — the pause would run past the runtime budget, or `reset` is unknown. Fatal.
-**Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-format.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
+**Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-variants.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
 
 **Two renderings, chosen by `resume_at`.** The block above is the **known-reset**
 form, and it is the only one that may carry `{resume_at}`. The `stop` verdict has
@@ -108,7 +108,7 @@ wait for. Print this **unknown-reset** form instead, and never mix the two:
 
 Raising `autopilot.max_runtime_minutes` is offered by the known-reset form only:
 with no reset instant the verdict is `stop` whatever the budget is, so a bigger
-one would change nothing. `references/summary-format.md` splits `Result: RATE
+one would change nothing. `references/summary-variants.md` splits `Result: RATE
 LIMITED`'s `Next action:` line on the same value for the same reason.
 
 **Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping. Drop **both** `{resume_at}` sentences from it as the unknown-reset form does: `warn` leaves `wait_s` at `0` too, so `resume_at` is `null` here as well — and nothing is being waited for in the first place.
@@ -188,7 +188,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
   This run is not resumable; checkpoints are skipped.
 ```
 **Trigger:** No `python3`, exit 2 (the script path did not resolve), or exit 4 (the write failed) from any `gi-state.py` call. A **missing bundled file** is different — that is a broken install, and the `✗ Missing bundled dependency` block above is the answer.
-**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Run lock*) and continue. The loop's own work is unaffected; only resume is lost.
+**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Run lock*): an `.idd/run.lock` younger than an hour is a live holder and stops the run; otherwise continue. The loop's own work is unaffected; only resume is lost.
 
 ## Explicit List Mode
 
@@ -395,8 +395,8 @@ the single home of that mapping, never restated here.
     Outcome: partial_followup
   Continuing to next issue...
 ```
-**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. Step 2a (Step 5.1b dependency gate) must pass before this output is shown.
-**Action:** Create follow-up issue, merge PR only after dependency gate passes. If the gate blocks, use *PR blocked by unmerged dependency* instead (PR left open, outcome `blocked_by_dependency`, loop still continues). Otherwise continue to next issue. Non-fatal either way.
+**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. All four Step 2a gates in `references/phases/phase-3-4-review.md` — merge floor, dependency, CI and merge identity — must pass before this output is shown.
+**Action:** Create follow-up issue, merge PR only after all four Step 2a gates pass. An unsatisfied dependency uses *PR blocked by unmerged dependency* instead (outcome `blocked_by_dependency`); an unmet merge floor, non-mergeable CI or a stale merge identity leaves the PR open (outcome `left_open`). Either way the issue joins the session skip list and the loop continues. Non-fatal either way.
 
 ### Review cycles exhausted (non-critical issue, PR left open)
 ```
@@ -511,6 +511,13 @@ the single home of that mapping, never restated here.
 ```
 **Trigger:** Phase 5.1b (Dependency Gate) finds at least one `Depends on #N` / `Blocked by #N` reference whose target issue is still open, or whose target issue is closed but has an unmerged linked PR. Only fires when `autopilot.respect_dependencies: true`.
 **Action:** Do **not** merge. Leave the PR open and unchanged, record iteration outcome as `blocked_by_dependency`, add the issue to the session skip list, and continue to the next eligible issue. **Non-fatal — the run is not paused.** The gate never merges out of order, but it never strands the rest of the backlog either; the loop ends on dependency grounds only when no eligible issue is left (`⚠ No eligible issues to pick`). The audit trail is the iteration line in the final summary table plus the alert above, and exactly one `.idd/runs.jsonl` line with `outcome: blocked_by_dependency`.
+
+### Dependency markers unreadable (PR left open)
+```
+⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})
+```
+**Trigger:** Phase 5.1b cannot read the issue body: the read it kept exits non-zero, or no string body parses from it or from Step 1.2b's held snapshot.
+**Action:** Do **not** run `gi-deps.py` or merge; outcome `left_open`, session skip list, continue (`references/phases/phase-5-merge.md` → *Parse dependency markers*). Non-fatal.
 
 ### Dependency cycle detected (auto-skip)
 ```

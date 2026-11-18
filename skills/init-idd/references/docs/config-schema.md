@@ -115,14 +115,14 @@ resolve:
   # skipped, and QA is capped at 1 cycle. The Decision Record and Acceptance
   # Criteria Verification table are always emitted regardless. Complex or
   # ambiguous issues (M/L/XL, low-confidence, or no band) keep the full pipeline.
-  # When false, every issue gets the full pipeline as before — the profile is
+  # When false, every issue gets the full pipeline — the profile is
   # pinned to "full". The chosen profile is surfaced on the [0/5] tracker line
   # and in the run log's `profile` field. See
   # https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md
   # (Complexity → pipeline profile).
   adaptive_effort: true
 
-  # Borrow catalogued-but-not-installed skills for one task (issue #309).
+  # Borrow catalogued-but-not-installed skills for one task.
   # Type: boolean. Default: false (installed-only). true installs selected
   # missing skills, records {name, origin} in run-state, uninstalls only
   # origin: borrowed; auto never installs unless this key is true.
@@ -308,7 +308,7 @@ autopilot:
   # LEGACY: kept for backwards compatibility. Ignored when autopilot.mode is set.
   # When mode is unset and auto_merge is not explicitly present in the file, effective mode is balanced.
   # When mode is unset but auto_merge is explicitly present, legacy interpretation applies:
-  #   auto_merge: true  ≈ mode: aggressive + merge_partial: true (preserves prior 2.1.x behavior)
+  #   auto_merge: true  ≈ mode: aggressive + merge_partial: true
   #   auto_merge: false ≈ mode: conservative
   auto_merge: true
 
@@ -382,7 +382,7 @@ triage:
 
 # Issue analysis settings
 analysis:
-  # Max files to read during deep analysis (more thorough than resolver's 20)
+  # Max files to read during deep analysis
   # Type: integer
   # Default: 30
   # Minimum: 5
@@ -479,7 +479,7 @@ security:
 # Context-threshold check + re-entry rules. Contract:
 # https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
 compaction:
-  # Type: boolean. Default: true. false = behave as before.
+  # Type: boolean. Default: true. false = all rules off.
   enabled: true
   # Type: integer 1-99 per skill, % of context remaining (else exit 3).
   # Default: as listed (auto-pilot 15, every other skill 40).
@@ -555,7 +555,6 @@ graph TD
     RS --> R2["branch_prefix"]
     RS --> R3["auto_test"]
     RS --> R4["test_timeout"]
-    RS --> R5["pr_auto_link"]
     RS --> R6["max_commits"]
     RS --> R7["qa_max_cycles"]
     RS --> R8["adaptive_effort"]
@@ -637,7 +636,7 @@ Repo-root state beside `.idd.yml`, created on first use.
 |------|-----------|-------------|
 | `.idd/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.idd/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot`, `/issue-pr-review` | Append-only run log |
 | `.idd/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
 > **Not in `.idd/`:** the model-suggestion cache is **user-level** (`~/.cache/idd/`, all repos).
@@ -684,11 +683,11 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | *(removed)* `resolve.pr_auto_link` | — | Deprecated; `Closes #N` is unconditional per SPEC §5.1 |
 | `resolve.max_commits` | `10` | Max commits warning |
 | `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
-| `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off #256's caller context: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
+| `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off caller-context reuse: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
-| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
+| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and auto-pilot's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |
 | `review.merge_method` | `"squash"` | Merge method: `squash`, `merge` or `rebase` (tracker-only) |
 | `review.confidence_threshold` | `80` | Min confidence level for issues (a `constraints` finding is reported at any confidence) |
@@ -755,6 +754,6 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `agents.model` per-role keys | `null` | Overrides `default`; a `null` role resolves to it |
 | `agents.effort.default` | `null` | Thinking effort, same rules |
 | `agents.effort` per-role keys | `null` | As `agents.model` |
-| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = behave as before |
+| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = all off |
 | `compaction.threshold` · `auto-pilot` | `15` | % of context remaining (1-99) at or below which the skill prompts compaction |
 | `compaction.threshold` · every other skill | `40` | Same, one key per skill |

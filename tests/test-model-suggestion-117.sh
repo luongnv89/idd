@@ -127,7 +127,7 @@ else
   fail "T3.AC4.1: reference does not use the XS/S/M/L/XL scale"
 fi
 
-if grep -qE 'GPT-5\.5' "$REF" && grep -qE 'Opus|Fable 5' "$REF"; then
+if grep -qE 'GPT-5\.[0-9]' "$REF" && grep -qE 'Opus|Fable|Sonnet|Haiku' "$REF"; then
   pass "T3.AC5.1: reference maps to one OpenAI + one Anthropic model"
 else
   fail "T3.AC5.1: reference mapping incomplete"

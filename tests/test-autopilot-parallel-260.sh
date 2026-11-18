@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$REPO_ROOT/src/shared/scripts/gi-state.py"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
-PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+PROMPTS="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
 RUNLOG="$REPO_ROOT/src/skills/auto-pilot/references/run-log.md"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 RESOLVER_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
@@ -35,9 +35,9 @@ has "$SCHEMA" 'autopilot\.max_parallel.*`1`|max_parallel: 1' \
   "AC4: schema defines max_parallel with default 1"
 has "$TEMPLATE" '^[[:space:]]+max_parallel: 1$' \
   "AC4: init template emits max_parallel: 1"
-has "$PHASES" 'Legacy sequential path \(`max_parallel = 1`\)' \
-  "AC4: phases keep an explicit legacy sequential branch"
-has "$PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\).*legacy in-place path exactly' \
+has "$PHASES" '#### Sequential path \(`max_parallel = 1`\)' \
+  "AC4: phases keep an explicit sequential branch"
+has "$PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\).*use the in-place path exactly' \
   "AC4: value 1 keeps the ordinary in-place resolver prompt"
 
 # Resolver-only concurrency and worktree ownership.

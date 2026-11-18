@@ -222,7 +222,7 @@ if printf '%s' "$row" | python3 "$ROOT/src/shared/scripts/gi-runlog.py" --echo >
 else
   fail "T4.3 gi-runlog rejects a resolver failed row with skipped_reason"
 fi
-n="$(grep -c '^- skipped_reason:' "$ROOT/src/skills/auto-pilot/references/subagent-prompts.md" || true)"
+n="$(cat "$ROOT/src/skills/auto-pilot/references/prompts/"*.md | grep -c '^- skipped_reason:' || true)"
 [ "$n" -eq 2 ] && pass "T4.4 both auto-pilot resolver prompts return skipped_reason" \
   || fail "T4.4 auto-pilot resolver prompts return skipped_reason $n time(s), want 2"
 P23="$ROOT/src/skills/auto-pilot/references/phases/phase-2-resolve.md"
@@ -258,7 +258,7 @@ for tree in "$RS_SRC" "$RS_DIST"; do
       || fail "T6.1 ${tree#$ROOT/}: auto No for $reason does not recommend a split"
   done
   grep -qF '`large_scope`, `max_commits_exceeded`: split #{issue_number} into smaller issues;' \
-    "$tree/references/report-templates.md" \
+    "$tree/references/closing-blocked.md" \
     && pass "T6.2 ${tree#$ROOT/}: the closing summary's Next action names the split" \
     || fail "T6.2 ${tree#$ROOT/}: the closing summary's Next action omits the split"
 done

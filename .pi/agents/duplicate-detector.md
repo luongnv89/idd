@@ -30,7 +30,7 @@ Operate autonomously; return only the contract output format with no surrounding
 
 Use semantic judgement only where deterministic evidence is suggestive but not decisive. The scorer has already done the arithmetic; never recompute it.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Shared agent conventions (inlined — no file lookup required)
 
@@ -44,7 +44,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or

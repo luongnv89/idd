@@ -18,20 +18,19 @@ the other:
 | Scope | cross-run telemetry, grows forever | this run only; the next run overwrites it |
 | Audience | `/idd-doctor` metrics, humans reading history | this loop, resuming itself after an interruption |
 | Read by the loop? | yes, in one place only: `gi-runlog.py --failure-streak` counts an issue's consecutive `failed` records for *Phase 2.3*'s quarantine. Best-effort **by design** — the log is gitignored and deletable, so the streak is *progress toward* a quarantine and the durable state is the label on the issue. A missing or unreadable log reports `streak: 0` and quarantines nothing | yes, by *Step 1.0*'s resume gate |
-| Lifetime | committed history of what ran | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
+| Lifetime | machine-local, gitignored history of what ran, kept across runs | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
 
 A checkpoint is **not** a run-log line: it records where the loop is, not what an
 issue's run concluded. Reading the run state to reconstruct telemetry would
 double-count (it holds `processed[]` for every issue this run touched), and
 reading the run log to resume would be wrong (it has no phase, no branch, and no
-PR-in-flight). Everything below is about the run log and is unchanged by resume
-support.
+PR-in-flight). Everything below is about the run log alone.
 
 ## Single-writer rule (per processed issue)
 
 **Auto-pilot is the single writer per processed issue.** The resolver subagent
-is invoked with `--no-run-log` (see *Resolver Subagent* in
-`references/subagent-prompts.md`), so it **does not** append its own line — only
+is invoked with `--no-run-log` (see
+`references/prompts/resolver.md`), so it **does not** append its own line — only
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,
@@ -141,7 +140,7 @@ iteration and writes its one `failed` line as usual — the quarantine is decide
 from that line, so no second line is written for it. `skipped_reason:
 quarantined` belongs to the **later** run that skips the issue because it carries
 `autopilot.quarantine_label`, which is an ordinary skip before resolution
-started. One line per processed issue, unchanged.
+started. One line per processed issue.
 
 **Which later run writes that line, and which writes none.** In **explicit list
 mode** the user named the issue, so it gets an `[Issue {i}/{total}]` slot and its
@@ -150,6 +149,6 @@ one `skipped` line with `skipped_reason: quarantined`
 label is a pick filter: *Step 1.2* drops the issue from the candidates, or — on a
 reused cache whose labels predate the label — *Step 1.2b*'s post-pick re-check
 rejects it and re-picks. Either way the issue is never processed, so it writes
-**no** line at all, exactly as a `wontfix` issue does today. Both are the same
+**no** line at all, exactly as a `wontfix` issue does. Both are the same
 rule: one line per *processed* issue, and a candidate filtered before the spawn
 was not one.

@@ -55,7 +55,7 @@ Load config once; never re-read it. Run `python3 references/scripts/gi-config.py
 
 Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default config. Run /init-idd to customize.`
 
-**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/run-log-fields.md`).
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`). At each `[N/5]` step start, beside that clock read, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-resolver`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 
@@ -83,7 +83,7 @@ Agent(
 
 ### Orchestrating the agents
 
-Name the role in `description`, size model/effort per `references/docs/agent-model-effort.md`, and read each return before advancing: a missing or blocking return stops (interactive) or takes the auto behavior (*Orchestrating the agents*).
+Name the role in `description`, size model/effort per `references/docs/agent-model-effort.md`, and read each return before advancing: a missing or blocking return stops (interactive) or takes the auto behavior (`references/pipeline-steps.md` → *Orchestrating the agents*).
 
 ### Bundled dependency precheck
 
@@ -108,6 +108,12 @@ references/steps/step-3-implement.md
 references/steps/step-4-qa.md
 references/steps/step-5-deliver.md
 references/report-templates.md
+references/closing-summary.md
+references/closing-pr-created.md
+references/closing-already-resolved.md
+references/closing-blocked.md
+references/report-examples.md
+references/run-log-fields.md
 references/step-reports.md
 references/run-stats.md
 references/bug-verification.md
@@ -154,7 +160,7 @@ A killed session can resume (`--resume`). Read the record after the precheck, be
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line (`●` → `✓`/`✗`); expected output example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line (`●` → `✓`/`✗`); expected output example: `references/report-examples.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
@@ -190,7 +196,7 @@ Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels
 
 If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -->` marker (a legacy `gitissue:normalized` one counts):
 
-1. **Security label check (SPEC §1.4)** — before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
+1. **Security label check** — normalization rewrites the reporter's words, so a security-labelled issue is never rewritten without explicit operator confirmation. Before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
@@ -320,10 +326,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Update documentation
 
-1. List the user-visible names the diff changes (commands, flags, config keys, public functions, output strings).
-2. Search `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings for each name.
-3. Update each match describing the old behavior; add a `CHANGELOG` entry if that file exists.
-4. No match: record `docs: none found` in the Evidence row.
+Update every passage in `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings that describes a user-visible name the diff changes (a command, flag, config key, public function or output string), and add a `CHANGELOG` entry if that file exists. With nothing to update, record `docs: none found` in the Evidence row.
 
 ### Push branch and create PR
 
@@ -371,7 +374,7 @@ With `projects.sync_enabled` true, set `status_map.done` (`references/docs/githu
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.idd/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), per `references/docs/run-log-schema.md`.
+At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.idd/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/run-log-fields.md` (*Run-log entry — field derivation and suppression*), per `references/docs/run-log-schema.md`.
 
 ```bash
 # Exactly one runs. --echo validates the telemetry you return and writes nothing.
@@ -385,7 +388,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 ## Closing Summary
 
-Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/report-templates.md` (*Closing Summary*), then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
+Emit **one** closing block at **every** terminal outcome, stops included. Read `references/closing-summary.md` now — its *Review contract* holds for every outcome — then read only the outcome's variant and print it: `references/closing-pr-created.md` (a PR was created), `references/closing-already-resolved.md` or `references/closing-blocked.md`. `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
 
 ---
 

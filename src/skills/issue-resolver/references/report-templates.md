@@ -1,6 +1,6 @@
-# Report and PR Body Templates
+# PR Body Template — /issue-resolver
 
-Templates for the PR body, the single closing summary, and the expected pipeline output.
+Read at Step 5 (Deliver). The closing summary is in `references/closing-summary.md`, with one variant file per outcome.
 
 ## PR Body Template (Step 5 — Deliver) <!-- a:rt-pr-body-template -->
 
@@ -21,7 +21,7 @@ Closes #{issue_number}
 
 ## Decision Record
 
-- **Root cause:** {one-paragraph diagnosis from analysis Step 6}
+- **Root cause:** {one-paragraph diagnosis: a fresh analysis's `root_cause` (*Lifting the Decision Record*), else this run's Step 1 research}
 - **Options considered:** Option 1 — {name}; Option 2 — {name}; Option 3 — {name}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
@@ -33,7 +33,7 @@ Closes #{issue_number}
 - **Verification recipe:** {only when `.idd-recipe.json` (or legacy `.gitissue-recipe.json`) exists at the base ref — "drove {k}/{n} capabilities ({names}), {pass | fail}; evidence `{evidence_dir}`" when it ran, else "skipped ({reason})"; omit when the base ref has no recipe}
 - **Premise reset:** {only when it blocked — "premise {premise_id} failed in cycles {cycles}; {lifted by revision {new_id} ({diagnostic commands}) | not lifted — no further fix}"; omit otherwise}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
-- **Produced by:** model {model, per *Run-log entry* below, else unknown} · effort {effort, same rule} · skill issue-resolver@{skill_version} · locally modified {yes if Self-Improve edited this skill this session, else unknown}
+- **Produced by:** model {model, per `references/run-log-fields.md`, else unknown} · effort {effort, same rule} · skill issue-resolver@{skill_version} · locally modified {yes if Self-Improve edited this skill this session, else unknown}
 
 Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 
@@ -108,8 +108,8 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 **Copy the field names, never recall them.** The grammar above is a **closed
 literal vocabulary**. Render the marker by copying the *PR Body Template*'s last
 line character-for-character and substituting only its `{braced}` tokens; a
-field name reconstructed from memory is how issue #446 shipped a marker no
-consumer would ever trust. `review=clean` is that exact spelling and has **no
+field name reconstructed from memory yields a marker no consumer will ever
+trust. `review=clean` is that exact spelling and has **no
 synonym** — `verdict=`, `status=` and `result=` are not accepted, and a marker
 spelling it any of those ways still matches the consumer's parse grep, so it is
 never `absent`: the wrong key is ignored as an unknown one, `review=` is then
@@ -123,11 +123,12 @@ omissions the field table above documents; nothing else may be dropped.
    `gi-secscan` or any other security gate, in any spelling. Its only possible
    consumer would be a safety gate, and a marker that can gate safety is a
    safety gate an attacker can write: the PR body is editable by whoever opened
-   the PR (`gh pr edit --body`). Issue #274 — a PR disabling the secret-scanning
-   gate through its own `.idd.yml` — is the standing proof this repo can
-   lose a security gate to repo-controlled input. A field nobody is allowed to
-   act on is a field a future edit eventually acts on, so it is not written at
-   all.
+   the PR (`gh pr edit --body`). A PR also controls its own branch's
+   `.idd.yml`, which is why the secret scan reads its policy from the base
+   ref (`docs/pre-commit-security.md`, rule 5): a gate that trusts
+   repo-controlled input can be switched off by the change it gates. A field
+   nobody is allowed to act on is a field a future edit eventually acts on, so
+   it is not written at all.
 2. **No marker on a non-clean exit.** On the `⚠ {N} issues remain` stagnation /
    max-cycles path, emit **no marker line**. Absent and dirty must take the
    identical path in the consumer, and the only way to guarantee that is to
@@ -145,7 +146,7 @@ construction.
 ### Revision receipt <!-- a:rt-revision-receipt -->
 
 The marker is a claim in a body the PR author can edit, and its `head=` is a
-public SHA, so the marker on its own proves nothing (issue #515). The consumer
+public SHA, so the marker on its own proves nothing. The consumer
 therefore trusts it only beside a **revision receipt** for the same commit,
 which `shared/scripts/gi-receipt.py --write` stores under the git common dir
 (`idd/receipts/<sha40>.json`). That store is outside every branch and every PR
@@ -172,265 +173,6 @@ in full.
 
 ### Lifting the Decision Record
 
-Analysis JSON is **fresh** exactly when the predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. That section is the single home of the definition: do not restate, tighten, or re-derive a freshness rule here. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
+Analysis JSON is **fresh** exactly when the predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
 
-If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, the half of the dual write this skill controls, from which squash-merge carries it into git history under the repo-setting condition stated at the top of this file.
-
-## Closing Summary
-
-The closing summary is the **single** end-of-run block. It never repeats a
-per-step pass/fail or a metric the `[N/5]` tracker already printed (files read,
-complexity, option, files changed, test counts, QA cycles — see *Expected Inline
-Pipeline Output*). Print it **once**: after the tracker's last line, or after the
-error block of a stop. Pick the variant that matches the run's outcome.
-
-### Review contract
-
-Apply these rules to every variant. The resolver opens a PR and never merges it,
-so no row asks for approval. The rows are human-facing only: the report-back
-fields a caller reads and the run-log record keep their shape.
-
-1. **Result first.** The first row is `Result:` with one status and the main
-   finding or stop reason:
-   - `DONE` — a PR was created and every step's completion report printed
-     `Result: PASS`; or the issue was `already_resolved`.
-   - `PARTIAL` — a PR was created, but at least one step printed
-     `Result: PARTIAL` (an issue not ready, residual QA findings, a failed
-     board sync or run-log append, a check that could not be evaluated).
-   - `BLOCKED` — the run stopped before a PR was created: a failed
-     prerequisite, an invalid config, a missing bundled dependency, `not found`,
-     `closed`, `pr_in_progress`, a declined design confirm, a step that printed
-     `Result: FAIL`, a blocked secret scan, or a failed final test run.
-
-   These run statuses are separate from the per-step `PASS | PARTIAL | FAIL`
-   vocabulary (`references/step-reports.md`).
-2. **Evidence.** Name only checks that ran, each with its observed result: the
-   final suite (`{count} passed@{sha7}`, or its skip reason), the secret-scan
-   verdict and `policy_source`, the QA verdict, the PR URL that `gh pr create`
-   returned, the docs search (*Update documentation*), and the run-log write
-   (`appended`, `echoed`, or `fallback`). For `already_resolved`, cite the fixing
-   commit or PR. For `BLOCKED`, cite the failed check and its observed output.
-   A resumed run adds `resumed from step {k}/5 (record {age} old)`.
-3. **Uncertainty.** List what this run did not verify: PR-body AC rows not marked
-   `pass`, a skipped browser UI review, `resolve.auto_test: false`, a script that
-   degraded to its prose procedure, the inline fallback without the Agent tool,
-   a reused analysis (`analysis_reuse = fresh` — verified first, not re-derived),
-   the `light` profile's single QA cycle, and a resumed run's restored plan and
-   findings (verified, not re-derived). Label `risk_rating` as a judgment,
-   not a measurement. Write `none identified` only when no item applies.
-4. **Decision.** Print `Decision: No approval needed.` in interactive and auto
-   mode alike. Name the remaining user action on `Next action:`:
-   - a created PR: `/issue-pr-review {pr_number}` (review, then merge);
-   - `large_scope`, `max_commits_exceeded`: split #{issue_number} into smaller issues;
-   - under `/auto-pilot`: `none — auto-pilot reviews and merges`;
-   - `pr_in_progress`: `/issue-pr-review {pr_number}` for the existing PR;
-   - any other `BLOCKED`: the `To fix:` command of the error block.
-
-A wrapped row continues on the next line, aligned under its value, so every line
-stays within 80 characters.
-
-### Successful Resolution
-
-Every step printed `Result: PASS`:
-
-```
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:       DONE — issue #{issue_number} resolved ({risk_rating} risk)
-  Evidence:     final tests {count} passed@{sha7}
-                secret scan pass ({policy_source}) · QA review clean
-                run log {run_log_state}
-  Uncertainty:  {items, or "none identified"}
-  Decision:     No approval needed.
-  Next action:  /issue-pr-review {pr_number}
-
-  PR #{pr_number}: {pr_title}
-  https://github.com/owner/repo/pull/{pr_number}
-  Closes #{issue_number}
-```
-
-### Resolution With Warnings
-
-A PR was created, but a step printed `Result: PARTIAL`. The `Result:` row names
-the residual gap — the remaining count and cycle total are new facts (the
-tracker's `[4/5] QA` line showed the in-progress state, not the final count):
-
-```
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:       PARTIAL — issue #{issue_number} PR created ({risk_rating} risk)
-                QA: {remaining} issues remain after {cycles} cycles
-  Evidence:     final tests {count} passed@{sha7}
-                secret scan pass ({policy_source}) · run log {run_log_state}
-  Uncertainty:  {remaining} unresolved QA findings listed in the PR body
-  Decision:     No approval needed.
-  Next action:  /issue-pr-review {pr_number}
-
-  PR #{pr_number}: {pr_title}
-  https://github.com/owner/repo/pull/{pr_number}
-  Closes #{issue_number}
-```
-
-### Already Resolved
-
-Step 0 or Step 1 found the fix already on the default branch. No PR is created,
-so the PR reference is omitted:
-
-```
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:       DONE — issue #{issue_number} already resolved, no PR needed
-  Evidence:     fixed by {sha7} ({merged PR #M | closing commit})
-  Uncertainty:  matched by commit and PR text; the suite was not re-run
-  Decision:     No approval needed.
-  Next action:  close #{issue_number} — the resolver never closes it
-```
-
-### Blocked
-
-The run stopped before a PR was created. The error block from
-`references/error-messages.md` prints first; this block follows it:
-
-```
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:       BLOCKED — {stop reason}
-  Evidence:     {failed check}: {observed output}
-  Uncertainty:  {steps not run, e.g. "Steps 1-5 not run; no code changed"}
-  Decision:     No approval needed.
-  Next action:  {To fix command, or /issue-pr-review {pr_number}}
-```
-
-### Format rule
-
-The default format is the terminal block above, after the `[N/5]` tracker. The
-PR body is the durable Markdown record. If the user asks for another format (for
-example a Markdown summary or JSON), render it from the same facts and keep the
-`Result`, `Evidence`, `Uncertainty`, `Decision` and `Next action` rows. If the
-host cannot render the requested format, say so and print the terminal block.
-
-The resolver produces no interactive report: one run covers one issue and one
-PR, the closing block has at most a dozen rows, and the PR body's *Acceptance
-Criteria Verification* table already ties each criterion to its evidence. No
-review of this output needs repeated filtering.
-
-### Evaluate report understanding
-
-Grade actual outputs against these criteria as well as correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states `DONE`, `PARTIAL` or `BLOCKED` and the PR or stop reason, without reading the tracker or logs. |
-| Facts and assumptions are separate | Observed checks (suite run, secret scan, `gh pr create` URL) are distinct from unverified ACs, skipped legs and `risk_rating`. |
-| Claims are traceable | Each test claim names its count and SHA; `already_resolved` names the fixing commit; `BLOCKED` names the failed check; `PARTIAL` names the residual gap. A created PR is not reported as merged. |
-| Next decision is clear | The output says `No approval needed.` and names the next action. |
-
-When running behavioral evaluations, include a delivered PR, a PR with residual
-QA findings, a blocked secret scan, and an `already_resolved` issue, and grade
-each closing block against all four rows. Ask human reviewers the matching four
-questions and record their answers in the eval case's `human_review` block.
-Missing, blank, or nonresponsive feedback leaves human understanding
-unconfirmed; agent inspection cannot confirm it.
-
-## Expected Inline Pipeline Output
-
-A successful resolve prints the full 6-step tracker, then the single Closing
-Summary block — per-step status appears only in the tracker, the PR reference only
-in the closing block:
-
-```
-  ◆ Resolve Pipeline
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [0/5] Preflight    ✓ issue #42 open, not yet resolved, effort: full
-  [1/5] Research     ✓ read 12 files, complexity: medium
-  [2/5] Plan         ✓ option 2 selected: balanced refactor
-  [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
-  [4/5] QA           ✓ clean after 2 cycles
-  [5/5] Deliver      ✓ PR #87 created
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:       DONE — issue #42 resolved (low risk)
-  Evidence:     final tests 14 passed@3f9c2a1
-                secret scan pass (ref:origin/main) · QA review clean
-                run log appended
-  Uncertainty:  browser UI review skipped (no running app)
-  Decision:     No approval needed.
-  Next action:  /issue-pr-review 87
-
-  PR #87: fix(auth): resolve mobile auth redirect (#42)
-  https://github.com/user/repo/pull/87
-  Closes #42
-```
-
-The tracker metrics — files read, complexity, option, files changed, test counts,
-QA cycles — stay on the `[N/5]` lines above. Below the separator are only the
-*Review contract* rows, the `risk_rating`, and the PR reference.
-
-## Run-log entry — field derivation and suppression
-
-Full detail for SKILL.md *Step 5 — Deliver → Run-log entry (monitoring)*, which
-owns the trigger (every terminal outcome), the append snippet, and the
-`--no-run-log` switch. This section carries the parts a run only needs once it is
-actually writing the line.
-
-### Fields to populate
-
-Build the object from values already known during the run — `ts`, `issue`,
-`mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `skill_version`, and `skipped_reason` —
-following the schema in `docs/run-log-schema.md` rather than re-deriving fields
-here.
-
-These derivations are the resolver's own:
-
-- **`complexity`** — collapse the researcher's 5-value scale to the 3-value
-  run-log scale before writing: `trivial`/`low` → `low`, `medium` → `medium`,
-  `high`/`complex` → `high`.
-- **`profile`** — the pipeline profile chosen in *Step 0g* (`light` or `full`).
-  Omit the field only when `resolve.adaptive_effort` is `false`, or when no
-  profile was selected at all (for example an early failure before Step 0g ran).
-- **`agent_overrides`** — tally every configured (non-`null`) `agents.model` /
-  `agents.effort` knob of each role this run spawned: `applied` when all of them
-  reached their spawn (verbatim, or effort as the prompt hint), `fallback` when
-  none did (unsupported-parameter skip, a role degraded by a rejected spawn, no
-  Agent tool), `partial` for a mix. **Omit the field when no spawned role had an
-  override configured** — never write `null` or a fourth value (exit 3).
-- **`phases`** — seconds per step, from the epochs taken as each `[N/5]` step
-  starts (SKILL.md *Configuration*): `preflight` runs from `run_started_epoch` to
-  the `[1/5]` start, then `research`, `plan`, `implement`, `qa` (every cycle) and
-  `deliver` each to the next boundary, the last to the terminal outcome. Omit a
-  step that never started (an early exit or failure); the step in progress at
-  that exit is measured to it. Omit the field when no boundary was captured.
-- **`ceiling`** — class policy: `1` if `profile` is `light`; `resolve.qa_max_cycles`
-  (default 5) if complexity is `high`; otherwise `2`. Fail-safe omitted
-  profile/complexity as full + medium (`2`).
-- **`breach_reason`** — required when `qa_cycles` exceeds `ceiling`
-  (`gi-runlog.py` exits 3 without it); omit otherwise.
-- **`verification`** — `success` only, by the `docs/run-log-schema.md` rule
-  applied to the PR's AC table: any row not `pass` → `partial`, deferred rows
-  excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
-  so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
-
-- **`tokens`, `agents`, `duration_s`** — the row and the *Run Stats Footer*
-  (`references/run-stats.md`) agree. `tokens` is the count the footer prints:
-  write it only when the host reported one, never derived, estimated or `0`.
-  `agents` is the footer's spawn count; omit it when the footer prints `n/a`.
-  `duration_s` is the terminal epoch minus `run_started_epoch`, the clock the
-  footer's `elapsed` reads.
-- **`skill_version`** — this skill's own `metadata.version` (SKILL.md frontmatter).
-- **`model`, `effort`** — this session's model and reasoning effort, only when
-  the host states them; never guessed from a tier or a config default.
-
-`outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
-found the issue already fixed and exited early), or `failed` (a step failed). A
-`failed` run an auto-mode default No stopped also carries — and, under
-`--no-run-log`, returns — `skipped_reason` (`assigned_to_other`, `blocked_label`,
-`needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded`).
-
-### Suppression rule (single writer under `/auto-pilot`)
-
-`--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
-subagent and writes the **single** run-log line per issue itself — appending here
-too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
-telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `agent_overrides`, `duration_s`, `phases`) in the
-subagent result so the orchestrator folds it into its own line — with `tokens`,
-`agents`, `model` and `effort` by the same rules (`skill_version` is the
-writer's, so it is not returned).
-
-The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
-run is *not* suppressed and still writes its own line.
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the `Reproduction` line comes from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, the half of the dual write this skill controls, from which squash-merge carries it into git history under the repo-setting condition stated at the top of this file.

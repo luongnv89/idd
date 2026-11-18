@@ -125,7 +125,7 @@ SRC_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md
 SRC_CONFIG="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
 SRC_ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
-SRC_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+SRC_PROMPTS="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
 SRC_EXPLICIT="$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
 SRC_EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/step-reports.md"
@@ -143,7 +143,7 @@ BUILT_PHASES="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/phases.md")
 BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
 BUILT_ERRORS="$REPO_ROOT/skills/auto-pilot/references/error-messages.md"
 BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
-BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+BUILT_PROMPTS="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/spawning.md")"
 BUILT_EXPLICIT="$REPO_ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 BUILT_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/step-reports.md"
@@ -230,8 +230,8 @@ check_block_has "$GATE_BLOCK" 'any doubt is .stale' \
   "T2.8: the gate degrades to a full triage on any doubt"
 check_block_has "$GATE_BLOCK" 'can only remove duplicated work, never change an outcome' \
   "T2.9: the gate states it can only remove duplicated work"
-check_block_has "$GATE_BLOCK" 'worst case is exactly today.s behavior' \
-  "T2.10: the gate names today's behavior as its worst case"
+check_block_has "$GATE_BLOCK" 'worst case is a full triage' \
+  "T2.10: the gate names a full triage as its worst case"
 
 # Step 1.1 must stop claiming a fresh triage every iteration.
 check_lacks "$SRC_PHASES" 'Run a fresh triage to get current priorities' \
@@ -796,7 +796,8 @@ check_lacks "$SRC_CONV" '^listed, the triage row it wrote' \
 
 # G3 — Step 1.2's four buckets are stated to always sum to the rejected
 # candidates, so a skip-list writer with no bucket breaks that sum silently.
-# Step 1.2b became the third writer.
+# Step 1.2b is the third writer. A new skip-list writer adds a row to that
+# table (maintainer rule, kept here and out of the runtime bundle).
 check_block_has "$PICK_BLOCK" '^\| Reason \| Added by \| Bucket \|' \
   "T11.24: Step 1.2 owns a reason-to-bucket table"
 check_block_has "$PICK_BLOCK" '^\| .failed. \|.*\| .Skipped. \|$' \
@@ -811,8 +812,6 @@ check_block_has "$PICK_BLOCK" '^\| .assigned. \|.*\| .Assigned. \|$' \
 # exactly the kind of edit that drops the claim it was added to preserve.
 check_block_has "$PICK_BLOCK" 'every filtered issue lands in exactly one bucket' \
   "T11.29: the sum invariant survives the rewrite that added the table"
-check_block_has "$PICK_BLOCK" 'a new skip-list writer adds a row here' \
-  "T11.29b: the table states what a future skip-list writer owes the invariant"
 check_bullet "$SRC_PHASES" '^- \*\*Not skipped\*\*' 'Step 1\.2b' \
   "T11.30: the Not skipped criterion names Step 1.2b as a skip-list writer"
 check_block_has "$CAPTURE_BLOCK" 'session skip list with the reason' \
@@ -1026,10 +1025,10 @@ if [ "$STEP10_HEADINGS" = "1" ]; then
 else
   fail "T13.10: phases.md has $STEP10_HEADINGS '### Step 1.0 — ' headings, expected 1"
 fi
-# The rename has to explain itself where the step is defined, or the next reader
-# renumbers it back.
-check_block_has "$GATE_BLOCK" 'Lettered onto \*Step 1\.1\*' \
-  "T13.11: the gate says why it is lettered onto 1.1"
+# Step 1.1a is lettered onto Step 1.1 because it gates Step 1.1 (the gate, the
+# scan and Step 1.1b's live read are one triage cluster); do not renumber it to
+# 1.0, which is Phase 0's run-state gate. That rationale lives here, not in the
+# runtime text.
 check_block_has "$GATE_BLOCK" 'are a different thing entirely' \
   "T13.12: the gate disambiguates itself from Phase 0's Step 1.0"
 check_block_has "$GATE_BLOCK" 'run-state\.json., not .\.idd/triage\.json' \

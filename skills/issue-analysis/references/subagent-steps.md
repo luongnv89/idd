@@ -33,7 +33,7 @@ Before emitting Steps 2-5 progress or spawning the synthesizer, copy the explore
 - `status.pr_in_progress: true` — print `⚠ Research: PR already in progress — {resolution_details}`. Continue only as advisory analysis, persist the status, and mark the final result `DONE (PR in progress — advisory)`.
 - `status.possibly_already_fixed: true` — print `⚠ Research: code evidence suggests this may already be fixed — verify before acting`. Continue synthesis, persist the status, and include the warning in the final report.
 
-Copy `scan_stats` unchanged into persisted JSON, including `scan_stats.scan_timed_out`. When it is true, emit the scan-timeout warning from *Step 3 — Research* and mark the final analysis `PARTIAL` even if synthesis completed.
+Copy `scan_stats` unchanged into persisted JSON, including `scan_stats.scan_timed_out`. When it is true, emit the *Scan timeout* warning from `references/error-messages.md` and mark the final analysis `PARTIAL` even if synthesis completed.
 
 Map explorer `complexity` (`trivial` / `low` / `medium` / `high` / `complex`) to the synthesizer's `XS` / `S` / `M` / `L` / `XL` tier using `references/docs/agent-model-effort.md`; record the selected tier in the step log and pass that tier intent to the synthesizer.
 
@@ -73,7 +73,7 @@ Steps 2-5 yourself. A delegated run never reads that file.
 When the Agent tool is available, spawn the synthesizer subagent to handle Steps 6-7. Pass the following context:
 
 - Issue data: number, title, body, labels, type, state, author, createdAt
-- Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
+- Exploration findings: the full structured JSON returned by the explorer subagent
 - Mode: `"auto"` when `IDD_AUTO_MODE=1` or invoked by `/auto-pilot`; otherwise `"interactive"`
 - Criteria: the numbered list above, when `gi-ready.py` produced one
 

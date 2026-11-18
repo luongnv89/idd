@@ -1,6 +1,6 @@
 ---
 name: auto-pilot
-description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot the GitHub issue backlog, resolving everything until done with zero prompts. Don't use for single-issue work (/issue-resolver), triage (/issue-triage), or PR review (/issue-pr-review)."
+description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot the GitHub issue backlog, working through eligible issues until none remain or a stop condition fires, with no routine prompts. Don't use for single-issue work (/issue-resolver), triage (/issue-triage), or PR review (/issue-pr-review)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 metadata:
@@ -55,7 +55,7 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 **Only when `compaction.enabled` is true; otherwise skip this section** (`references/docs/context-threshold.md`). After a compaction inside a live run:
 
 - This run still holds the lock: never re-take or re-validate it, and **never run Step 1.0's resume gate**, which classifies a dead run's leftovers.
-- Read `python3 references/scripts/gi-state.py --read` (if it cannot run or the state is unreadable, every recorded step is a doubt under (3) below), then re-read the current phase file, `references/subagent-prompts.md`, `references/summary-format.md` and `references/step-reports.md`.
+- Read `python3 references/scripts/gi-state.py --read` (if it cannot run or the state is unreadable, every recorded step is a doubt under (3) below), then re-read the current phase file, `references/spawning.md` and `references/step-reports.md`.
 - **Never re-spawn a lane or subagent this run spawned that has not returned**: it is in flight, so wait for its notification. Decide in order: (1) this conversation's spawn record or task notification; (2) else the pre-spawn checkpoint (`current.phase` `resolve` or `review` for that issue) plus a live `gh … --json` read for its open PR or branch, or new PR activity since that checkpoint; (3) any doubt counts as in flight — wait, never re-spawn.
 - Resume at the last checkpointed phase. Re-review a PR, re-post a comment, re-create a follow-up issue, push, create a PR or merge only after a live `gh … --json` read shows the recorded step did not happen.
 
@@ -106,12 +106,17 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/phases/phase-2-resolve.md`
 - `references/phases/phase-3-4-review.md`
 - `references/phases/phase-5-merge.md`
-- `references/subagent-prompts.md`
+- `references/spawning.md`
+- `references/prompts/resolver.md`
+- `references/prompts/reviewer.md`
+- `references/prompts/analyzer.md`
+- `references/prompts/batch-resolver.md`
 - `references/preflight.md`
 - `references/orchestration.md`
 - `references/explicit-list-mode.md`
 - `references/run-log.md`
 - `references/summary-format.md`
+- `references/summary-variants.md`
 - `references/step-reports.md`
 - `references/run-stats.md`
 - `references/configuration.md`
@@ -154,7 +159,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 1. From the repo root, run `python3 references/scripts/gi-state.py --lock --pid "$PPID"`. Add `--resume` under `/auto-pilot --resume`, and `--dry-run` under `--dry-run` (reports the holder, acquires nothing).
 2. Exit 0 (`acquired`, `reclaimed`, `reacquired`): this run holds the lock — evidence about the lock, never the run state.
 3. Exit 3: another run holds it. Apply the stop rule with `✗ Another /auto-pilot run is in progress`.
-4. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and continue unlocked and un-resumable.
+4. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and run the fallback in `references/preflight.md` → *Run lock*: an `.idd/run.lock` younger than an hour is a live holder, so apply the stop rule as in 3; otherwise continue unlocked and un-resumable.
 
 Then auto-stash a dirty tree and switch/rebase onto the default branch without confirmation (`references/preflight.md` → *Auto-stash and branch sync*); `git stash pop` after the run.
 
@@ -172,12 +177,12 @@ Load config once with `python3 references/scripts/gi-config.py`:
 ○ First run — using default config. Run /init-idd to customize.
 ```
 
-Never re-read the config. **The run clock is `run_state.started_at`**; the run-stats footer measures `elapsed` from it.
+Never re-read the config. **The run clock is `run_state.started_at`**; it anchors the footer's `elapsed`.
 
-Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
+Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.triage_cache_max_age_minutes: 60` · `autopilot.retriage_every: 0` (never) · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
 
-- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` takes the legacy sequential path.
-- **Quarantine label:** append it to the effective `skip_labels` set as part of this config load, so the pick skips quarantined issues.
+- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` runs sequentially.
+- **Quarantine label:** add it to the effective `skip_labels` at config load, so picks skip quarantined issues.
 
 ### Merge Modes
 
@@ -200,7 +205,7 @@ Gate logic: `references/phases/phase-3-4-review.md` (partial) and `references/ph
 
 ## Context Window Management
 
-The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes in isolated worktrees, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Read `references/subagent-prompts.md` once at skill start.
+The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes in isolated worktrees, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Spawn form and bindings: read `references/spawning.md` now. On Claude Code each subagent reads its own prompt file by path, so no prompt body enters this context.
 
 ## Mode Detection
 
@@ -271,9 +276,9 @@ After each iteration print a brief status; `Outcome` takes one of the six catego
 Append exactly **one JSON line** to `.idd/runs.jsonl` (schema: `references/docs/run-log-schema.md`) for **every processed issue including skips**, except the in-batch `already resolved in batch` skip. Read `references/run-log.md` first: it holds the single-writer, parallel-lane and batch fan-out contracts. Resolvers run with `--no-run-log` and return telemetry for it: `ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus `qa_cycles` / `ceiling` / `breach_reason` / `complexity` / `profile` / `agent_overrides` / `duration_s` / `phases` when present, and `tokens` / `agents` / `model` / `effort` as the resolver's footer reported them. Auto-pilot adds its own `skill_version` and the review's `verification` (*Step 3.2*). **A `skipped` outcome always carries `skipped_reason`.** The sequential/batch write is non-fatal (no `python3`, exit 2 or 4 → raw fallback); a parallel lane persists `event_id` as `log_pending`, appends once, then checkpoints `logged`.
 
 ```bash
-# Sequential/batch path — legacy behavior:
+# Sequential/batch path:
 printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append
-# Fallback when `python3` is unavailable or the script exits 4 (legacy only):
+# Fallback when `python3` is unavailable or the script exits 4 (sequential/batch only):
 # mkdir -p .idd && printf '%s\n' "$run_json" >> .idd/runs.jsonl
 
 # Parallel lane — event_id is persisted before this call:
@@ -300,7 +305,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
 | Merge blocked (CI/conflicts) or merge floor unmet | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
-| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (`blocked_by_dependency`, *loop continues*) |
+| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged` (`blocked_by_dependency`, *loop continues*) |
 | Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (nothing mutated) |
 | Runtime budget reached (`autopilot.max_runtime_minutes`) | `○ Runtime budget reached ({max} min) — stopping cleanly` (*Runtime budget check*); the final summary is persisted with `--report`, and the lock is released |
 | API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`; the summary is persisted with `--report` and reports `Result: RATE LIMITED` |
@@ -310,7 +315,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 
 ## Final Summary
 
-When the loop ends, for any reason, print the final summary: one row per iteration tagged with one of the six categorical outcomes — **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**. Read `references/summary-format.md` first and follow its **Review contract**: `Result:` first (status, `complete` or `partial`, main finding), then `Evidence` (observed checks only), `Uncertainty`, and `Decision` (`No approval needed.`, or the pending critical-issue decision on `PAUSED`); remaining user actions go on `Next action:`.
+When the loop ends, for any reason, print the final summary: one row per iteration tagged with one of the six categorical outcomes — **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**. Read `references/summary-format.md` first and follow its **Review contract**: `Result:` first (status, `complete` or `partial`, main finding), then `Evidence` (observed checks only), `Uncertainty`, and `Decision` (`No approval needed.`, or the pending critical-issue decision on `PAUSED`); remaining user actions go on `Next action:`. On `BUDGET REACHED` or `RATE LIMITED`, in explicit list mode, or for another format, also read `references/summary-variants.md`.
 
 **Persist it:** pipe the payload into `python3 references/scripts/gi-state.py --report` (stdin, never a command line) to write `.idd/last-run-report.md`, then release the lock. A dry run skips both.
 

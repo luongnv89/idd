@@ -6,7 +6,7 @@
 
 Explore distinct paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Shared agent conventions (inlined — no file lookup required)
 
@@ -20,7 +20,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or

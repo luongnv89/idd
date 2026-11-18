@@ -874,7 +874,9 @@ fi
 path_wired() {
   local rel="$1" esc
   esc="$(printf '%s' "$rel" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
-  printf '%s\n' "$WIRING_TEXT" | grep -qE "(^|[^A-Za-z0-9._-])${esc}([^A-Za-z0-9._-]|$)"
+  # A here-string, not `printf | grep -q`: under pipefail, grep -q exiting on
+  # its first match can SIGPIPE the writer and fail a wired path at random.
+  grep -qE "(^|[^A-Za-z0-9._-])${esc}([^A-Za-z0-9._-]|$)" <<< "$WIRING_TEXT"
 }
 
 # For the stat line and the all-or-nothing vacuity guard only; per-file

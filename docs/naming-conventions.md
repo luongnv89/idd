@@ -157,24 +157,30 @@ Same convention as commit messages. The PR title should summarize what the entir
 Closes #<issue-number>
 
 ## Summary
-{One-paragraph summary of what was done and why}
+{What was done and why}
 
 ## Approach
-{Brief description of the implementation approach}
+{Selected option}
+
+## Decision Record
+- **Root cause:** {diagnosis}
+- **Options considered:** {options}
+- **Options rejected:** {option — reason}
+- **Selected option:** {option}
+- **Residual risk:** {or "none identified"}
 
 ## Changes
 | File | Change |
 |------|--------|
 | `file1` | {what changed} |
-| `file2` | {what changed} |
 
 ## Test Results
-{Test output summary}
+{Test summary}
 
-## Acceptance Criteria
-- [x] {criterion 1}
-- [x] {criterion 2}
-- [ ] {criterion 3 — if not addressed}
+## Acceptance Criteria Verification
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| {criterion} | pass/fail/unverified | {evidence} |
 ```
 
 ---

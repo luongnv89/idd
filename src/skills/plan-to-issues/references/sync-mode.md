@@ -6,8 +6,8 @@ The full procedure behind SKILL.md's *Sync mode* summary. Read this when running
 **Sync is not part of the working loop.** The map carries no issue state, so nothing in it
 goes stale as work proceeds — open/closed lives in the epic's **sub-issues panel**, which GitHub
 maintains. Run sync only when the *set* of issues or the *plan* changes: more tasks filed, a task
-added to the plan, a child re-parented. Running it after an issue merely closes is a no-op that
-rewrites the body to identical bytes.
+added to the plan, a child re-parented. Running it after an issue merely closes
+changes only the footer's date.
 
 It creates nothing and edits exactly one body. Run the reduced preflight first (Phase 0 — env and
 gh groups only).
@@ -52,9 +52,8 @@ Sync is **source-agnostic**: it re-renders the map of an existing epic and never
 so an epic bound with `<!-- plan-to-issues:conversation=<slug> -->` syncs by the same five steps as
 one bound with `<!-- plan-to-issues:plan=<path> -->`. Two deltas:
 
-**Step 2 — identify the source.** Read the epic body and branch on which marker it carries. An epic
-with neither is not this skill's epic — **stop**, as step 1 already does for a missing sentinel
-pair. An epic carrying *both* is corrupt: stop and report it rather than picking one, since the
+**Step 1 — identify the source.** In the fetched epic body, branch on which marker it carries. An
+epic with neither is not this skill's epic — **stop**, as for a missing sentinel pair. An epic carrying *both* is corrupt: stop and report it rather than picking one, since the
 Phase 3 mutual-exclusion probe (`references/epic-identity.md`) should have made it impossible.
 
 **Step 4 — re-detect unmapped tasks.** On the file path this re-parses the plan. There is no file on

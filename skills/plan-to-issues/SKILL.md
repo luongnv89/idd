@@ -4,7 +4,7 @@ description: "Convert any phased plan file, or a conversation about what to buil
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication (`gh auth status`), plus the sibling issue-creator skill from the same idd distribution."
 metadata:
-  version: 2.4.1
+  version: 2.4.2
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
   architecture: "orchestrator (resolve input → worklist → label set → epic → per-phase issue-creator batch → sub-issue registration → static map render → verify-by-re-read)"
@@ -35,7 +35,7 @@ Own four things, delegate the rest. Never write an issue body; never invent work
 
 ## Leading terms
 
-The terms this skill relies on — **input**, **task**, **worklist**, **label set**, **epic plan map**, **source marker**, **source-faithful**, **idempotent re-run**, **verify-by-re-read** — are defined in `references/glossary.md`; read it once before Phase 0.
+The terms this skill relies on — **input**, **task**, **worklist**, **label set**, **epic plan map**, **source marker**, **source-faithful**, **idempotent re-run**, **verify-by-re-read** — are stated where each phase uses them; open `references/glossary.md` only if one is unclear.
 
 ## Prompt Injection Boundary
 
@@ -62,6 +62,7 @@ any issue is filed — a half-created backlog is worse than one not started.
 | `python3` | tool, degradable | runs `references/scripts/gi-config.py` and `references/scripts/gi-plan-map.py`; each has a prose fallback beside its call |
 | **`issue-creator`** skill | **skill** | writes every issue body; no fallback path. Ships in the same idd distribution |
 | `codebase-modernizer` skill | skill, optional | one way to produce a plan file; never required — the conversation path needs no file |
+| `tasks-generator` skill | skill, optional | turns a PRD into a plan file; suggested, never run |
 | this skill's `references/` | bundled | a truncated install fails mid-run (*Bundled dependency precheck*) |
 
 `gh` gets six readiness probes rather than one `command -v`, because every way it can be
@@ -139,7 +140,7 @@ and every failure block: `references/preflight.md`.
 
 **Resolve the input here**, by the ordered rules in `references/input-resolution.md`: explicit path
 → `--from-conversation` → *both available, ask once* → plan discovery → conversational fallback →
-stop. Record `source.kind` and `source.value`; Phase 3 binds the epic to them. Never guess between
+requirements-document fallback (ask once; skipped with no user present) → stop. Record `source.kind` and `source.value`; Phase 3 binds the epic to them. Never guess between
 candidates, and never fall back from an unparseable plan file to the conversation.
 
 **Sync mode** runs a reduced preflight: env and gh only, budget 10 requests.
@@ -159,8 +160,9 @@ summarised or improved — enriching a thin Description from the codebase is a c
 
 *Completion criteria:* task count equals `grep -cE '^#{3,4} Task ' <plan>`; every task has an id,
 title, ≥ 1 acceptance criterion, a `Dependencies` value (`None` allowed), and an effort; every phase
-appears with its goal and milestone; the dependency table references only ids in the worklist; the
-critical path is recorded. Any mismatch is a **FAIL** — report the missing ids rather than filing a
+appears, with its goal and milestone where the plan states them and `null` where it does not; the
+dependency table references only ids in the worklist; the critical path is recorded when the plan
+states one. Any mismatch is a **FAIL** — report the missing ids rather than filing a
 partial backlog silently.
 
 **`conversation`** — draft from the user's turns, print compact rows plus the epic title, ask
@@ -320,7 +322,7 @@ The run succeeded only if **all** hold; the full wording is in `references/accep
 - [ ] The epic is labelled `epic` and holds exactly one source marker for this input and one map
       between the sentinels — verified by re-reading, not by exit code.
 - [ ] The map groups every child by phase and asserts **no issue status**; re-rendering after issues
-      close reproduces identical bytes. Milestones appear with their measurable exit conditions.
+      close changes only the footer's date. Milestones appear with their measurable exit conditions.
 - [ ] No source file was modified — the conversation path **never materializes a plan file**.
       `git status --porcelain` matches the pre-run snapshot — this skill runs no repo sync.
 - [ ] Re-running on the same input creates zero duplicate issues and zero new epics (file path
@@ -397,15 +399,3 @@ with explicit field selection, never parsed text (references/docs/platform-githu
 `Depends on #N` follow the IDD markers (`references/issue-creator-bridge.md` → *Step 5*;
 methodology: https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md). Errors use
 `references/error-messages.md`.
-
-## Reference files
-
-`references/`: `glossary.md` (term definitions) · `input-resolution.md` (input kinds, resolution
-order, the draft-and-confirm gate, conversation-path epic identity) · `preflight.md` (dependency
-detection, failure blocks) · `security-boundary.md` (injection and shell-interpolation rules) ·
-`phase-contracts.md` (full prose for Phases 0–6) · `acceptance-criteria.md` (unabridged contract) ·
-`reporting.md` (report format, check names, review contract, closing summary) · `sync-mode.md` ·
-`edge-cases.md` · `plan-parsing.md` (grammar, worklist schema) · `plan-parser.md` (Phase 1 parser
-spawn prompt for a large plan) · `labels.md` · `issue-creator-bridge.md` · `epic-identity.md` ·
-`epic-dashboard.md` · `error-messages.md` · `run-stats.md`.
-`references/scripts/gi-plan-map.py` renders the map (stdin JSON → markdown stdout).

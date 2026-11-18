@@ -691,7 +691,7 @@ fi
 # The pointer counts are the ones SKILL.md carries today. A PR that adds or
 # drops a "read … now|first|once", "read it now|first|once" or "read the
 # *Section* in …" pointer on purpose updates this line with the ratchet.
-want_counts="auto-pilot=4 init-idd=0 issue-analysis=2 issue-creator=6 issue-pr-review=5 issue-resolver=2 issue-triage=2 plan-to-issues=1"
+want_counts="auto-pilot=5 init-idd=0 issue-analysis=2 issue-creator=6 issue-pr-review=5 issue-resolver=3 issue-triage=2 plan-to-issues=1"
 got_counts="$(python3 -c '
 import json, sys
 skills = json.load(open(sys.argv[1]))["skills"]

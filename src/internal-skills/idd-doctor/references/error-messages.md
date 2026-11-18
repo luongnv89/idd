@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command (+ docs link when useful).
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Setup
 
@@ -203,7 +203,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 | Only rebase | `rebase only` |
 | Nothing allowed | `no merge strategies enabled` |
 
-This repo today sets no `review.merge_method` and allows squash only, so it reads `squash allowed · IDD's merge carries the PR body`. See `docs/decisions/b1-binding-declaration.md`.
+A repo that sets no `review.merge_method` (so the method is `squash`), allows squash only and sets `review.auto_merge: true` reads `squash allowed · IDD's merge carries the PR body`.
 
 ---
 

@@ -47,6 +47,7 @@ supersedes it; two lists of the same children drift within a week.
 
 ```markdown
 <!-- plan-dashboard:start -->
+
 ## Plan
 
 **Plan:** `MODERNIZATION_PLAN.md` · **Baseline at audit:** AMBER — builds; 41/58 tests pass
@@ -86,7 +87,7 @@ Open/closed status is live in the **Sub-issues** panel above — this map is sta
 |---|---|---|---|
 | F-DEP-009 | Medium | upstream v4 unreleased | when v4 ships |
 
-<sub>Rendered by `/plan-to-issues` — refresh with `/plan-to-issues sync 100`</sub>
+<sub>Plan map rendered 2026-08-26 by `/plan-to-issues` — re-render after filing more issues with `/plan-to-issues sync 100`</sub>
 <!-- plan-dashboard:end -->
 ```
 
@@ -130,7 +131,7 @@ stdout. It is deterministic: same input, same bytes.
       "milestone": { "id": "ME", "exit": "CLAUDE.md and AGENTS.md exist" },
       "tasks": [
         { "task_id": "Pre.1", "title": "Make the project environment agent-runnable",
-          "issue": 101, "state": "closed", "depends_on": [], "unknown_deps": [] }
+          "issue": 101, "depends_on": [], "unknown_deps": [] }
       ]
     }
   ],
@@ -140,9 +141,8 @@ stdout. It is deterministic: same input, same bytes.
 }
 ```
 
-`issue` is `null` for a task that was not filed. `state` is **accepted and ignored** — it is retained
-in the schema so an older render input still validates, but nothing reads it: the map encodes no
-status. Do not add a consumer for it.
+`issue` is `null` for a task that was not filed. Leave out `state`: the renderer accepts and ignores
+it because the map encodes no status, so fetching issue state for the render input wastes calls.
 `synced` is supplied by the caller (`date -u +%Y-%m-%d`) — the renderer never reads the clock, so its
 output stays reproducible.
 

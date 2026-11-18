@@ -1,6 +1,6 @@
 # Summary Report Templates
 
-Templates for the Step 7 summary report and the expected inline pipeline output. SKILL.md keeps the contract short; this file holds the full templates.
+Templates for the Step 7 summary report and the step completion reports; SKILL.md's *Pipeline Overview* shows the inline tracker. SKILL.md keeps the contract short; this file holds the full templates.
 
 The Step 7 summary always shows the **five review dimensions** explicitly so reviewers can see, at a glance, that a PR is being judged on more than just tests. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are reported with their own status line.
 
@@ -33,7 +33,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
      stays `PASS`.
    - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
-     findings remain after the cycle cap, a stagnation stop, a #36 hard-block, or a
+     findings remain after the cycle cap, a stagnation stop, an AC or traceability hard-block, or a
      strict-pass blocker. Never merged.
    - `BLOCKED ({reason})` — the run stopped before a verdict, or the merge
      failed: a failed prerequisite or missing bundled dependency, invalid
@@ -74,21 +74,6 @@ severity beside its claim. When the user asks for another format (for example a
 Markdown table to paste into a PR comment), render it from the same results and
 keep the `Result`, `Evidence`, `Uncertainty`, and `Decision` rows. When the host
 cannot render the requested format, say so and print the terminal summary.
-
-### Report-understanding criteria
-
-Grade a Step 7 summary on these, alongside correctness:
-
-| Criterion | Observable check |
-|-----------|------------------|
-| Main result is findable | The first row states `Result:` with its status and main finding; no scrolling or log reading is needed. |
-| Facts and assumptions are separated | `Evidence` names checks that ran here; inherited, skipped, or model-judged items appear under `Uncertainty`. |
-| Claims are traceable | Each finding names its dimension and `file:line`; each pass names the check and commit; a step `PASS` never stands in for a merge. |
-| Next decision is clear | `Decision:` and `Next action:` state whether approval is needed and what the user does next. |
-
-Behavioral evals apply these to actual summaries. Ask human reviewers the same
-four questions and record their answers in the eval's feedback; absent, blank,
-or nonresponsive feedback leaves human understanding unconfirmed.
 
 ## Summary — Clean PR
 
@@ -168,7 +153,7 @@ commit it is inherited from, never `✓ pass`:
   {pr_url}
 ```
 
-Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only group them — a finding's blocking behavior comes from its dimension status, not its axis. The `traceability: fail` line is the one Standards-axis case where tests can be green and the PR is still blocked from soft-pass. Issue #36's contract: missing `Closes #N` always reports a traceability failure even if tests pass.
+Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only group them — a finding's blocking behavior comes from its dimension status, not its axis. The `traceability: fail` line is the one Standards-axis case where tests can be green and the PR is still blocked from soft-pass. A missing `Closes #N` always reports a traceability failure even if tests pass.
 
 ### Summary — Strict-pass blockers
 
@@ -190,7 +175,7 @@ non-productive fix loop.
 
 ## Summary — Human-Authored PR (Decision Record absent)
 
-When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, the Decision Record is typically absent. This is reported as `partial` traceability, not `fail`, per issue #36's "Human-Authored PRs" decision (see issue #36 body and the IDD methodology doc):
+A human-authored PR (one not produced by `/issue-resolver`) usually has no Decision Record. That is `partial` traceability, not `fail` (*Traceability checks* in `references/verification-checks.md`):
 
 ```
   Review dimensions:
@@ -291,7 +276,7 @@ Log the matching mechanism (label name or pattern). Emptying both keys disables 
 ## Auto-Merge
 
 When SKILL.md *Step 7 → Merge rule* allows the merge, run the
-merge identity check, then merge with the expected-head guard (issue #516):
+merge identity check, then merge with the expected-head guard:
 
 ```bash
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
@@ -420,24 +405,6 @@ When `--no-merge` is set (in any mode): skip the merge step entirely and report 
 
 When the *Merge rule* does not allow the merge (`review.auto_merge: false`, or the PR is not clean): skip the merge step and report status only.
 
-## Expected Inline Output
-
-A clean review prints the 7-step tracker and a summary:
-
-```
-  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42), depth: full
-  [2/7] Script Pre    ✓ 3 lint fixes applied
-  [3/7] Review        ✓ spec[ac:pass correctness:pass safety:pass]
-                        standards[trace:pass maint:pass]
-                        0 fixable, 1 noted
-  [4/7] Tests         ✓ 12 passed
-  [5/7] CI            ✓ all checks green
-  [6/7] Fix           ○ skipped — nothing to fix
-  [7/7] Summary       ✓ PR passed review — 1 note to check before merging
-
-  ✓ PR #87 passed review (soft-pass: 1 medium note)
-```
-
 ## Step Completion Reports
 
 Every step ends with a completion report — the checkable bar that separates *the
@@ -445,7 +412,7 @@ step ran* from *the step succeeded*. Emit it right after the step's `[N/7]`
 tracker line:
 
 ```
-  [4/7] Tests        ✓ 128 passed, 0 failed
+  [4/7] Test         ✓ 128 passed, 0 failed
     √ Suite passed   × Build clean
     Result: FAIL
 ```
@@ -483,12 +450,12 @@ Rules that make the report worth reading:
 
 `PARTIAL` covers the documented soft paths: no CI configured (Step 5); a Step 5
 CI failure held non-blocking by `review.ignore_ci_billing_failures: true`; the
-fix loop exhausting `review_cycles` with only non-blocking findings left (Step
+fix loop exhausting `review.max_cycles` with only non-blocking findings left (Step
 6); or Step 4's test + build run skipped under `qa_handoff = trusted`, which
 evaluates neither of that step's checks and so renders
 
 ```
-  [4/7] Tests        ○ tests skipped (qa handoff @ {commit_sha_short})
+  [4/7] Test         ○ tests skipped (qa handoff @ {commit_sha_short})
     × Suite passed   × Build clean
     Result: PARTIAL
 ```

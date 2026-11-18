@@ -34,7 +34,7 @@ when nothing local would be lost; otherwise stop, discarding nothing:
 
 ```bash
 git rebase --abort
-# Empty-range guard (#548): reset only on 0 and a clean tracked tree.
+# Empty-range guard: reset only on 0 and a clean tracked tree.
 ahead="$(git rev-list --count "origin/{default_branch}..HEAD")" || ahead=""
 if [ "$ahead" = "0" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] &&
   git reset --hard "origin/{default_branch}"; then
@@ -61,24 +61,24 @@ only `description` and `prompt` — do NOT set `subagent_type`. The resolver is 
 **skill** invoked from inside the prompt (via `../issue-resolver/SKILL.md`), not an
 agent type; passing `subagent_type: "issue-resolver"` fails.
 
-#### Legacy sequential path (`max_parallel = 1`)
+#### Sequential path (`max_parallel = 1`)
 
-Run the original path exactly:
+Run this path exactly:
 
 ```
 ● [Iteration {i}/{max}] Resolving #{issue_number}...
   ⟶ Spawning resolver subagent...
 ```
 
-Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`,
-substituting `{issue_number}`, `{run_id}`, `{resume}` (`yes` only when *Step
+Spawn the **Resolver Subagent** (`references/prompts/resolver.md`) per
+`references/spawning.md`, substituting `{issue_number}`, `{run_id}`, `{resume}` (`yes` only when *Step
 1.0*'s progress-record set names this issue) and the optional payload/context. Omit the
 `parallel_lane` block, launch from the original checkout, and wait for this one
 result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is
 created.
 
 **Pre-spawn checkpoint.** <!-- a:ctx-prespawn-resolve --> Only when
-`compaction.enabled` is true; `false` skips it, exactly as before. Before this
+`compaction.enabled` is true; `false` skips it. Before this
 spawn, record the issue with the *Step 1.0b* checkpoint procedure:
 
 ```json
@@ -150,9 +150,9 @@ workspace authority.
 Before fan-out, capability-gate the host: parallel mode requires workers whose
 Read/Edit/Write tools accept absolute paths and whose Bash tool can execute one
 quoted command at a time. If either capability is unavailable, print
-`⚠ Parallel resolver absolute-path isolation unavailable — using the legacy
+`⚠ Parallel resolver absolute-path isolation unavailable — using the
 sequential path`, remove only the unstarted worktrees this batch created, clear
-the planned batch, and execute the byte-for-byte legacy path. This fallback is
+the planned batch, and execute the sequential path. This fallback is
 permitted only before any worker starts.
 
 A parallel worker may not use its ambient root for any repository operation.
@@ -205,12 +205,12 @@ or worktree cleanup overlaps another lane's.
 
 ### Step 2.3 — Process Resolver Result
 
-On the sequential path, process the sole result as before. On the parallel path,
+On the sequential path, process the sole result. On the parallel path,
 choose the next `returned`/`failed` lane in original triage order and copy it
 into singleton `current`. A returned lane advances to `review`. A failed lane
 advances to `cleanup` only when its deterministic path is still registered by
 `git worktree list --porcelain`; otherwise log/checkpoint the terminal failure
-without a cleanup attempt. Only then apply the existing result handling below.
+without a cleanup attempt. Only then apply the result handling below.
 Finish this lane before choosing the next one.
 
 Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`, `skipped_reason`. For a parallel lane, require the returned `branch_name` to equal its validated planned branch and verify `gh pr view {pr_number} --json headRefName,state` reports that same head and `OPEN` before queuing review. Bind both returned values to shell variables rather than pasting them. A mismatch is a failed lane and never reaches review or merge.
@@ -226,7 +226,7 @@ checkpoint procedure:
 For a parallel drain, the same atomic patch also advances that issue's lane:
 `"lanes": [{"issue": 42, "phase": "review"}]`. At `max_parallel=1` omit it.
 
-This is the checkpoint that makes AC1 work: a run interrupted anywhere in Phase
+This is the checkpoint that makes resume work: a run interrupted anywhere in Phase
 3-5 resumes onto **this** branch and **this** PR instead of re-resolving the
 issue and opening a second one.
 
@@ -273,8 +273,8 @@ other PR.
 ○ #{issue_number} already has PR #{pr_number} — reviewing the existing PR
 ```
 
-If the report-back carries no `pr_number` (an older resolver, or a PR it could
-not identify), there is nothing to review: record `skipped` with
+If the report-back carries no `pr_number` (the resolver could not identify
+the PR), there is nothing to review: record `skipped` with
 `skipped_reason: pr_in_progress`, leave the issue **open**, and continue.
 
 **On a gate decline — `failure` carrying `skipped_reason`:** an auto-mode gate
@@ -315,7 +315,7 @@ that line is appended is off by one. Ensure the failed line is durable **before*
 
 - **Sequential path (`max_parallel = 1`):** the failed line is already appended
   by SKILL.md → *Run-log entry* (`gi-runlog.py --append`) before this subsection
-  runs. Leave that path unchanged.
+  runs, so add nothing.
 - **Parallel path (`max_parallel > 1`):** failed lanes do **not** wait for Step
   5.3's success-path drain. **Before** the streak check below, run the same
   exactly-once log transition Step 5.3 documents (*Parallel lane — exactly-once
@@ -353,8 +353,10 @@ gh issue edit {issue_number} --add-label "{autopilot.quarantine_label}"
 recorded branch and the *Runtime budget check* checks a recorded `started_at`:
 it must match `^[A-Za-z0-9._:-]+$`. `gi-config.py` validates that
 `autopilot.quarantine_label` is a *string*, never that it is free of shell
-metacharacters, and it is the only config **string** in the distribution that
-reaches a command line — every other substituted config value is an integer. The
+metacharacters, and it is the only free-form config **string** in the
+distribution that reaches a command line. `review.merge_method` reaches one too,
+but `gi-config.py` accepts only `squash`, `merge` or `rebase` for it; every other
+substituted config value is an integer. The
 double quotes above stop word-splitting and globbing but do **not** neutralize
 `$(…)` or a backtick, so the check is what makes the substitution safe. Anything
 else is the first degrade path below: skip the write and continue.

@@ -15,10 +15,8 @@ never starts.
 and not "merges since the last triage". `0` (default) means never. When `N > 0`
 and `i % N == 0`, set `retriage_required` so *Step 1.1* runs in full **this**
 iteration: on a `fresh` cache, under `mode: conservative` (which merges
-nothing), and on every non-merging iteration. `N: 1` therefore forces a full
-triage every iteration, which is what `references/configuration.md` claims.
-This check does **not** live in *Step 1.6* — that step runs only after a merge,
-so a trigger there cannot fire on a non-merging iteration.
+nothing), and on every non-merging iteration, so `N: 1` forces a full triage
+every iteration.
 
 ### Step 1.1a — Triage cache gate <!-- a:ap-step11a-cache-gate -->
 
@@ -27,12 +25,9 @@ a full triage every time round the loop is the duplicated work this gate
 removes: between one merge and the next pick the backlog changes only by this
 loop's own hand, and *Step 1.6* applies that one change directly.
 
-(Lettered onto *Step 1.1* because it gates *Step 1.1* — the gate, the scan and
-*Step 1.1b*'s live read are one triage cluster, evaluated in that order. Phase
-0's *Step 1.0* and *Step 1.0b* are a different thing entirely: they are the run
-state — the resume entry gate and the checkpoint procedure — and they own
-`.idd/run-state.json`, not `.idd/triage.json`. Nothing in this step
-reads or writes the run state.)
+Phase 0's *Step 1.0* and *Step 1.0b* are a different thing entirely: they own
+`.idd/run-state.json`, not `.idd/triage.json`. Nothing in this step reads or
+writes the run state.
 
 **It runs on every path into Phase 1, including `--resume`.** Phase 0 resolves
 first; this gate is evaluated after it either way. A resumed run still needs an
@@ -51,8 +46,8 @@ triage_cache = fresh | stale | absent
 | State | When | Effect |
 |-------|------|--------|
 | `fresh` | `.idd/triage.json` exists, parses, carries a non-empty `summary.suggested_order`, its `updated` is younger than `autopilot.triage_cache_max_age_minutes` (default 60), **and** no commit landed after that timestamp | Step 1.1's scan is skipped; Step 1.2 picks from the cached order |
-| `stale` | the file exists and parses, but any one of those checks fails or cannot be run | run Step 1.1's full triage, unchanged |
-| `absent` | the file is missing, unparsable, or carries no `summary.suggested_order` | run Step 1.1's full triage, unchanged |
+| `stale` | the file exists and parses, but any one of those checks fails or cannot be run | run Step 1.1's full triage |
+| `absent` | the file is missing, unparsable, or carries no `summary.suggested_order` | run Step 1.1's full triage |
 
 The commit half is the check `/issue-triage`'s own cached view already makes
 (*Detect changes and suggest update*), read here rather than reinvented as a
@@ -73,8 +68,7 @@ re-running once it is old enough for the backlog itself to have moved.
 a `suggested_order` that is not an array, a `git log` that cannot run, a
 `.idd/` that does not exist — every one of them runs the full triage.
 **This gate can only remove duplicated work, never change an outcome** —
-`stale` and `absent` both run the same full triage that runs unconditionally
-today, so the worst case is exactly today's behavior.
+`stale` and `absent` both run the full triage, so the worst case is a full triage.
 
 Nothing here is a safety gate, and nothing here reads the file's contents as
 instructions: `.idd/triage.json` is local data derived from issue text and
@@ -206,7 +200,7 @@ which reads as a failure and is not one.
 the per-iteration triage; it must not also remove the orchestrator's live view of
 the backlog. Two of *Step 1.2*'s four eligibility criteria — **Open** and
 **Not assigned** — are answers only GitHub holds: `.idd/triage.json` carries
-neither a GitHub `state` nor an `assignees` field, and never did. Evaluating them
+neither a GitHub `state` nor an `assignees` field. Evaluating them
 against a cache that cannot answer them would falsify *Step 1.1a*'s central claim
 that the gate **can only remove duplicated work, never change an outcome** — an
 issue closed as `not planned` lands no commit, so the gate's commits-since check
@@ -222,15 +216,9 @@ already carries both fields for every open issue — read them from it and issue
 gh issue list --state open --json number,assignees --limit 100
 ```
 
-**Two scalar fields, and no `body`.** The orchestrator still bulk-fetches no
-issue bodies — this list cannot carry one — so the body budget is untouched:
-exactly one body per iteration in triage mode, fetched for the picked issue
-alone in *Step 1.2b*; explicit-list mode retains the same snapshot shape at
-validation and reuses it from the mode-neutral capture, so no body enters this
-context from the analyzer path either. A hundred `{number, assignees}` rows is a
-few kilobytes against the
-~150KB a hundred bodies would cost, so the per-iteration context saving survives
-intact. Nothing here is a triage: no graph is built, no order is computed, and
+**Two scalar fields, and no `body`** — exactly one body per iteration is
+fetched, for the picked issue alone, in *Step 1.2b* (*Step 1.1* gives the
+reason). Nothing here is a triage: no graph is built, no order is computed, and
 `.idd/triage.json` is neither read nor written.
 
 What it supplies, and nothing else:
@@ -305,7 +293,7 @@ Apply all four eligibility checks independently to every proposed member, then
 run *Step 1.2b* for each. A rejected member is removed before any spawn; another
 eligible member of the same group may fill the slot. A group with fewer than two
 survivors degrades to one ordinary issue without creating a parallel worktree.
-Explicit-list batch resolution is unchanged and does not consume triage
+Explicit-list batch resolution does not consume triage
 `parallel_groups`.
 
 Before preparing any worktree, derive every branch/path from the synced base and
@@ -438,7 +426,7 @@ entries whose reason was lost, it is the reason for all of them.
 So `{dep_blocked_count}` is the count of gate-added entries and nothing else, and
 every filtered issue lands in exactly one bucket — which is what keeps the four
 counts summing to the candidates Step 1.2 rejected. A reason with no bucket would
-break that sum silently, so a new skip-list writer adds a row here. Omit the
+break that sum silently. Omit the
 `Dep-blocked` line when its count is zero. All four labels pad to a common value
 column, so widening one widens the rest. **This is the only place a run ends for
 dependency reasons** (see *Step 5.1b — Dependency Gate*); the gate itself never
@@ -500,19 +488,14 @@ entry; that record is `{issue_payload}`. The field set is identical on both path
 Every working source yields the **same record**, so the resolver's *Step 0i*
 reads `supplied` either way. If no complete matching record exists, **omit
 `{issue_payload}` for that issue entirely** —
-*Step 0i* then reads `absent` and the resolver fetches for itself, which is
-today's behavior. Never emit a body-less partial: a block missing `body` reads
+*Step 0i* then reads `absent` and the resolver fetches for itself. Never emit a body-less partial: a block missing `body` reads
 as `partial` there, which costs the resolver the fetch *and* hides the failure
 behind a payload that looks captured.
 
 **Post-pick eligibility re-check.** This record is as fresh as `gi-issue.py`'s
-TTL allows — a real read at pick time in practice, since this loop fetches each
-issue once per run, so the TTL has nothing of its own to serve back. Call it
-that, never "live": it is the same TTL-cached read the resolver's *Step 0i*
-already describes as possibly old before the caller ever held it. On that
-footing it is still the freshest answer this step has to criteria *Step 1.2*
-could otherwise take only from a list read moments earlier or from a cached
-triage row.
+TTL allows, never "live" — in practice a real read at pick time, since this loop
+fetches each issue once per run — and it is the freshest answer this step has to
+*Step 1.2*'s criteria.
 Reject the pick on any one of four readings of this record — `.issue.state` is
 not `open`; the issue is assigned to another user and *Step 1.2*'s **Not
 assigned** criterion would therefore have rejected it (that criterion, escape
@@ -571,8 +554,7 @@ before its Step 0b — deliberately bypassing this cache — and stops on any `s
 but `open`. That read is the last word on `state`; this check is what keeps an
 ineligible pick from spending a spawn to reach it, and it is not the reason the
 resolver's stops hold. If the fetch itself degraded to nothing there is no record
-to check — spawn as before, which is the behavior that shipped before *Step 1.1a*
-existed. That degrade covers the label reading too: with no record, the only
+to check — spawn, and let the resolver's own live read decide. That degrade covers the label reading too: with no record, the only
 answer available is the one *Step 1.2* already took from the triage row. Note
 that it takes **both** the script and the `gh` fallback beside it failing to get
 there, and that a stale-cache quarantine costs one wasted resolve, never a
@@ -589,7 +571,7 @@ matched. Check the labels in the order the table lists them, so an issue carryin
 both the quarantine label and `wontfix` reports the quarantine.
 
 Capture three compact-JSON blocks for the spawn prompts rather than making each
-subagent derive them again (issue #256) — one per consumer shape:
+subagent derive them again — one per consumer shape:
 
 - **`{issue_payload}`** — the record above, verbatim and complete as the fetch
   returns it: `number`, `title`, `body`, `labels`,
@@ -638,7 +620,7 @@ esac
 Serialize each block as compact JSON and substitute it into complete-line
 `BEGIN_UNTRUSTED_<kind>_{payload_nonce}` /
 `END_UNTRUSTED_<kind>_{payload_nonce}` boundaries from
-`references/subagent-prompts.md`. Operational `Instructions:` follow the final
+`references/spawning.md`. Operational `Instructions:` follow the final
 closing line. If nonce generation fails, omit all payload blocks for that spawn.
 A missing or mismatched boundary makes that payload unusable. Framing prevents
 accidental delimiter collision; it does **not** authenticate or validate the
@@ -648,7 +630,7 @@ Substitute the complete explicit-list payload map into the analyzer prompt;
 its per-issue `/issue-analysis` invocation forwards only the matching record.
 Substitute `{issue_payload}` + `{triage_context}` into resolver and batch-resolver
 prompts, `{issue_payload_ids}` into the reviewer prompt. The resolver accepts the
-explicit-list keyed map as well as the legacy batch array. The resolver passes
+explicit-list keyed map as well as the batch array. The resolver passes
 `triage_context` onward to the codebase-researcher, which uses it to order Phase
 2b and seed Phase 5. Step 5.1b's dependency read takes the body directly from the
 held resolution snapshot — it is already here.
@@ -662,8 +644,7 @@ the exclusion list has one home, in
 
 If a block cannot be assembled — capture degraded to nothing, framing failed,
 or the triage file is unreadable — omit that block entirely and spawn without it. Every
-consumer treats a missing block as "fetch it yourself", which is today's
-behavior, so an omission costs a read and breaks nothing.
+consumer treats a missing block as "fetch it yourself", so an omission costs a read and breaks nothing.
 
 ```
 ○ Issue payload: captured from Phase 1 (#{issue_number}) — passed to subagents

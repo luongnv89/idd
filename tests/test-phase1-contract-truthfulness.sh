@@ -50,8 +50,8 @@ DIST_REVIEW="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
 DIST_TRIAGE="$REPO_ROOT/skills/issue-triage/references/detection.md"
 DIST_TRIAGE_SCANNER="$REPO_ROOT/skills/issue-triage/references/agents/issue-relationship-scanner.md"
 DIST_TEMPLATE="$REPO_ROOT/skills/init-idd/templates/idd-template.yml"
-AUTOPILOT_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
-DIST_AUTOPILOT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+AUTOPILOT_PROMPTS="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
+DIST_AUTOPILOT_PROMPTS="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/spawning.md")"
 
 for file in "$RESOLVER" "$ANALYSIS" "$ANALYSIS_STEPS" "$ANALYSIS_OUTPUT" \
             "$REVIEW" "$REVIEW_REPORTS" "$CONFIG" "$TRIAGE_SKILL" "$TRIAGE" \

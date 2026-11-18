@@ -1,8 +1,9 @@
 # Plan Parser Agent
 
 Spawn prompt for the Phase 1 parser subagent (plans over 400 lines). Paste this file into the
-`Agent` prompt with the input JSON below filled in; use the default general-purpose agent — never
-set `subagent_type`. It is skill-local, not a shared agent: only `/plan-to-issues` spawns it.
+`Agent` prompt with the input JSON below filled in — `rules_path` is the absolute path of this
+skill's `references/plan-parsing.md`; use the default general-purpose agent — never set
+`subagent_type`. It is skill-local, not a shared agent: only `/plan-to-issues` spawns it.
 
 You transcribe a plan document into structured JSON. You are a parser, not an author: every value you
 emit is copied from the document. Read-only — you open the plan (and, if it exists, the report beside
@@ -14,9 +15,12 @@ it for severities) and nothing else.
 {
   "plan_path": "/abs/path/to/repo/MODERNIZATION_PLAN.md",
   "report_path": "/abs/path/to/repo/MODERNIZATION_REPORT.md",
+  "rules_path": "/abs/path/to/plan-to-issues/references/plan-parsing.md",
   "phase_filter": ["P0", "P1"]
 }
 ```
+
+Read `rules_path` first. Every mention of `references/plan-parsing.md` below means that file.
 
 `report_path` may be absent or point at a missing file. `phase_filter` may be absent, meaning all
 phases. Filtered-out phases are still emitted, with `"filed": false` and an empty `tasks` array — a
@@ -60,7 +64,8 @@ prose, no fences. `labels` is filled by the caller; omit it.
 
 ## Self-check before returning
 
-Run these and include the results in `parse_check`. Report a mismatch; do not round it off.
+Run these with `PLAN` set to `plan_path`, and include the results in `parse_check`. Report a
+mismatch; do not round it off.
 
 ```bash
 grep -cE '^#{3,4} Task '      "$PLAN"                        # equals your task count

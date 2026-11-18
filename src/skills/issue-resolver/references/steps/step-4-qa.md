@@ -43,8 +43,7 @@ it is already in hand from Step 0g, and carrying it costs nothing, exactly as
 **Single home of `tests_state` and of its two run-state consumers.** Those are <!-- a:rs-clean-tree -->
 Step 4 cycle N+1 below and Step 5 Deliver (`references/steps/step-5-deliver.md`). The QA marker is the durable rendering
 of the same state; `references/report-templates.md` is only that marker's
-rendering location, not a third consumer. Two definitions of "the suite already
-ran on this commit" drift apart, so this is the only place either is stated.
+rendering location, not a third consumer.
 
 ```
 tests_state = <passing_count>@<tests_sha>        # e.g. 128@9f2c1ab…  (sha40)
@@ -55,7 +54,7 @@ progress record: the count the suite
 reported, and `tests_sha` = `git rev-parse HEAD` evaluated in the same step,
 *before* anything else commits. Full 40-character SHA — the short form is
 display-only. It is a
-**run-state variable**, not merely the marker field it renders into (issue #256);
+**run-state variable**, not merely the marker field it renders into;
 `references/report-templates.md` (*QA handoff marker*) describes how to render
 it; it neither defines nor consumes the run-state decision.
 
@@ -91,14 +90,14 @@ Both consumers layer **under `resolve.auto_test`**, never over it: when
 `resolve.auto_test` is `false` the suite is skipped for that reason alone and
 `tests_state` is never consulted. Fail-safe is `run`: nothing recorded, a short
 or non-hex SHA, a count that is not a number, or any doubt at all ⇒ run the
-suite, exactly as today. `resolve.adaptive_effort: false` also forces `run`;
-no new config key is introduced. Never compare against a SHA captured anywhere but
+suite. `resolve.adaptive_effort: false` also forces `run`.
+Never compare against a SHA captured anywhere but
 the step that ran the suite, and never substitute the current head for a missing
 record.
 
 *Update documentation* commits **after** Step 5's Verify (see the Deliver order in
-SKILL.md), so a doc-only commit is never covered by `tests_state` — that is
-today's ordering, unchanged by this variable, and the reason `tests=` is captured
+SKILL.md), so a doc-only commit is never covered by `tests_state`; that is why
+`tests=` is captured
 in Step 4 rather than at push time.
 
 One `○` line per skip, per docs/terminal-style.md:
@@ -134,7 +133,7 @@ The contract, opt-in, lifecycle and verdict handling live in `docs/ui-review.md`
 
 - **Max cycles (hard bound):** `resolve.qa_max_cycles` (default: 5). Never
   exceed this configured cap.
-- **Policy ceiling by class** (issue #308; distinct from the hard bound):
+- **Policy ceiling by class** (distinct from the hard bound):
   `light` → **1**; `full` + low/medium complexity → **2**; `full` + high/complex
   → `resolve.qa_max_cycles`. Missing profile/complexity fail-safe as full +
   medium (ceiling **2**). The reviewer spawn still runs on the `light` path

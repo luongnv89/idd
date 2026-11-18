@@ -83,7 +83,7 @@ variable, exactly as for `current.branch`. Then reconcile by phase:
 | `planned` | No work was promised yet. Recreate its worktree from the recorded branch and synced base, then spawn it |
 | `resolve` | Look for an open PR by the recorded branch. Found → checkpoint `returned`; absent but the registered path/branch exists → reject any active merge/rebase/cherry-pick/bisect state, then re-run with `IDD_RESUME_LANE=1` while preserving staged/unstaged/untracked edits; ambiguous ownership → `blocked_dirty`; neither exists → recreate from the recorded base SHA and run |
 | `returned` | Require the recorded open PR, or derive it from the conventional branch and checkpoint it; then queue the lane for the serialized drain |
-| `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the existing singleton review phase (a `merge` lane re-enters at review, as above). Exactly one lane may be in these draining phases at a time |
+| `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the singleton review phase (a `merge` lane re-enters at review, as above). Exactly one lane may be in these draining phases at a time |
 | `log_pending` | Retry this lane's persisted normalized telemetry with `gi-runlog.py --append-once`; identical `event_id` succeeds without a second line, conflicting data stops |
 | `logged` / `cleanup` | Reconcile the PR outcome, then finish cache/worktree cleanup; never append a raw fallback line |
 | `completed` / `failed` / `blocked_dirty` | Do not spawn again; retain the worktree for failed/blocked recovery and continue draining ready siblings |
@@ -111,8 +111,8 @@ advances a real run.
 **Leftover borrowed skills.** After a successful `--read` of a state object —
 **on every gate outcome, and before any `--init`** — if `borrowed_skills`
 lists any `origin: borrowed` entries, run the resolver's
-teardown (`references` in `/issue-resolver` → *Step 3 — Propose relevant
-skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
+teardown (`/issue-resolver`'s `references/steps/step-3-implement.md` →
+*Step 3 — Propose relevant skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
 then write the record back with `--update` exactly as that section
 specifies — the payload rule lives there and is deliberately not restated
 here, so a failed uninstall keeps its retry. **That one `--update` follows the
@@ -128,7 +128,7 @@ borrowed directory survives in the global `~/.claude/skills/` — the untracked
 orphan the resolver's marker rule exists to prevent, and one no later run
 can find. Tear down (or carry the failures back) before `--init` writes; a state
 object too damaged to read for `borrowed_skills` has nothing to tear down and
-proceeds to `--init` as before.
+proceeds to `--init`.
 The read-back rule above binds here too: skip any entry whose `name` does not
 match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
 `borrowed` before it reaches an `rm -rf`, and remove a directory only when it
@@ -314,8 +314,8 @@ matches is an ordinary cap stop.
 
 ### Context threshold check <!-- a:ctx-check -->
 
-Only when `compaction.enabled` is true; `false` skips this check entirely and
-the loop behaves exactly as before. The contract, including the signal rule, is
+Only when `compaction.enabled` is true; `false` skips this check entirely.
+The contract, including the signal rule, is
 `docs/context-threshold.md`. Evaluate it at the **top of every iteration** only,
 right after the *Open PR cap check*, against
 `compaction.threshold.auto-pilot` (default 15). It reads only a

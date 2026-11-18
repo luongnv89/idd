@@ -27,13 +27,10 @@ Rules that make the report worth reading:
 - A step may not be reported complete without a `Result:` line. If a check could
   not be evaluated (a tool was unavailable, a gate was skipped by config), mark
   it `×` and use `PARTIAL` — never assume `√`.
-- One clarification of that rule, because two paths reach Step 2 without spawning
-  the synthesizer: *Step 2 — Plan*'s `Options produced` check is `√` whenever
-  options are in hand at the end of the step — synthesized this run, lifted from
-  a fresh analysis (`analysis_reuse = fresh`), or replaced by the `light`
-  profile's direct minimal plan — and `×`/`PARTIAL` only when the step ends with
-  no plan at all. The check asks whether the plan exists, not which machinery
-  produced it.
+- *Step 2 — Plan*'s `Options produced` is `√` whenever the step ends with
+  options in hand — synthesized, lifted from a fresh analysis
+  (`analysis_reuse = fresh`), or the `light` profile's minimal plan — and
+  `×`/`PARTIAL` only when it ends with no plan at all.
 - `Scope inside the issue` is `√` when the *Criteria coverage gate* returns
   `covered` or `no_criteria`; a `gap` is `×`.
 
@@ -51,8 +48,9 @@ Rules that make the report worth reading:
 | 4 — QA | `Review clean` · `Tests pass` · `Build clean` · `AC verified` |
 | 5 — Deliver | `Tests green` · `Branch pushed` · `PR opens with Closes #N` |
 
-`PARTIAL` is legitimate in exactly three places: *Step 0 — Preflight* when only
-`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); *Step 4 — QA* when the loop hits
-`review_cycles` with residual non-blocking findings (delivered with known
-issues), and *Step 5 — Deliver* when the PR is created but an optional extra
-(project-board sync, run-log append) failed. Anywhere else a `×` is blocking.
+Besides the two cases above (a check that could not be evaluated, and Step 2's
+`Options produced`), `PARTIAL` is legitimate on *Step 0 — Preflight* when only
+`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); on *Step 4 — QA* when the loop hits
+its cycle cap with residual non-blocking findings (delivered with known
+issues); and on *Step 5 — Deliver* when the PR is created but an optional extra
+(project-board sync, run-log append) failed. Any other `×` is blocking.

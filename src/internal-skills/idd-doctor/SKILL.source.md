@@ -20,10 +20,10 @@ Run a report-only health check on an IDD repository, surfacing doc drift on the 
 - **Do** run it before landing a change to `src/skills/issue-creator/` README/SKILL text or the issue templates.
 - **Do** run it after `/init-idd`, to confirm the generated config sets `autopilot.mode`.
 - **Do** wire it into pre-merge or pre-release checks.
-- **Avoid** running it as a fix tool — v1 is **report-only**: no file modified, no issue commented on, no PR created.
+- **Avoid** running it as a fix tool — it is **report-only**: no file modified, no issue commented on, no PR created.
 - **Never** treat its output as a substitute for code review; it catches only the four classes of drift below.
 
-## Scope (v1)
+## Scope
 
 The doctor performs exactly four **gating checks** (each PASS / WARN / FAIL), then
 one **informational, non-gating** section — the *run-log summary* — reporting
@@ -37,7 +37,7 @@ those is **out of scope**:
 | 3 | Autopilot mode set | `.idd.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.idd.yml` exists) |
 | 4 | Merge method | The repository allows the configured `review.merge_method` (`squash` or `merge`), so IDD's merge carries the PR body into git history (SPEC §4.3 B1/B2). `rebase` is tracker-only; so is a hand merge whose message source is not `PR_BODY`. | `WARN` |
 
-### Explicitly out of scope for v1
+### Out of scope
 
 `gh` authentication checks; full schema validation of `.idd.yml`; stale-triage detection; PR-format checks; commit-message linting; README link validation; and autofix of any kind.
 
@@ -65,7 +65,7 @@ Verify this skill's bundled reference files are present. If any is missing, stop
   Then restart the agent session and re-run /idd-doctor.
 ```
 
-That stop is a terminal outcome: print the block, then the *Run Stats Footer* (`references/run-stats.md`), then stop. It runs before the clock capture in *Pipeline*, so there is no `run_started_epoch` and `elapsed` prints the literal `n/a`, with `agents 0`. If `references/run-stats.md` is itself the missing file, print those two lines from the shape in *Run stats footer*.
+That stop is a terminal outcome: print the block, then the *Run Stats Footer* (`references/run-stats.md`), then stop. It runs before the clock capture in *Pipeline*, so there is no `run_started_epoch` and `elapsed` prints the literal `n/a`, with `agents 0`. If `references/run-stats.md` is itself the missing file, print a `┄` separator line, then `  Run stats   elapsed n/a · agents 0`.
 
 Check these, relative to this SKILL.md's directory:
 
@@ -77,7 +77,7 @@ Check these, relative to this SKILL.md's directory:
 
 ## Configuration
 
-This skill **reads** `.idd.yml` only to determine whether Check 3's `autopilot.mode` is set (that field is documented in `docs/config-schema.md`); it is otherwise config-free, with no `doctor:` section and no per-check toggles in v1.
+This skill **reads** three `.idd.yml` keys, all documented in `docs/config-schema.md`: `autopilot.mode` (Check 3), and `review.merge_method` and `review.auto_merge` (Check 4). It has no `doctor:` section and no per-check toggles.
 
 If `.idd.yml` does **not** exist, Check 3 skips rather than fails (see *Check 3*) — a repo that has not yet run `/init-idd` is not punished for it.
 
@@ -89,7 +89,7 @@ The doctor executes the four checks in order — one line each, then a summary f
 
 **Capture the run clock before Check 1** — one `date +%s`, kept as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it. Reading a clock is not a repo mutation, so it stays inside the *Read-only guarantee*.
 
-Expected output for a clean repo (verify against this when testing):
+Expected output for a clean repo:
 
 ```
   ◆ /idd-doctor — health check
@@ -130,7 +130,7 @@ The skill runs inside an agent, so there is no real exit code. A wrapper script 
 
 ## Check 1 — Stale skill claims
 
-Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for stale claims about its own scope. The forbidden patterns describe the **old** behavior where the creator allegedly inspected the codebase; the intent-only contract (SPEC.md §1.2 intent–code boundary) forbids them.
+Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for claims that the creator inspects the codebase. The intent-only contract (SPEC.md §1.2 intent–code boundary) forbids such claims.
 
 ### What to scan
 
@@ -139,11 +139,11 @@ src/skills/issue-creator/docs/README.md
 src/skills/issue-creator/SKILL.source.md
 ```
 
-These two are the only files in scope. Other skills (`/issue-analysis`, `/init-idd`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
+These two are the only files in scope. Other skills (`/issue-analysis`, `/init-idd`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, any file under `docs/` other than the `docs/README.md` above, the top-level `README.md`, or another skill's files.
 
 ### Forbidden patterns (case-insensitive substring match, with surrounding negation)
 
-A line **fails** if it contains any pattern below **and** no negation marker (`no`, `not`, `never`, `does not`, `doesn't`, `without`, `cannot`, `won't`).
+A line **fails** if it contains any pattern below **and** no negation marker as a whole word (`no`, `not`, `never`, `does not`, `doesn't`, `without`, `cannot`, `won't`); the `no` inside "notes" is not a marker.
 
 | Pattern | Why it's forbidden |
 |---------|-------------------|
@@ -212,13 +212,13 @@ Check 1's *Pattern match algorithm* without its negation steps: every matching l
 
 ## Check 3 — Autopilot mode
 
-Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
+Verify that `.idd.yml`, when present, sets `autopilot.mode`. Without it, an explicit legacy `autopilot.auto_merge` key decides the merge mode instead of the `balanced` default, and `auto_merge: true` means `aggressive` with partial merges. The mapping is in `docs/config-schema.md` under `autopilot.auto_merge`.
 
 ### Procedure
 
 1. Check whether `.idd.yml` exists in the repo root, else legacy `.gitissue.yml` (print `⚠ legacy .gitissue.yml found — rename to .idd.yml`). If neither, skip with `○ [3/4] Autopilot mode        skipped — no .idd.yml`.
 2. Read the file as text — no YAML parser required; a regex check suffices and adds no dependency. If the file exists but cannot be read, print the *Fail (unreadable)* line and go to Check 4.
-3. Look for a line matching `^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Any non-empty value matches; the value is not validated in v1. Equivalent shell heuristic:
+3. Look for a line matching `^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Any non-empty value matches; the value is not validated. Equivalent shell heuristic:
 
    ```bash
    cfg=.idd.yml; [ -f "$cfg" ] || cfg=.gitissue.yml
@@ -305,7 +305,7 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
    exactly as `references/run-log-summary.md` defines them. When a
    `.idd/improvement-proposals.jsonl` ledger exists, that reference's
    optional *Skill improvements* line also reports pending correction-guard
-   proposals (issue #524) — still informational, still read-only.
+   proposals — still informational, still read-only.
 
 ---
 
@@ -329,24 +329,18 @@ Optional, propose-only. With no user present to approve (a subagent, unattended,
 
 The skill MUST NOT modify any file in the repo, create branches, commits, tags, or PRs, edit issue bodies or post comments, or mutate `.idd.yml` or any config file.
 
-It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`). Test fixtures (see *Testing*) assert the working tree is unchanged after a doctor run.
-
----
-
-## Testing
-
-`tests/test-idd-doctor.sh` (pure bash, exit 0 on pass) asserts this spec against itself — structure, both pattern catalogs, check order, read-only guarantee, `gh` field selections, skips, exit codes, and the run-log summary. Run `bash tests/test-idd-doctor.sh`. Those assertions check correctness only; grade a real report's readability against the *Understanding criteria* in `references/review-contract.md`.
+It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`).
 
 ---
 
 ## Output Conventions
 
-Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link when applicable. This terminal layout is the default; a requested Markdown or JSON report follows the *Format rule* in `references/review-contract.md`.
+Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name} {detail}`, with the check name padded exactly as in `references/error-messages.md`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link when applicable. This terminal layout is the default; a requested Markdown or JSON report follows the *Format rule* in `references/review-contract.md`.
 
 ## Edge Cases
 
 - **`.idd.yml` has no `autopilot:` section** — Check 3 fails with the standard fix hint.
-- **`autopilot.mode` set to a non-canonical value** (e.g. `mode: yolo`) — Check 3 still passes; any non-empty value satisfies "key set", and a future v2 may validate values.
-- **A skill README carries a forbidden pattern inside a code block or fenced quote** — Check 1 still flags it; v1 is mechanically strict, not contextually nuanced.
+- **`autopilot.mode` set to a non-canonical value** (e.g. `mode: yolo`) — Check 3 still passes; any non-empty value satisfies "key set".
+- **A skill README carries a forbidden pattern inside a code block or fenced quote** — Check 1 still flags it; the match is mechanically strict, not contextually nuanced.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
 - **`/issue-creator` is missing** — Check 1 fails with a `src/skills/issue-creator/docs/README.md not found` finding; that skill is required in an IDD repo.

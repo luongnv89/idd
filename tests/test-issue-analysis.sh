@@ -163,14 +163,36 @@ else
 fi
 
 # --- T10: report and cache validation rules remain part of the skill --------
+# Report-understanding grading is maintainer material: it lives in
+# evals/report-understanding.md, not in the runtime reference (#630).
+EVAL_RU="$REPO_ROOT/evals/report-understanding.md"
+has "$EVAL_RU" "## issue-analysis" "T10: the eval grading guide has an issue-analysis section"
 for criterion in "Result is findable" "Facts and assumptions are separate" \
                  "Claims are traceable" "Next decision is clear"; do
-  has "$PERSIST" "$criterion" "T10: review guidance covers $criterion"
+  has "$EVAL_RU" "$criterion" "T10: eval grading guide covers $criterion"
 done
-has "$PERSIST" "unconfirmed" "T10: absent human feedback does not imply understanding"
+has "$EVAL_RU" "unconfirmed" "T10: absent human feedback does not imply understanding"
+if grep -qF "Evaluate report understanding" "$PERSIST"; then
+  fail "T10: output-and-persist.md still carries eval-grading criteria"
+else
+  pass "T10: output-and-persist.md carries no eval-grading criteria"
+fi
 has "$PERSIST" "Atomically replace" "T10: new analysis replaces cache only after validation"
 has "$PERSIST" 'Do not print `Saved:`' "T10: failed persistence cannot claim a saved result"
 has "$SKILL" "Validate analysis data" "T10: view mode validates cached data before rendering"
+
+# --- T11: examples show the current report shape (#631) ----------------------
+# Examples set the output shape more strongly than prose, so the full-flow
+# example must carry the Decision Record and every example run the footer.
+EXAMPLES="$REPO_ROOT/src/skills/issue-analysis/references/examples.md"
+has "$EXAMPLES" "◆ Decision Record" "T11: full-flow example renders the Decision Record"
+has "$EXAMPLES" "Analyzed at:        main @ " "T11: example pins the analysis to a commit"
+has "$EXAMPLES" "Run stats   elapsed" "T11: examples end with the run-stats footer"
+if grep -qF "extracted from SKILL.md" "$EXAMPLES"; then
+  fail "T11: examples.md still narrates its history"
+else
+  pass "T11: examples.md carries no history phrase"
+fi
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

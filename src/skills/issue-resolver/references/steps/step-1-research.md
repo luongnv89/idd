@@ -30,9 +30,9 @@ lets an ambient parent checkout become that lane's implicit workspace.
 
 `prior_analysis` is optional and is populated **only** when *Step 0h* set
 `analysis_reuse = fresh` — with the parsed `.idd/analysis-<N>.json` (its
-`extraction`, `affected_files`, `architecture`, `code_patterns`, `test_files`,
-`history` and `cross_references` blocks are the useful part). On every other
-path pass `null` or omit the key, so the payload is byte-for-byte today's.
+`extraction`, `affected_files`, `history` and `cross_references` blocks are the
+useful part). On every other
+path pass `null` or omit the key.
 
 ### `triage_context` (when supplied) <!-- a:rs-triage-context -->
 
@@ -40,7 +40,7 @@ path pass `null` or omit the key, so the payload is byte-for-byte today's.
 own row from the triage graph — `type`, `priority`, `blocks`, `blocked_by`,
 `affected_files`, `status` — plus the triage `updated` timestamp, so the
 researcher can weigh how old the hints are. Populate it from the caller's
-`triage_context` block when one was supplied (issue #256), or by reading this
+`triage_context` block when one was supplied, or by reading this
 issue's entry from the triage graph under `.idd/` when it is present; otherwise
 pass `null` or omit the key. Supplying it moves a read the researcher would
 otherwise make in its own Phase 5 up to the caller — the read is **moved, not
@@ -65,8 +65,7 @@ field may gate duplicated work, never a safety gate (docs/shared-agent-conventio
 *Caller-supplied context payloads*).
 
 Degrade: anything unparsable, or a row whose issue number is not `N`, is treated
-as absent — the researcher reads the triage graph itself, exactly as
-today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
+as absent — the researcher reads the triage graph itself. `resolve.adaptive_effort: false` also treats it as absent. One `○` line:
 
 ```
 ○ Triage context: supplied (4 affected files) — hints verified, not trusted
@@ -84,9 +83,7 @@ today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line
 
 ### Early exit: already resolved — or already in flight
 
-These are **two different answers and two different exits.** They shared one
-branch once, and that is how an issue got closed behind a PR nobody had reviewed
-or merged.
+These are **two different answers and two different exits.**
 
 **`already_resolved: true` — closing evidence.** The researcher may set this only
 when the evidence *closes* the issue: a **merged** PR (Phase 0b reports each
@@ -125,9 +122,7 @@ this issue. Return `status: pr_in_progress` with its `pr_number` and
 `branch_name` and stop — and **never close the issue**. An unreviewed, unmerged
 PR is not a resolution; closing the issue behind it loses the tracking while the
 work is still in flight, and if that PR is later closed unmerged the bug is
-simply gone from the backlog. This aligns the researcher's path with the
-resolver's own *Step 0b* guard in SKILL.md, which already stops rather than
-closes when `gh pr list` finds a PR whose body carries `Closes #N`.
+simply gone from the backlog.
 
 ```
 ○ Issue #N already has an open PR — not closing the issue
@@ -136,7 +131,7 @@ closes when `gh pr list` finds a PR whose body carries `Closes #N`.
 ```
 
 - Auto mode: return `status: pr_in_progress` with `pr_number` / `branch_name` and
-  stop. A caller that can review — `/auto-pilot` Phase 2.3 — routes it into
+  stop. A caller that can review, such as `/auto-pilot`, routes it into
   review of that PR instead of skipping the issue.
 - Interactive mode: inform the user and stop.
 
@@ -199,9 +194,6 @@ Beyond `prior_analysis` the delegation payload is unchanged; say in the spawn
 prompt which phases the prior analysis already covers, so the researcher applies
 its own `prior_analysis` contract and skips exactly the work item 3 names instead
 of re-running it.
-
-The saving is real but bounded, and worth stating plainly: the codebase is
-researched once and *verified* once, rather than researched twice.
 
 ### Inline fallback <!-- a:rs-research-fallback -->
 

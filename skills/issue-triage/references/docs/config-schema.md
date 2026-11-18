@@ -59,7 +59,7 @@ triage:
 # Context-threshold check + re-entry rules. Contract:
 # https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
 compaction:
-  # Type: boolean. Default: true. false = behave as before.
+  # Type: boolean. Default: true. false = all rules off.
   enabled: true
   # Type: integer 1-99 per skill, % of context remaining (else exit 3).
   # Default: as listed (auto-pilot 15, every other skill 40).
@@ -116,7 +116,7 @@ Repo-root state beside `.idd.yml`, created on first use.
 |------|-----------|-------------|
 | `.idd/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.idd/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot`, `/issue-pr-review` | Append-only run log |
 | `.idd/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
 > **Not in `.idd/`:** the model-suggestion cache is **user-level** (`~/.cache/idd/`, all repos).
@@ -160,6 +160,6 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `agents.model` per-role keys | `null` | Overrides `default`; a `null` role resolves to it |
 | `agents.effort.default` | `null` | Thinking effort, same rules |
 | `agents.effort` per-role keys | `null` | As `agents.model` |
-| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = behave as before |
+| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = all off |
 | `compaction.threshold` · `auto-pilot` | `15` | % of context remaining (1-99) at or below which the skill prompts compaction |
 | `compaction.threshold` · every other skill | `40` | Same, one key per skill |

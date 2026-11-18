@@ -1242,7 +1242,7 @@ fi
 RES_STEPS="$(spec_concat "$SKILLS/issue-resolver/references/pipeline-steps.md")"
 RES_SKILL="$SKILLS/issue-resolver/SKILL.md"
 RESEARCHER="$SKILLS/issue-resolver/references/agents/codebase-researcher.md"
-AP_PROMPTS="$SKILLS/auto-pilot/references/subagent-prompts.md"
+AP_PROMPTS="$(spec_concat "$SKILLS/auto-pilot/references/spawning.md")"
 
 # The shared early exit is split: the auto-close path must be reachable only
 # from closing evidence.

@@ -1,7 +1,7 @@
 # Preflight — dependency detection and failure blocks
 
 Everything Phase 0 needs: how to probe `gh` for real readiness, how to detect each dependency, and the exact block to print when one is
-missing. Read this when a check fails — or when you are unsure how to check one.
+missing. Read this at the start of Phase 0, and before sync mode's reduced preflight.
 
 **One report, not one stop per failure.** Run every check in all five groups — **env**, **gh**,
 **skill**, **bundled**, **input** — collect the failures, then print every failure block together and
@@ -11,7 +11,7 @@ in one pass instead of three re-runs.
 ## gh readiness
 
 `command -v gh` proves a binary exists. It does not prove `gh` can file 50 issues into *this* repo as
-the *intended* user. These six probes do. Every command below was verified against `gh` 2.87.3.
+the *intended* user. These six probes do.
 
 ### The probes — G1–G6
 
@@ -184,7 +184,8 @@ Both probes failing means `issue-creator` is missing — stop with the missing-s
 | Skill | Required | Source repo | Install |
 |---|---|---|---|
 | `issue-creator` | **yes** | `luongnv89/idd` | `asm install https://github.com/luongnv89/idd --skill issue-creator` |
-| `codebase-modernizer` | only when no plan exists yet | `luongnv89/skills` | `asm install github:luongnv89/skills:skills/codebase-modernizer` |
+| `codebase-modernizer` | optional | `luongnv89/skills` | `asm install github:luongnv89/skills:skills/codebase-modernizer` |
+| `tasks-generator` | optional | `luongnv89/skills` | `asm install github:luongnv89/skills:skills/tasks-generator` |
 
 ## Failure blocks
 
@@ -199,8 +200,8 @@ Print the *Missing required skill — `issue-creator`* block from `references/er
 ### No plan file found
 
 Printed only when the user **passed an explicit path that does not exist**. A discovery miss is
-not this error: it continues to conversation fallback, or to *No input to convert* when the
-conversation also has no actionable intent.
+not this error: it continues to the next rule in `references/input-resolution.md`, ending at *No
+input to convert*.
 
 ```text
 ✗ No plan file found
@@ -227,9 +228,10 @@ block — never fall through to the conversation, and never reuse the *No plan f
   plan this skill can convert.
 
   To fix:  add task headings in the supported grammar (references/plan-parsing.md),
-           or pass a different file.
+           or pass a different file. A requirements document (PRD) needs a plan first.
 
        /plan-to-issues path/to/real-plan.md
+       /tasks-generator {path}
 ```
 
 **The input check resolves to exactly one of two kinds** — a plan **file**, or **conversational
@@ -240,8 +242,9 @@ file check fall through to the conversation kind: a missing or unparseable expli
 not a downgrade. A **discovery** miss is not a failing file check — it is the next rule in the
 resolution order.
 
-**No input at all** — no plan file resolves *and* the conversation carries no actionable intent — is
-a `×` on the **input** group:
+**No input at all** — no plan file resolves, the conversation carries no actionable intent, and no
+requirements document was picked (rule 6 of `references/input-resolution.md`) — is a `×` on the
+**input** group:
 
 ```text
 ✗ No input to convert
@@ -251,6 +254,7 @@ a `×` on the **input** group:
 To fix:  give a plan file      /plan-to-issues path/to/plan.md
          or describe the work, then re-run with --from-conversation
          or generate a plan    /codebase-modernizer
+                               /tasks-generator path/to/prd.md   (from a PRD)
 
   docs: references/input-resolution.md
 ```
@@ -388,12 +392,12 @@ On success, one line per check, then continue:
 ```text
 ◆ Preflight (phase 0 of 7 — dependencies)
 ··································································
-  Tools present:      √ pass (git, gh 2.87.3, python3)
+  Tools present:      √ pass (git, gh {version}, python3)
   gh ready:           √ pass (luongnv89 · scopes include repo · --json ok)
   Repo writable:      √ pass (luongnv89/skills · issues on · ADMIN)
   API budget:         √ pass (4905 remaining, ~324 needed · 1240 items)
   Skills installed:   √ pass (issue-creator 0.8.0)
-  Bundled files:      √ pass (22/22)
+  Bundled files:      √ pass (24/24)
   Input resolved:     √ pass (file MODERNIZATION_PLAN.md — 50 tasks, 6 phases)
   ____________________________
   Result:             PASS

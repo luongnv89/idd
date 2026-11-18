@@ -16,8 +16,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  5 (of 8 open)
   Limit:              3
+  Resolver lanes:     1 (review/merge serialized)
   Review cycles:      3
-  Merge mode:         {conservative | balanced | aggressive}
+  Merge mode:         balanced
   First issue:        #12 — Fix auth redirect loop
 
   Execution order:
@@ -33,6 +34,10 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ● Picking next issue from triage order...
   Selected: #12 — Fix auth redirect loop
+○ Issue payload: captured from Phase 1 (#12) — passed to subagents
+  Phase 1 — Triage and Pick
+    √ Triage current   √ Issue picked   √ Dependencies clear
+    Result: PASS
 
 ● [Iteration 1/3] Resolving #12...
   ⟶ Spawning resolver subagent...
@@ -41,6 +46,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
     PR:      #45
     Changed: 2 files
     Tests:   4 written, 12 passed
+  Phase 2 — Resolve
+    √ Resolver returned   √ PR created   √ Telemetry returned   √ Quarantine checked
+    Result: PASS
 
 ● Reviewing PR #45...
   ⟶ Spawning PR review subagent (/issue-pr-review --auto --no-merge)...
@@ -50,10 +58,18 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
     Issues found/fixed: 0/0
     Verification: full — AC 3/0/0 pass/fail/unverified
     CI: all checks passed
+  Phase 3-4 — PR Review
+    √ Review ran   √ Fix cycles converged   √ CI green
+    Result: PASS
 
+○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, checks green, no re-poll
+○ Merge identity: fresh (head 9f2c1ab, base main not ahead) — merging
 ✓ PR #45 merged — #12 closed
   https://github.com/owner/repo/pull/45
 ✓ Triage cache updated — #12 resolved, 7 remain
+  Phase 5 — Merge
+    √ Mergeable   √ Merged   √ Issue closed
+    Result: PASS
 
 ✓ Iteration 1/3 complete
   Issue:    #12 — Fix auth redirect loop
@@ -448,7 +464,7 @@ fact contradicts the other.
 
 ## Unattended hardening: quarantine, rate-limit pause, runtime budget
 
-One run showing all three of issue #259's behaviors, with
+One run showing all three behaviors, with
 `autopilot.max_runtime_minutes: 90` and the default `quarantine_after: 3`.
 
 A resolve fails for the third run in a row, so the issue is labelled and the loop

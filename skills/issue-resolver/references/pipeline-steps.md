@@ -65,14 +65,14 @@ the default — leaves every spawn exactly as the step file writes it. A rejecte
 retries once with no overrides and never blocks the step; the `[N/5]` tracker line
 gains `· model: {x}` (or `· model: {x} → inherited`) only when a model was configured.
 
-**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — the four
-signals the run log folds into its single line — plus the `[N/5]` tracker line the user
+**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — fields
+of the run-log line — plus the `[N/5]` tracker line the user
 sees.
 
 ## Step files
 
 Each step's full procedure lives in its own file so a run reads only the step it
-is on — never the whole pipeline (issue #323). Every `(*Step N — …*)` pointer in
+is on — never the whole pipeline. Every `(*Step N — …*)` pointer in
 SKILL.md or another reference resolves here:
 
 | Step | File | Read when |
@@ -129,7 +129,7 @@ PR body notes: `> **Note:** No acceptance criteria defined — manual review rec
 - Auto: take the default No — stop, `skipped_reason: large_scope`
 
 ### Tests fail or timeout
-- PR is not created. The Verify step stops with the failing test output and a resume hint.
+- PR is not created. Step 5 — Deliver stops with the failing test output and a resume hint.
 
 ### Branch already exists
 - Interactive: `continue` or `fresh` prompt.

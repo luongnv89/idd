@@ -22,30 +22,9 @@ existing authorization; a recommendation does not authorize implementation.
    such as reviewing the recommended option or rerunning an incomplete scan.
    Do not request implementation approval merely to finish this analysis.
 
-Default to a concise summary and a static table comparing the 2–3 options; keep
-the detailed sections below when useful or requested. A small diagram may explain
-architecture relationships when the output supports it; otherwise use text.
-These bounded comparisons do not need an interactive report. Honor a requested
-format while retaining result, evidence, uncertainty, and decision. Print `Saved:`
-only after the new file was verified; a retained old cache is not a successful save.
-
-### Evaluate report understanding
-
-Apply these criteria to actual outputs as well as schema correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | Opening text states status and the main finding; limitations are visible without searching logs. |
-| Facts and assumptions are separate | Code observations, hypotheses, cached data, and untested reproduction are labeled distinctly. |
-| Claims are traceable | Each material claim names supporting code, commit, tracker evidence, or an observed validation check. |
-| Next decision is clear | Output identifies the next decision or says no approval is needed, and lists remaining work. |
-
-When running behavioral evaluations, include fresh analysis, cached view, scan
-timeout, and failed persistence. Grade the agent's report against all four rows.
-Ask human reviewers the corresponding four questions and record their responses
-with the evaluation. Missing, blank, or nonresponsive feedback leaves human
-understanding **unconfirmed**. Contract tests inspect instructions and examples;
-they do not establish live agent behavior or human understanding.
+Render the Step 8 sections below in order. Honor a requested format while
+retaining result, evidence, uncertainty, and decision. Print `Saved:` only after
+the new file was verified; a retained old cache is not a successful save.
 
 ## Validate analysis data
 
@@ -105,7 +84,7 @@ ordinary analysis:
 ```
 
 Render each applicable line. If `scan_stats.scan_timed_out` is true, also render
-the timeout warning from `subagent-steps.md` and label the summary result
+the *Scan timeout* warning from `references/error-messages.md` and label the summary result
 `PARTIAL`.
 
 ### Keywords & targets
@@ -465,7 +444,7 @@ Keep the Step 8 report available, but mark the final result `PARTIAL` and persis
 }
 ```
 
-The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. This schema defines its shape so both skills agree on it, but `/issue-analysis` does not itself populate it: it is read-only and runs *before* the fix, so it cannot produce the post-fix `regression_test` proof. The evidence is produced by `/issue-resolver` at its Step 3 bug-verification checkpoint; this field is the optional cache mirror it lifts into the PR Decision Record and acceptance table when present (the PR body is the always-present durable home). `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
+The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. This schema defines its shape so both skills agree on it, but `/issue-analysis` does not itself populate it: it is read-only and runs *before* the fix, so it cannot produce the post-fix `regression_test` proof. The evidence is produced by `/issue-resolver` at its Step 3 bug-verification checkpoint and written to the PR body, its durable home; the resolver never writes this file, so no skill populates this field. It is an optional cache mirror the resolver lifts into the PR Decision Record and acceptance table only when present. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
 
 ### Schema field reference
 
@@ -503,7 +482,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `analysis.type_specific` | string | `"root_cause"` (bug), `"architecture_fit"` (feature), `"current_impl"` (improvement) |
 | `analysis.summary` | string | One-paragraph analysis summary |
 | `analysis.details` | string | Full multi-paragraph analysis |
-| `options[]` | array | 2-3 implementation approaches |
+| `options[]` | array | Implementation approaches, usually 2–3; one when only one is justified |
 | `options[].number` | integer | Option number (1-indexed) |
 | `options[].name` | string | Short label |
 | `options[].summary` | string | One-sentence description |
@@ -570,7 +549,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `decision_record.selected_option.name` | string | Option name |
 | `decision_record.selected_option.summary` | string | One-sentence description of the chosen approach |
 | `decision_record.residual_risk` | string | What remains uncertain or accepted as a known limitation; `"none identified"` if empty |
-| `decision_record.reproduction` | object | **Bug issues only** (omit otherwise). Red-capable verification evidence mirrored from the resolver's bug-verification checkpoint |
+| `decision_record.reproduction` | object | **Bug issues only** (omit otherwise). Red-capable verification evidence in the shape of the resolver's bug-verification checkpoint; no skill writes it |
 | `decision_record.reproduction.command` | string | Exact command/test that reproduces the symptom |
 | `decision_record.reproduction.status` | string | `"red"` (reproduced, failing for the stated reason) or `"not_reproduced"` |
 | `decision_record.reproduction.stated_reason_match` | string | The failing line/message matching the issue symptom |

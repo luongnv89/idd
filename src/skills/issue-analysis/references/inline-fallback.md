@@ -41,8 +41,6 @@ After extraction:
 
 ### Step 3 — Research (Deep Codebase Scan)
 
-This is the most thorough codebase scan in IDD Stack — more comprehensive than issue-resolver's Research step.
-
 ### Phase 3a — Broad search
 
 1. Grep for each extracted error message, function name, and component name
@@ -288,7 +286,7 @@ Propose 2-3 distinct implementation approaches. Each approach includes:
 10. **Risk details** — brief explanation of the risk rating
 11. **Criteria covered** — the IDs (`AC1`…) of the criteria it fully satisfies, numbered by `python3 shared/scripts/gi-ready.py --criteria` on Step 1's issue (no `python3` or a non-zero exit: number the top-level `Acceptance Criteria` items in order yourself). Keep that list as the top-level `criteria`.
 
-The approaches should cover a spectrum: typically one minimal/tactical fix, one moderate refactor, and one larger structural change (when applicable). For simple issues, 2 options may suffice.
+Make each approach genuinely distinct. One justified option is valid; never invent alternatives to fill the 2-3 slots.
 
 ### Complexity guide
 

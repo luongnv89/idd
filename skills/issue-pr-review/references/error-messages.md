@@ -2,7 +2,7 @@
 
 All errors follow the rich format: symbol + description + fix action.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ---
 
@@ -73,12 +73,11 @@ All errors follow the rich format: symbol + description + fix action.
 
 ### PR already closed/merged
 
-**Trigger:** PR state is `CLOSED` or `MERGED`.
+**Trigger:** PR state is `CLOSED` (stop) or `MERGED` (no review; SKILL.md Step 1.4).
 
 ```
-⚠ PR #{N} is already {state}
-
-  Nothing to review.
+⚠ PR #{N} is already closed
+○ PR #{N} is already merged
 ```
 
 ---
@@ -91,15 +90,11 @@ All errors follow the rich format: symbol + description + fix action.
 *Depth gate* refresh nor its direct-`gh` degrade returns a usable record — on the
 first attempt or on the single re-run. This is a **stop**, not a degrade: Step 3
 would otherwise verify acceptance criteria against an empty snapshot and report
-the `acceptance_criteria` hard-block as `pass`. That describes the default
-configuration, and the stop is **not** conditional on it. When
-`review.require_acceptance_criteria_check` is `false` the hard-block does not
-run at all — Step 3 reports `○ acceptance_criteria: disabled` for that dimension —
-yet this error is still raised, because the flag governs how the dimension is
-reported, not whether the linked issue was read. Printing that note past a
-failed read would credit a deliberate opt-out for a gap nobody opted into.
-Full reasoning, including why the stop is kept rather than relaxed:
-*The empty-record fail-safe* in `references/review-loop-mechanics.md`. A PR
+the `acceptance_criteria` hard-block as `pass`. When
+`review.require_acceptance_criteria_check` is `false` (Step 3 reports
+`○ acceptance_criteria: disabled`) this error is still raised: the flag governs
+how the dimension is reported, not whether the linked issue was read. Full
+reasoning: *The empty-record fail-safe* in `references/review-loop-mechanics.md`. A PR
 with **no** linked issue is not this error and is never stopped by it — same
 section.
 

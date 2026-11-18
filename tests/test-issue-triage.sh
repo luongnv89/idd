@@ -188,6 +188,34 @@ has_near "$SKILL" "Your branch may be behind the remote" "Sync now? [Y/n]" 10 \
 has "$SKILL" "If the user declines the prompt, proceed without syncing." \
   "T10: interactive decline path unchanged"
 
+# --- T11: examples show the current report shape (#631) ----------------------
+# Examples set the output shape more strongly than prose: every run shows (or
+# points to) the Final Report and the run-stats footer, the cached view fires
+# the >24 hours age line, and a blocked issue is never shown `ready`.
+EXAMPLES="$REPO_ROOT/src/skills/issue-triage/references/examples.md"
+has "$EXAMPLES" "◆ Issue Triage — 4 issues analyzed" "T11: first-run example prints the Final Report"
+has "$EXAMPLES" "◆ Issue Triage — cached" "T11: cached-view example prints the cached Final Report"
+has "$EXAMPLES" "○ Report is 3d 2h old (>24 hours)." "T11: cached-view example fires the >24 hours age line"
+has "$EXAMPLES" "Run stats   elapsed" "T11: examples end with the run-stats footer"
+lacks "$EXAMPLES" "Issues may have changed." "T11: no update-suggestion wording outside the contract"
+# A maybe-fixed issue still counts as stale (#3 is 28d old), so the
+# explicit-update example must print the Stale line; a whole-file grep would
+# pass on the first-run example alone.
+update_ex="$(awk '/^## Example: Explicit update/{f=1;next} /^## Example:/{f=0} f' "$EXAMPLES")"
+if grep -qF -e "  ⚠  Stale: 1 issue (>14 days inactive)" <<<"$update_ex"; then
+  pass "T11: explicit-update example prints the Stale line beside Maybe fixed"
+else
+  fail "T11: explicit-update example omits the Stale line while #3 is stale"
+fi
+# The issue column is the first one after the row number; #9 also appears in
+# #5's Blocks column, which must not count as #9's own row.
+row9="$(grep -E '^ *[0-9]+ +│ #9 ' "$EXAMPLES" || true)"
+if [ -n "$row9" ] && ! grep -qv "blocked #5" <<<"$row9"; then
+  pass "T11: #9 is shown blocked by #5 in the circular-dependency example"
+else
+  fail "T11: #9 row is not 'blocked #5' while #5 blocks it: $row9"
+fi
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

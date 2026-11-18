@@ -26,7 +26,7 @@ already skipped):
   seconds of each phase name (skip a non-object `phases` and any entry that is
   not a non-negative integer). Print the phase with the highest median, its
   median, and how many runs recorded it. `n/a` when no run carries the field.
-- **Skill improvements** (optional; issue #524) — when
+- **Skill improvements** (optional) — when
   `.idd/improvement-proposals.jsonl` exists, the count of keys whose
   **latest** event is `proposed` (pending approval). Parse it with the same
   tolerance as the run log: skip malformed lines; a key's status is its last
@@ -44,7 +44,7 @@ Print the section with DESIGN.md symbols:
     ○ Run-log summary           last {n} of {total} runs · {m} malformed skipped
         Resolve rate:    {resolved}/{n} ({pct}%)
         Median QA cycles: {median}
-        Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
+        Top skip reasons: {reason1} ({c1}), {reason2} ({c2}), {reason3} ({c3})
         Agent overrides:  {applied} applied · {partial} partial · {fallback} fallback
         Slowest phase:    {phase} (median {median}s · {runs} runs)
         Skill improvements: {p} pending approval — review .idd/improvement-proposals.jsonl
@@ -56,8 +56,8 @@ one pending proposal. When no runs are
 recorded, SKILL.md step 1's single graceful-degradation line replaces the
 whole block.
 
-A read heuristic for the input (no new dependency — `tail` plus a JSON-aware
-pass):
+A read heuristic for the input — `tail` plus a JSON-aware pass, nothing
+beyond the shell:
 
 ```bash
 [ -s .idd/runs.jsonl ] && tail -n 50 .idd/runs.jsonl

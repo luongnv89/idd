@@ -147,10 +147,14 @@ fi
 # ───────────────────────────────────────────────────────────
 # T4: AC7 — legacy per-repo cache handled gracefully (ignored)
 # ───────────────────────────────────────────────────────────
-if grep -qiE '\.idd/model-data\.json' "$REF" && grep -qiE 'ignore|legacy' "$REF"; then
-  pass "T4.AC7.1: reference states the legacy per-repo cache is ignored"
+# The runtime reference says nothing about the old path (config-schema, T4.AC7.2,
+# carries the user-facing note); ignoring it is enforced by the cache script
+# never naming it.
+CACHE_SCRIPT="$REPO_ROOT/src/shared/scripts/gi-model-cache.py"
+if [ -f "$CACHE_SCRIPT" ] && ! grep -qE '\.idd/model-data\.json' "$CACHE_SCRIPT" "$REF"; then
+  pass "T4.AC7.1: the legacy per-repo cache is never read (script and reference never name it)"
 else
-  fail "T4.AC7.1: reference does not address the legacy per-repo cache"
+  fail "T4.AC7.1: the legacy per-repo .idd/model-data.json is still named by the cache script or reference"
 fi
 
 # The durable docs (config-schema) must record that the cache is no longer in

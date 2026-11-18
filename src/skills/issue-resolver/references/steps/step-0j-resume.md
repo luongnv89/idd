@@ -165,7 +165,7 @@ issue is this run's own only when its number equals the recorded `pr` (or, under
 a `pr_create` intent, its `headRefName` equals the recorded branch), it reads
 `isCrossRepository: false`, and its `headRefOid` equals the local HEAD or the
 recorded push `sha`. Then 0b continues. Anything else — a cross-repository PR
-above all — returns `pr_in_progress` exactly as today, and the record is
+above all — returns `pr_in_progress` as *0b* does, and the record is
 cleared.
 
 ### Read-back trust <!-- a:rs-0j-trust -->

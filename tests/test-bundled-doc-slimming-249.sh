@@ -326,7 +326,7 @@ for skill in issue-resolver auto-pilot; do
   fi
 done
 # The resolver's run-log instructions must point at the small doc, not the schema.
-REPORTS="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
+REPORTS="$REPO_ROOT/src/skills/issue-resolver/references/run-log-fields.md"
 if grep -q 'docs/run-log-schema.md' "$REPORTS" && \
    ! grep -q 'docs/config-schema.md' "$REPORTS"; then
   pass "AC2: resolver run-log fields derive from run-log-schema.md, not config-schema.md"

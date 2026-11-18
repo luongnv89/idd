@@ -14,6 +14,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$REPO_ROOT/tests/lib/spec.bash"  # spec_concat — the split auto-pilot spawn prompts read as one file (#611)
 PASS=0
 FAIL=0
 
@@ -118,7 +119,7 @@ has "$DOCTOR" "read-only" "T4: idd-doctor summary preserves read-only guarantee"
 # dedicated --no-run-log flag (independent of --auto, so standalone
 # `/issue-resolver N --auto` still logs); the suppressed resolver returns its
 # telemetry instead, and auto-pilot writes the single enriched line.
-SUBAGENT="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+SUBAGENT="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
 
 # Resolver documents the suppression flag and that it returns (not appends)
 # telemetry when suppressed.
@@ -204,7 +205,7 @@ has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_res
 # (d) Failed/partial batch coverage: no inverse under-count, no re-resolve
 #     double-count. The unresolved issues are re-resolved individually and logged
 #     there — not double-logged as a batch 'failed' line.
-has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
+has "$EXPLICIT" "double-count this invariant forbids" "T7: spec guards the re-resolve double-count"
 has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
 has "$RUNLOG"   "no inverse under-count" "T7: run-log-schema documents no inverse under-count"
 # (d.0) Discriminates the batch-TIME write rule: an unresolved attempted issue is
@@ -268,7 +269,7 @@ if [ -f "$GEN_AUTOPILOT" ]; then
 else
   fail "T5: generated skills/auto-pilot/SKILL.md not found — run scripts/build.py"
 fi
-GEN_SUBAGENT="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+GEN_SUBAGENT="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/spawning.md" || true)"
 if [ -f "$GEN_SUBAGENT" ]; then
   has "$GEN_SUBAGENT" "--no-run-log" "T5: generated auto-pilot subagent prompt passes --no-run-log"
   # #158: the batch fan-out must survive the build into the generated mirror too.
@@ -314,7 +315,7 @@ done
 
 # --- T9: parallel-lane append is crash-safe and idempotent (issue #260) -----
 TMP_RUNLOG="$(mktemp -d)"
-trap 'rm -rf "$TMP_RUNLOG"' EXIT
+trap 'spec_cleanup; rm -rf "$TMP_RUNLOG"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 HELPER="$REPO_ROOT/src/shared/scripts/gi-runlog.py"
 record='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":87}'
 printf '%s' "$record" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null
@@ -425,7 +426,7 @@ has_skill "$REPO_ROOT/src/skills/issue-resolver" "Omit the field when no spawned
 has "$AUTOPILOT" "agent_overrides" "T11g: auto-pilot run-log entry lists agent_overrides"
 has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" "Omit the field" \
   "T11g: auto-pilot omits agent_overrides when nothing is configured"
-has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- agent_overrides:" \
+has "$SUBAGENT" "- agent_overrides:" \
   "T11g: resolver subagent returns agent_overrides to the single writer"
 has "$DOCTOR_RUNLOG" "Agent overrides:" "T11h: idd-doctor prints the agent-overrides line"
 has "$DOCTOR_RUNLOG" "{applied} applied · {partial} partial · {fallback} fallback" \
@@ -497,12 +498,12 @@ has_skill "$REPO_ROOT/src/skills/issue-resolver" '**`phases`**' \
 has_skill "$REPO_ROOT/src/skills/issue-resolver" 'step that never started' \
   "T12g: resolver omits phases that never started"
 has "$RESOLVER" 'as each `[N/5]` step starts' "T12g: resolver captures a clock at each step boundary"
-has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" '`duration_s`, `phases`) in the' \
+has "$REPO_ROOT/src/skills/issue-resolver/references/run-log-fields.md" '`duration_s`, `phases`) in the' \
   "T12g: resolver returns phases under --no-run-log"
 has "$AUTOPILOT" '`duration_s` / `phases` when present' "T12h: auto-pilot folds phases into its line"
 has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" '`breach_reason` / `phases` through unchanged' \
   "T12h: auto-pilot folds resolver phases through unchanged"
-has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- phases:" \
+has "$SUBAGENT" "- phases:" \
   "T12h: resolver subagent returns phases to the single writer"
 has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`qa_cycles`, `duration_s`, `phases` and' \
   "T12h: batch fan-out attributes phases once"
@@ -552,15 +553,15 @@ else
 fi
 has "$RUNLOG" '| `verification` | string | no |' "T13f: run-log schema documents verification"
 has "$RUNLOG" 'missing counts are `partial`, never `full`' "T13f: a review without counts is never logged full"
-has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" 'applied to the PR'"'"'s AC table: any row not `pass` → `partial`' \
+has "$REPO_ROOT/src/skills/issue-resolver/references/run-log-fields.md" 'applied to the PR'"'"'s AC table: any row not `pass` → `partial`' \
   "T13g: a resolver PR with an unverified criterion is logged partial, not clean"
 has "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-3-4-review.md" 'field is `partial`' \
   "T13g: a reviewer report-back without counts is partial, never full"
 has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`verification` on the primary line only' \
   "T13g: batch fan-out never stamps unreviewed issues as verified"
-has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- criteria: {"pass": n, "fail": n, "unverified": n}' \
+has "$SUBAGENT" '- criteria: {"pass": n, "fail": n, "unverified": n}' \
   "T13h: the PR reviewer returns the criteria counts"
-has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- disabled_dimensions:' \
+has "$SUBAGENT" '- disabled_dimensions:' \
   "T13h: the PR reviewer returns disabled dimensions"
 has "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" '→ PR #{pr1} · AC {p}/{f}/{u} pass/fail/unverified' \
   "T13i: the merged row prints the criteria counts"
@@ -660,7 +661,7 @@ else
   fail "T14g: the schema's cost example line is rejected by gi-runlog"
 fi
 # AC2 — the agreement rule, in the schema and beside each writer.
-RESOLVER_RUNLOG="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
+RESOLVER_RUNLOG="$REPO_ROOT/src/skills/issue-resolver/references/run-log-fields.md"
 AP_RUNLOG_REF="$AUTOPILOT_DIR/references/run-log.md"
 has "$RUNLOG" '**Footer agreement.**' "T14h: schema states the footer-agreement rule"
 has "$RUNLOG" "are the values the run's Run Stats Footer printed" "T14h: schema ties tokens and agents to the footer's values"
@@ -685,14 +686,14 @@ has "$AP_RUNLOG_REF" 'is written to no row, so rows never sum to it' \
 has "$AP_RUNLOG_REF" "is auto-pilot's own" "T14j: auto-pilot writes its own skill_version"
 has "$AUTOPILOT" "\`tokens\` / \`agents\` / \`model\` / \`effort\` as the resolver's footer reported them" \
   "T14j: auto-pilot run-log entry lists the cost fields"
-has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- tokens: the token count your Run Stats Footer printed" \
+has "$SUBAGENT" "- tokens: the token count your Run Stats Footer printed" \
   "T14k: resolver subagent returns its footer's token count"
-has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- agents: the agents count your Run Stats Footer printed" \
+has "$SUBAGENT" "- agents: the agents count your Run Stats Footer printed" \
   "T14k: resolver subagent returns its footer's agents count"
-has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- model, effort:" \
+has "$SUBAGENT" "- model, effort:" \
   "T14k: resolver subagent returns model and effort"
 if [ "$(grep -cF -e '- tokens: the token count your Run Stats Footer printed' \
-        "$AUTOPILOT_DIR/references/subagent-prompts.md")" = "2" ]; then
+        "$SUBAGENT")" = "2" ]; then
   pass "T14k: both the Resolver and the Batch Resolver return tokens"
 else
   fail "T14k: tokens is not in both resolver report-back lists"

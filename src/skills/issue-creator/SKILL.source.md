@@ -223,7 +223,7 @@ probe_limit=$((backlog_limit + 1))
 fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
 ```
 
-Then **read `references/dup-score-fallback.md` now** — the parse-and-truncation rule and the canonical scoring rules the script implements. Read it only on this branch; the medium-judgement protocol above is unchanged.
+Then **read `references/dup-score-fallback.md` now** — the parse-and-truncation rule and the canonical scoring rules the script implements. Read it only on this branch; the medium-judgement protocol above still applies.
 
 #### Present results
 
@@ -248,7 +248,7 @@ The Step 6 summary still reports it as `⚠ warn`, exactly as an interactive ove
 
 ### Step 3.5 — Clarify Ambiguous Intent
 
-Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op and the Step 3 → Step 4 path is unchanged. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaults and mark those fields `(needs review)`.
+Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op: Step 3 goes straight to Step 4. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaults and mark those fields `(needs review)`.
 
 Resolve from the repo before asking, and hold the **Output Contract boundary**: inspection here sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint reaches the body. When the step fires, **read `references/clarify-intent.md` now** for the gating rules, the example prompt with its `[Y/n]` default, and the confidence each answer earns.
 
@@ -276,7 +276,7 @@ Resolve the template directory from `issue.template`: `"default"` → this skill
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
   Images:   2 uploaded ✓
-  ⚡ Model:  GPT-5.6 Sol High (~$2.79/task) · Opus 5 Medium (~$3.29/task)
+  ⚡ Model:  {openai_model} (~${openai_cost}/task) · {anthropic_model} (~${anthropic_cost}/task)
   Labels:   bug, auth, mobile
   Criteria: 3 acceptance criteria generated (medium)
 
@@ -359,7 +359,7 @@ After each issue is created, when `projects.sync_enabled` is `true`, sync it per
 
 For every terminal outcome, **read references/examples.md (Review contract) now** and apply its result, evidence, uncertainty, and decision contract. Keep concise text; use per-item tables for batches.
 
-A successful create prints Step 6's `◆ Issue Created` block; Normalize and Batch print their own (`references/modes.md`, Steps 12 and 6), batch adding a line per issue and a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+A successful create prints Step 6's `◆ Issue Created` block; Normalize and Batch print their own (`references/modes.md`, Steps 12 and 6), batch adding a line per issue and Step 6's `Create:` totals row.
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome in every mode, a run that created nothing included: a cancelled confirmation, an invalid config, a failed `gh issue create`. One footer per batch, never one per issue.
 
@@ -368,5 +368,5 @@ A successful create prints Step 6's `◆ Issue Created` block; Normalize and Bat
 - **Duplicate detection** — a close match is raised before filing (Step 3).
 - **Screenshot-only input** — the image is described in text, drafted, attached.
 - **Ambiguous batch input** — unclear boundaries get a parsed preview first.
-- **GitHub API rate limit** — creation stops at the last successful issue, reporting the partial result with a resume hint.
+- **GitHub API rate limit** — a secondary limit is retried, then the item is skipped; primary exhaustion stops with the *Rate limited* error (`references/modes.md`, Batch Create Step 5).
 - **Empty body** — created with only a title, `(needs review)` in Metadata.

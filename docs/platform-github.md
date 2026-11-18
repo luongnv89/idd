@@ -52,15 +52,15 @@ REST, not `--json`: whether a merge made by hand carries the PR body (`PR_BODY`)
 | List open PRs | `gh pr list --state open --json number,title,body,headRefName --limit 20` |
 | Diff / changed files | `gh pr diff {N}` · `gh pr diff {N} --name-only` |
 | Checkout PR head branch | `gh pr checkout {N}` |
-| CI check status | `gh pr checks {N}` |
+| CI check status | `gh pr checks {N} --json name,state,bucket,link` |
 | CI log · sync head | `gh run list` · `gh run view {run_id} --log-failed` · `gh pr update-branch {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
 | Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge on `0`, same `headRefOid`, floor base tip |
-| Merge + clean up | `gh pr merge {N} --{merge_method} --delete-branch --match-head-commit {verified_head} --body-file {f}` — `{merge_method}` is `review.merge_method`; `{f}` is a file holding the PR body (`--json body`), never a shell word, so the commit carries it under any repo setting. `rebase`: no `--body-file`, tracker-only (#564) |
+| Merge + clean up | `gh pr merge {N} --{merge_method} --delete-branch --match-head-commit {verified_head} --body-file {f}` — `{merge_method}` is `review.merge_method`; `{f}` is a file holding the PR body (`--json body`), never a shell word, so the commit carries it under any repo setting. `rebase`: no `--body-file`, tracker-only |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
 
-**Merges bind a head and a base** (#516): `{verified_head}` is the SHA the CI verdict covers; compare the base **branch name** (its live tip), never `baseRefOid` (the base at the PR's last sync). Patch-id equality never replaces fresh integration checks.
+**Merges bind a head and a base**: `{verified_head}` is the SHA the CI verdict covers; compare the base **branch name** (its live tip), never `baseRefOid` (the base at the PR's last sync). Patch-id equality never replaces fresh integration checks.
 
 ### Raw API (escape hatch)
 
@@ -68,4 +68,4 @@ For operations with no first-class `gh` subcommand — uploading issue assets, s
 
 ## Adding a driver
 
-Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist — the build fails when a `gh` form in `src/` has no row in it (`gh` + group + verb; #566); anything the new tool cannot express is a documented gap, not a silent one. Until that second document exists, the preamble's "only implemented driver" is also the only valid `platform` value.
+Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist — the build fails when a `gh` form in `src/` has no row in it (`gh` + group + verb); anything the new tool cannot express is a documented gap, not a silent one. Until that second document exists, the preamble's "only implemented driver" is also the only valid `platform` value.

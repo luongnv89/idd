@@ -7,16 +7,17 @@
         "files": [
           "references/preflight.md",
           "references/run-log.md",
+          "references/spawning.md",
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46010
+        "measured": 46750
       },
-      "budget": 451265,
-      "measured": 451195,
+      "budget": 447138,
+      "measured": 446114,
       "skill_md": {
         "budget": 26986,
-        "measured": 26359
+        "measured": 26983
       }
     },
     "init-idd": {
@@ -25,32 +26,32 @@
         "files": [],
         "measured": 0
       },
-      "budget": 145114,
-      "measured": 145009,
+      "budget": 125395,
+      "measured": 124380,
       "skill_md": {
-        "budget": 26006,
-        "measured": 24994
+        "budget": 25315,
+        "measured": 24300
       }
     },
     "issue-analysis": {
       "always_read": {
-        "budget": 36932,
+        "budget": 35684,
         "files": [
           "references/output-and-persist.md",
           "references/subagent-steps.md"
         ],
-        "measured": 35916
+        "measured": 34668
       },
-      "budget": 168699,
-      "measured": 167774,
+      "budget": 166474,
+      "measured": 165450,
       "skill_md": {
-        "budget": 25078,
-        "measured": 24054
+        "budget": 24074,
+        "measured": 23050
       }
     },
     "issue-creator": {
       "always_read": {
-        "budget": 44706,
+        "budget": 43072,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -59,18 +60,18 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 43682
+        "measured": 42354
       },
-      "budget": 186712,
-      "measured": 186504,
+      "budget": 184851,
+      "measured": 183827,
       "skill_md": {
-        "budget": 26517,
-        "measured": 25493
+        "budget": 26487,
+        "measured": 25541
       }
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 128693,
+        "budget": 124320,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -78,45 +79,46 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 127898
+        "measured": 123385
       },
-      "budget": 324334,
-      "measured": 324263,
+      "budget": 319959,
+      "measured": 319024,
       "skill_md": {
         "budget": 32125,
-        "measured": 32123
+        "measured": 32050
       }
     },
     "issue-resolver": {
       "always_read": {
         "budget": 11196,
         "files": [
+          "references/closing-summary.md",
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 10172
+        "measured": 11103
       },
-      "budget": 435601,
-      "measured": 435315,
+      "budget": 430382,
+      "measured": 429358,
       "skill_md": {
         "budget": 33856,
-        "measured": 33180
+        "measured": 33649
       }
     },
     "issue-triage": {
       "always_read": {
-        "budget": 30412,
+        "budget": 29257,
         "files": [
           "references/detection.md",
           "references/output-and-persist.md"
         ],
-        "measured": 29388
+        "measured": 28301
       },
-      "budget": 141025,
-      "measured": 140092,
+      "budget": 139822,
+      "measured": 139705,
       "skill_md": {
-        "budget": 25696,
-        "measured": 24672
+        "budget": 25659,
+        "measured": 24660
       }
     },
     "plan-to-issues": {
@@ -125,13 +127,13 @@
         "files": [
           "references/reporting.md"
         ],
-        "measured": 5062
+        "measured": 5381
       },
-      "budget": 171356,
-      "measured": 171339,
+      "budget": 174493,
+      "measured": 174480,
       "skill_md": {
-        "budget": 26657,
-        "measured": 25633
+        "budget": 25900,
+        "measured": 25051
       }
     }
   }

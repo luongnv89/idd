@@ -76,7 +76,7 @@ Every IDD skill that performs a sync step MUST:
 
 ## Lint Enforcement
 
-`tests/test-sync-safety.sh` walks the **fenced code blocks** of every Markdown file under `src/skills/` (`SKILL.source.md` and `references/`). A block containing `git pull --rebase` must also contain a preceding `git stash`. A block under `src/` or top-level `docs/` containing `reset --hard` must contain a preceding `git rev-list …..HEAD` empty-range guard (issue #548). Both checks are per-block, with no line window and no comment escape hatch; inline backticks and prose are ignored, since only fenced blocks are executed. Failing the lint blocks merges, so skill edits cannot silently reintroduce an unsafe form.
+`tests/test-sync-safety.sh` walks the **fenced code blocks** of every Markdown file under `src/skills/` (`SKILL.source.md` and `references/`). A block containing `git pull --rebase` must also contain a preceding `git stash`. A block under `src/` or top-level `docs/` containing `reset --hard` must contain a preceding `git rev-list …..HEAD` empty-range guard. Both checks are per-block, with no line window and no comment escape hatch; inline backticks and prose are ignored, since only fenced blocks are executed. Failing the lint blocks merges, so skill edits cannot silently reintroduce an unsafe form.
 
 ---
 
@@ -89,7 +89,7 @@ For skills that want the minimal form inline:
 branch="$(git rev-parse --abbrev-ref HEAD)"
 dirty=0
 if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "pre-sync: ${branch}"
+  git stash push -u -m "pre-sync: ${branch} $(date +%Y-%m-%dT%H:%M:%S)"
   dirty=1
 fi
 git fetch origin

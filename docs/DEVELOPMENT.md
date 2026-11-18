@@ -271,7 +271,7 @@ bash tests/test-build-script.sh          # run one
 git ls-files 'tests/*.sh' | xargs -n1 bash   # run all
 ```
 
-`tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
+`tests/README.md`, `tests/README-sprint2.md`, and `tests/README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
 
 ### Anchor markers (assert on contracts, not on sentences)
 
@@ -403,6 +403,31 @@ When testing manually:
 - **No cross-skill state** — skills are fully isolated
 - **Config loaded once** — `.idd.yml` is read at skill start, not per-step
 - **Backup before edit** — always post a backup comment before modifying an issue
+
+## Maintaining the issue-resolver skill catalog
+
+`src/skills/issue-resolver/references/skill-index.md` is hand-maintained, and
+SKILL.md reads it at Step 3, so never inline the catalog back into SKILL.md.
+The file is the swappable candidate list: re-pointing it at another skill
+source is a contents swap, not a change to the step logic. To refresh it
+against the upstream repo, list the published skills:
+
+```bash
+gh api 'repos/luongnv89/skills/git/trees/HEAD?recursive=1' \
+  --jq '.tree[] | select(.path | test("/SKILL\\.md$")) | .path'
+```
+
+Then read each `skills/<name>/SKILL.md` frontmatter `name:` + `description:` and
+re-group by lifecycle phase. The skill names are the contract for runtime
+detection, so keep them exactly matching the upstream directory names.
+
+## Measuring auto-pilot's body-snapshot budget
+
+`/auto-pilot`'s caller-supplied context names three freshness boundaries
+(resolution, mutation, review). Measure body-returning `gh` reads by issue and
+by boundary/reason, never by total `gh` calls: the resolver's non-body
+`state,comments,updatedAt` probe preserves its 0a stops and 0h freshness check
+and is not a body read.
 
 ## File Reference
 

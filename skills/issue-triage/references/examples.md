@@ -1,17 +1,28 @@
 # /issue-triage — Examples
 
-Full example runs for each mode (first run, cached view, explicit update, empty repo, circular dependency).
+One full run per mode. After the first run, examples leave out the `[N/9]` step completion reports for brevity; every real run prints them.
 
 ## Example: First run (no cache exists)
 
-**User says:** `/issue-triage` (no previous triage run)
+**User says:** `/issue-triage` (no cache)
 
 ```
   ○ No cached triage found — running first analysis...
 
   ● Fetching 4 open issues...
+  [1/9] Fetch  ✓ 4 open issues
+    √ Issues fetched   √ Config applied
+    Result: PASS
   ● Scanning commit history for already-fixed issues...
   ● Scanning codebase for issue dependencies...
+  [1b-2/9] Scan  ✓ 1 batch, 1 dependency
+    √ Scanner returned   √ Dependencies mapped
+    Result: PASS
+  [3-7/9] Ordering  ✓ 4 issues ordered, 1 stale
+    √ Order computed   √ No cycle left unreported
+    √ Disjoint sets identified   √ Threshold applied
+    √ Every open issue scored   √ Every issue ranked
+    Result: PASS
 
   ◆ Issue Triage
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -27,6 +38,31 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
   ○  Suggested order: #12 → #8 → #3 → #15
 
   ✓ Triage saved to .idd/triage.json
+  [8-9/9] Output  ✓ report rendered, cache saved
+    √ Report rendered   √ .idd/triage.json written
+    Result: PASS
+
+◆ Issue Triage — 4 issues analyzed
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE — start with #12 (P1)
+
+  Fetch issues:      ✓ pass (4 open issues)
+  Dependencies:      ✓ pass (1 dependency found)
+  Circular deps:     ✓ pass (none detected)
+  Execution order:   ✓ pass (topological sort)
+  Parallelizable:    ✓ pass (1 parallel group)
+  Stale detection:   ✓ pass (1 stale issue)
+  Priority:          ✓ pass (1 P1, 1 P2, 2 P3)
+  Persist:           ✓ pass (saved to .idd/triage.json)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Evidence:          4 fetched; 1 scan batch; script exit 0
+  Uncertainty:       #12 → #15 edge inferred; priorities are rule buckets
+  Decision:          No approval needed.
+  Suggested start:   #12 — Fix auth redirect
+  Next action:       /issue-resolver 12
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed 1m 08s · agents 1
 ```
 
 ---
@@ -43,19 +79,26 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
     Updated by:    /issue-triage
     Issues:        4 analyzed
 
-    #  │ Issue                  │ Pri │ Blocks │ Status
-    ───┼────────────────────────┼─────┼────────┼───────────
-    1  │ #12 Fix auth redirect  │ P1  │ #15    │ ready
-    2  │ #8  Add pagination     │ P3  │ —      │ ready
-    3  │ #3  Old UI alignment   │ P3  │ —      │ stale (28d)
-    4  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
-
-    ⚡ Parallelizable: #12 + #8 + #3 (independent)
-    ⚠  Stale: 1 issue (>14 days inactive)
-    ○  Suggested order: #12 → #8 → #3 → #15
+    ... (table and summary lines as in the first run) ...
 
   ○ 7 commit(s) since last triage (3d 2h ago).
-    Issues may have changed. Run /issue-triage update for fresh analysis.
+  ○ Report is 3d 2h old (>24 hours).
+    Run /issue-triage update for fresh analysis.
+
+◆ Issue Triage — cached
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            CACHED — start with #12 (P1)
+  Cache load:        ✓ pass (age: 3d 2h)
+  Issues:            4 analyzed
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Evidence:          .idd/triage.json, updated 2026-03-17 14:30 UTC
+  Uncertainty:       backlog and code not re-checked since 2026-03-17 14:30 UTC
+  Decision:          No approval needed.
+  Suggested start:   #12 — Fix auth redirect
+  Next action:       /issue-triage update
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed n/a · agents 0
 ```
 
 ---
@@ -65,25 +108,11 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 **User says:** `/issue-triage` (cache exists, no commits since last triage)
 
 ```
-  ◆ Issue Triage (cached)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Last updated:  2026-03-21 09:15 UTC
-    Report age:    2h
-    Updated by:    /issue-triage
-    Issues:        4 analyzed
-
-    #  │ Issue                  │ Pri │ Blocks │ Status
-    ───┼────────────────────────┼─────┼────────┼───────────
-    1  │ #12 Fix auth redirect  │ P1  │ #15    │ ready
-    2  │ #8  Add pagination     │ P3  │ —      │ ready
-    3  │ #3  Old UI alignment   │ P3  │ —      │ stale (28d)
-    4  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
-
-    ⚡ Parallelizable: #12 + #8 + #3 (independent)
-    ⚠  Stale: 1 issue (>14 days inactive)
-    ○  Suggested order: #12 → #8 → #3 → #15
+  ... (cache header, age 2h, table and summary lines) ...
 
   ○ Cached report is up to date. No changes detected since last triage.
+
+  ... (cached Final Report, next /issue-resolver 12, footer) ...
 ```
 
 ---
@@ -100,14 +129,12 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 
   ◆ Issue Triage
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  #  │ Issue                  │ Pri │ Blocks │ Status
-  ───┼────────────────────────┼─────┼────────┼───────────
-  1  │ #12 Fix auth redirect  │ P1  │ #15    │ ready
-  2  │ #8  Add pagination     │ P3  │ —      │ ready
+  ... (header, rows 1-2 as in the first run) ...
   3  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
   4  │ #3  Old UI alignment   │ P3  │ —      │ maybe-fixed
 
   ⚡ Parallelizable: #12 + #8 (independent)
+  ⚠  Stale: 1 issue (>14 days inactive)
   ◆  Maybe fixed: 1 issue may already be resolved
   ○  Suggested order: #12 → #8 → #15 → #3
 
@@ -117,12 +144,14 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 
   #3 Old UI alignment
     ● Likely fixed by PR #14 (fix/12-fix-auth-redirect)
-      Commit: abc1234 "fix(ui): align header elements (#12)"
+      Commit: abc1234 "fix(ui): align header, refs #3 (#12)"
       Confidence: medium — commit references #3
       Target issue: #12
     → Verify and close: gh issue close 3 -c "Fixed by #14"
 
   ✓ Triage saved to .idd/triage.json
+
+  ... (Final Report, Already-fixed: ✓ pass (1 potentially fixed), footer) ...
 ```
 
 ---
@@ -136,6 +165,9 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 
   ○ No open issues found. Nothing to triage!
     Create issues with /issue-creator to get started.
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed 4s · agents 0
 ```
 
 ---
@@ -144,11 +176,9 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 
 **User says:** `/issue-triage update`
 
-**Repository has 2 open issues whose keyword scans overlap:**
-- #5 "Fix login flow" (bug, keywords: 'login auth session')
-- #9 "Refactor session management" (improvement, keywords: 'session auth refactor')
-
-**Output:**
+**2 open issues whose keyword scans overlap (the overlap edge runs from the older #5 to #9), while #5's body says `Depends on #9`:**
+- #5 "Fix login flow" (bug, older)
+- #9 "Refactor session management" (improvement)
 
 ```
   ● Fetching 2 open issues...
@@ -165,11 +195,13 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
   #  │ Issue                       │ Pri │ Blocks │ Status
   ───┼─────────────────────────────┼─────┼────────┼───────────
   1  │ #5  Fix login flow          │ P1  │ #9     │ ready
-  2  │ #9  Refactor session mgmt   │ P2  │ —      │ ready
+  2  │ #9  Refactor session mgmt   │ P3  │ —      │ blocked #5
 
   ○  Suggested order: #5 → #9
 
   ✓ Triage saved to .idd/triage.json
+
+  ... (Final Report for these 2 issues, start #5, footer) ...
 ```
 
 ---

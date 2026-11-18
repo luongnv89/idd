@@ -465,6 +465,9 @@ jobs:
       - name: test-plan-to-issues-502
         run: bash tests/test-plan-to-issues-502.sh
 
+      - name: test-plan-to-issues-prd-fallback-643
+        run: bash tests/test-plan-to-issues-prd-fallback-643.sh
+
       - name: test-runs-jsonl
         run: bash tests/test-runs-jsonl.sh
 
@@ -506,3 +509,18 @@ jobs:
 
       - name: test-stats-573
         run: bash tests/test-stats-573.sh
+
+      - name: test-spawn-by-path-611
+        run: bash tests/test-spawn-by-path-611.sh
+
+      - name: test-merge-gate-copies-619
+        run: bash tests/test-merge-gate-copies-619.sh
+
+      - name: test-autopilot-stale-facts-622
+        run: bash tests/test-autopilot-stale-facts-622.sh
+
+      - name: test-eval-grading-out-of-bundle-630
+        run: bash tests/test-eval-grading-out-of-bundle-630.sh
+
+      - name: test-runtime-text-history-628
+        run: bash tests/test-runtime-text-history-628.sh

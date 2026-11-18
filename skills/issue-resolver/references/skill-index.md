@@ -4,8 +4,7 @@ A reference catalog of the skills published at
 `https://github.com/luongnv89/skills`, grouped by the lifecycle phase each one
 serves. The Step 3 propose-and-select sub-step (see `references/steps/step-3-implement.md`,
 *Step 3 — Propose relevant skills*) reads this index to decide which skills to
-offer for the analyzed task. SKILL.md references this file at Step 3 — do not
-inline the catalog back into SKILL.md.
+offer for the analyzed task.
 
 The index answers one question: **what skills exist, and what is each one for?**
 It does **not** record which are installed — that is detected at runtime against
@@ -17,12 +16,7 @@ When `resolve.borrow_skills: true`, a catalogued-but-missing name is
 **available to borrow** for one task (install, record origin, uninstall only
 `origin: borrowed` — `references/steps/step-3-implement.md`).
 
-## Source-agnostic by design
-
-Never hardcode `luongnv89/skills`: this file is the **swappable candidate
-list**. The step intersects its names and phases with what is installed and
-proposes the relevant subset, so re-pointing the catalog is a *contents swap of
-this file*, not a rewrite of the step logic. Each name is the installable,
+Each name is the installable,
 invocable skill name (directory and `name:` frontmatter), so detection
 (`~/.claude/skills/<name>`) and invocation (`/<name>`) need no translation.
 
@@ -103,17 +97,3 @@ when the task clearly calls for them.
 | `seo-ai-optimizer` | Audit/optimize websites for SEO + AI bot accessibility. |
 | `tmux-agent-comms` | Manage AI agents in tmux (spawn/kill/message CLI agents). |
 | `viral-product-evaluator` | Review a product against 32 viral principles → a Virality Score. |
-
-## Maintenance
-
-This catalog is hand-maintained. To refresh it against the upstream repo, list
-the published skills and their one-line purposes:
-
-```bash
-gh api 'repos/luongnv89/skills/git/trees/HEAD?recursive=1' \
-  --jq '.tree[] | select(.path | test("/SKILL\\.md$")) | .path'
-```
-
-Then read each `skills/<name>/SKILL.md` frontmatter `name:` + `description:` and
-re-group by lifecycle phase. The skill names here are the contract for runtime
-detection — keep them exactly matching the upstream directory names.

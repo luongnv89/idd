@@ -1,9 +1,8 @@
 # Review contract — /idd-doctor
 
-Read this before printing the *Summary footer*. It defines the four rows that
-follow the `Result:` line, the format rule, and the criteria a reviewer grades
-a doctor report against. The doctor is report-only: it authorizes no change,
-so it never asks for approval.
+Read this before printing the *Summary footer*. It defines the three rows that
+follow the `Result:` line and the format rule. The doctor is report-only: it
+authorizes no change, so it never asks for approval.
 
 ## The rows
 
@@ -17,11 +16,11 @@ on every run that reached the summary footer:
     Decision:    No approval needed — report-only, nothing changed. Next: apply the check 4 Fix hint, then re-run /idd-doctor
 ```
 
-The `Result:` line itself is unchanged and stays the one line a wrapper script
-greps (see *Exit codes* in SKILL.md). The rows are additive human-facing
-output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
+The `Result:` line itself stays the one line a wrapper script
+greps (see *Exit codes* in SKILL.md). The rows are human-facing output and
+never carry `PASS`, `WARN`, or `FAIL` as a status token.
 
-1. **Result.** The existing `Result:` line states the status first. `PASS`
+1. **Result.** The `Result:` line states the status first. `PASS`
    means every check that **ran** passed; it does not mean a skipped check
    passed. The `Uncertainty` row carries that distinction.
 2. **Evidence.** Name what the run actually observed:
@@ -34,8 +33,8 @@ output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
      line. Do not repeat findings here.
 3. **Uncertainty.** List each item that applies, separated by `; `:
    - `check {N} not verified ({reason})` for each skipped check.
-   - `check 4 binding unverified` when Check 4 printed its unreadable-source
-     warn line.
+   - `check 4 binding unverified` when a Check 4 line printed `{value}` as
+     `unread` (the message source could not be read).
    - `checks 1-3 are text heuristics` — always printed when any of Checks 1–3
      ran. Check 1 is a per-line substring match with a negation guard, so a
      claim worded differently is missed and a negation on the same line hides
@@ -63,26 +62,3 @@ summary rows.
 - **Unsupported request:** when the user asks for a format the host cannot
   produce (for example an HTML dashboard), print one `⚠` line naming the
   limitation, then print the default terminal layout.
-
-**Interactive report: not applicable.** The doctor emits at most four check
-lines plus their findings and one summary section. A reader inspects the whole
-report without filtering, and every finding already carries its
-`{path}:{line_number}` source.
-
-## Understanding criteria
-
-Grade an actual doctor report against these criteria when a behavioral review
-is run. A heading's presence is not evidence of understanding.
-
-| Criterion | Observable check |
-|---|---|
-| Main result is findable | The `Result:` line states `PASS`, `WARN`, or `FAIL` before any contract row, without reading findings. |
-| Facts and assumptions are separated | `Evidence` names only checks that ran; skipped checks and heuristic limits appear under `Uncertainty`, never as passes. |
-| Claims are traceable | Every failed or warned check has a `{path}:{line_number}` finding or a quoted configuration value; `PASS` is never claimed for a skipped check. |
-| Next decision is clear | `Decision` says no approval is needed and names the fix hints to apply, or `Next: none`. |
-
-Ask a human reviewer whether they could find the result, separate facts from
-assumptions, trace each finding, and name the next action. Record the answers
-on the PR or issue that ran the review. Missing, blank, or nonresponsive
-feedback leaves human understanding **unconfirmed**; an agent's own inspection
-cannot confirm it.

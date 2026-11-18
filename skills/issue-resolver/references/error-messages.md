@@ -2,7 +2,7 @@
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
-**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md` — with the *Closing Summary* `BLOCKED` block (`references/report-templates.md`) printed between the two. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md` — with the *Closing Summary* `BLOCKED` block (`references/closing-blocked.md`) printed between the two. A stop is a terminal outcome like any other, so the error block never ends the run without the footer. A stop that happens before the run clock was captured prints `elapsed n/a`. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
 
 ## Authentication & Setup
 
@@ -164,7 +164,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** local setup preparation fails after the worktree was created (copy error, dependency install failure, bootstrap failure). The resolver removes the partial worktree, deletes only a branch created by this Step 0e, then continues on the in-place path. If cleanup fails, stop and ask the user to run the recovery commands.
 
-## Verify
+## Tests and commits
 
 ### Tests failed
 ```
@@ -194,10 +194,10 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   This may indicate the change is too large for a single issue.
   Continue creating PR? [y/N]
 ```
-**Trigger:** Number of commits created during Execute exceeds `resolve.max_commits`.
+**Trigger:** Number of commits created during Step 3 — Implement exceeds `resolve.max_commits`.
 **Auto:** takes the default No — no push, no PR; the commits stay on the local branch; recommend splitting the issue, `skipped_reason: max_commits_exceeded`. <!-- auto:no -->
 
-## Ship
+## Deliver
 
 ### PR creation failed
 ```
@@ -213,7 +213,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ Branch has merge conflicts with {base_branch}
 
   To fix:  git rebase {base_branch} and resolve conflicts
-  Then:    /issue-resolver N (to resume from verify phase)
+  Then:    /issue-resolver N (to continue on the rebased branch)
 ```
 **Trigger:** `git push` or `gh pr create` reports merge conflicts with the base branch.
 
@@ -346,7 +346,7 @@ Not confirmations: auto mode keeps every one of these.
 ### Security-labeled issue (skip)
 ```
 ⚠ Issue #N has a security label ({label}). Skipping auto-normalization.
-  Rewriting security-sensitive issues requires explicit operator confirmation (SPEC §1.4).
+  Rewriting security-sensitive issues requires explicit operator confirmation.
 
   To normalize first: /issue-creator N   (or /issue-creator N --force after review)
 ```

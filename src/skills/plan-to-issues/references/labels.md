@@ -11,7 +11,7 @@ dimensions.
 
 | Axis | Label | Derived from | Mandatory |
 |---|---|---|---|
-| Phase | `phase:pre`, `phase:p0` … `phase:p4` | the task's `## Phase` heading, lowercased | yes |
+| Phase | `phase:<id>`, e.g. `phase:p0`, `phase:mvp-foundation`, `phase:s1` | the task's resolved phase id (`references/plan-parsing.md` → *Resolving phases across both shapes*), lowercased | yes |
 | Type | `bug`, `improvement`, `feature` | dimension mapping below | yes |
 | Dimension | `dim:dep`, `dim:bug`, `dim:sec`, `dim:test`, `dim:ci`, `dim:docs`, `dim:perf`, `dim:ux`, `dim:clean`, `dim:dead`, `dim:env` | `<DIM>` of each `Closes:` finding id | when `Closes:` is non-empty |
 | Priority | `priority:critical`, `priority:high`, `priority:medium`, `priority:low` | highest severity among closed findings, else the phase default | yes |

@@ -30,7 +30,7 @@ Operate autonomously; return only the contract output format with no surrounding
 
 Trace every dependency like a program flow and map architecture like a machine's logic — understand intent and history, not just text.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
+The shared conventions are inlined into the prompt below.
 
 ## Shared agent conventions (inlined — no file lookup required)
 
@@ -44,7 +44,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or
@@ -88,9 +88,9 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ### `prior_analysis` and `triage_context` (when supplied)
 
-Two optional artifacts, **one contract, two trust profiles**. Both are caller-supplied context payloads (https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md, *Caller-supplied context payloads*) — never a reason to skip a safety check.
+Two optional artifacts, **one contract, two trust profiles**. Both are caller-supplied context payloads — never a reason to skip a safety check.
 
-**`prior_analysis`.** Its `affected_files`, `architecture`, `code_patterns` and `test_files` are
+**`prior_analysis`.** Its `extraction`, `affected_files`, `history` and `cross_references` are
 **verify-first hints to confirm or refute, never assertions to trust** — open the
 files, check each hint still holds, and drop any that does not, falling back to
 the ordinary scan for that part. Phase 0 (*Already resolved?*) runs **in full**
@@ -130,7 +130,7 @@ Read-only reconnaissance: extract search targets from the issue, scan the codeba
 
 ### Phase 0 — Already resolved?
 
-- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (`git branch --contains <sha> | grep -E "(main|master)"`), report `already_resolved: true` with details and **stop**.
+- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (resolve the default branch as in 0b, then `git merge-base --is-ancestor <sha> origin/<default>` exits 0), report `already_resolved: true` with details and **stop**.
 - **0b — PRs targeting this issue:** two scoped reads, never one `--state all`:
 
   ```bash
@@ -150,7 +150,7 @@ Parse title, body, and comments for: error messages/stack traces, function names
 ### Phase 2 — Deep scan
 
 - **2a:** grep each error/function/component; glob mentioned paths; collect matches with hit counts.
-- **2b:** rank `critical` (direct path match) / `high` (keyword + import link to a critical file) / `medium` (keyword only) / `low` (transitive dep). Read the top `max_files` files; parallel-read when 3+.
+- **2b:** rank `critical` (direct path match) / `high` (keyword + import link to a critical file) / `medium` (keyword only) / `low` (transitive dep). Read the top `max_files` files.
 - **2c:** parse imports/requires; trace up to `trace_depth` levels (within budget).
 - **2d:** map affected modules, the call chain from entry point to affected code, shared state/config/DB patterns, related test files, and existing conventions (naming, error handling, testing, framework).
 - Bounded by `scan_timeout`: near the limit, stop and set `scan_timed_out: true`.

@@ -1,6 +1,6 @@
 # /issue-analysis — Examples
 
-Full example runs (happy path, view mode, closed issue), extracted from SKILL.md.
+Full example runs (happy path, view mode, closed issue).
 
 ## Example: Full analysis flow
 
@@ -15,7 +15,7 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
   [2/8] Extract        ✓ 8 keywords, 2 file refs
   [3/8] Research       ✓ read 18 files, traced 12 deps
   [4/8] History        ✓ 5 related commits, 1 prior fix attempt
-  [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
+  [5/8] Cross-refs     ✓ 1 related issue, 1 may resolve this
   [6/8] Analysis       ✓ root cause identified
   [7/8] Options        ✓ 3 approaches proposed
   [8/8] Report         ✓ analysis complete
@@ -34,7 +34,7 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
     Error messages:  "ERR_TOO_MANY_REDIRECTS"
     Functions:       handleRedirect, validateSession
     Components:      AuthMiddleware
-    File refs:       src/auth/middleware.py
+    File refs:       src/auth/middleware.py, src/auth/session.py
 
   ◆ Affected Files
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -46,11 +46,12 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
 
   ◆ Git History
   ┄┄┄┄┄┄┄┄┄┄┄┄
-    Related commits:    5 touching affected files
-    Domain experts:     @jdoe (12 commits), @asmith (5)
+    Related commits:   5 commits touching affected files
+    Prior fix attempts: 1
+    Domain experts:    @jdoe (12 commits), @asmith (5)
     ⚡ Prior fix attempt: a1b2c3d fix: resolve auth re...
        Committed 2026-03-18 by @jdoe — issue still open
-    ⚡ Possible regression: e4f5g6h refactor: simplify...
+    ⚡ Possible regression: e4f5a6b refactor: simplify...
        Committed 2026-03-10, issue created 2026-03-15
 
   ◆ Cross-references
@@ -65,15 +66,11 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
 
   ◆ Root Cause Analysis
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    The redirect loop occurs because handleRedirect() in
-    middleware.py checks session validity but does not
-    exclude the login route itself from the check. On
-    mobile browsers, the session cookie is not sent on
-    the initial redirect, causing an infinite loop.
-
-    This is likely a regression introduced by commit
-    e4f5g6h (2026-03-10) which simplified the session
-    check and removed the login route exclusion.
+    handleRedirect() in middleware.py checks the session
+    but does not exempt the login route. Mobile browsers
+    omit the session cookie on the first redirect, so the
+    loop never ends. Likely regression: e4f5a6b
+    (2026-03-10) removed the login-route exclusion.
 
   ◆ Implementation Options
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -111,15 +108,27 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
     Risk:         Low
     Recommended:  Option 1 — Minimal fix
 
+  ◆ Decision Record
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    Root cause:         handleRedirect() no longer exempts the login route
+    Options considered: Option 1 — Minimal fix;
+                        Option 2 — Route-based auth config;
+                        Option 3 — Session-aware redirect
+    Options rejected:   Option 2 — config change; Option 3 — session state
+    Selected option:    Option 1 — Minimal fix
+    Residual risk:      other public routes may need the exemption
+
+    Analyzed at:        main @ 9c1d2e7 (2026-03-21)
+
   ✓ Analysis saved to .idd/analysis-42.json
 
 ◆ Issue Analysis: #42 — Fix mobile auth redirect loop
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Fetch:             ✓ pass (issue loaded)
-  Extract targets:   ✓ pass (6 keywords, 2 file refs)
-  Research:          ✓ pass (14 files scanned)
-  Git history:       ✓ pass (3 related commits)
+  Extract targets:   ✓ pass (8 keywords, 2 file refs)
+  Research:          ✓ pass (18 files scanned)
+  Git history:       ✓ pass (5 related commits)
   Cross-references:  ✓ pass (1 related issue)
   Root cause:        ✓ pass
   Options:           ✓ pass (3 approaches proposed)
@@ -130,6 +139,9 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
   Complexity: S │ Risk: Low
   Recommended: Option 1 — Minimal fix
   Saved: .idd/analysis-42.json
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed 2m 41s · agents 2
 ```
 
 ---
@@ -145,9 +157,13 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
     Last run:    2026-03-21 14:30 UTC
     Report age:  1d 3h
 
-    ... (same analysis sections as above) ...
+    ... (full analysis sections rendered from JSON, as above) ...
+    Analyzed at:        main @ 9c1d2e7 (2026-03-21)
 
   ○ Cached report. Run /issue-analysis 42 for fresh analysis.
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed n/a · agents 0
 ```
 
 ---

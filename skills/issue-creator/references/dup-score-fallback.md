@@ -34,7 +34,7 @@ are in `references/docs/config-schema.md`.
   lower-precedence signal.
 - Internal batch pairs applied in both directions, keeping the stronger.
 
-## Medium-band judgement is unchanged
+## Medium-band judgement
 
 The fallback uses the same bounded medium-judgement protocol `SKILL.md` states
 for the scripted path: the tri-state `decision`, identity matching, fail-safe

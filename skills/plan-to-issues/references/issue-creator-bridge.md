@@ -39,8 +39,8 @@ Done when every milestone exit condition holds:
 - M4 — UX findings closed; bundle ≤ 480 KB; docs match code
 ```
 
-The milestone exit conditions become the epic's acceptance criteria — whole-effort outcome, per IDD
-SPEC §2.1. Then `gh issue edit <epic> --add-label epic`.
+The milestone exit conditions become the epic's acceptance criteria — whole-effort outcome, per
+[SPEC.md](https://github.com/luongnv89/idd/blob/main/SPEC.md) §2.1. Then `gh issue edit <epic> --add-label epic`.
 
 **Do not put the plan-binding marker in the intent text.** `/issue-creator` reproduces intent text
 verbatim *in a blockquote* as Reporter Context, so a marker placed there arrives `> `-prefixed and
@@ -145,10 +145,9 @@ GitHub's *sub-issues* are a real relationship — register the children and the 
 sub-issues panel with each child's live open/closed state and a progress bar, updating on its own.
 That is why the plan map in the epic body carries no status: it does not need to.
 
-A markdown checkbox cannot substitute. GitHub does **not** auto-check a task-list box from the
-referenced issue's state — verified against a closed issue referenced from another body, which still
-renders `aria-label="Incomplete task"`. A `- [x]` in the map would be a claim that goes stale on the
-next close, and re-truing it is exactly the sync-after-every-close this design removes.
+A markdown checkbox cannot substitute: GitHub does **not** auto-check a task-list box when the
+referenced issue closes, so a `- [x]` in the map would go stale on the next close and need a sync
+after every close.
 
 The API takes the child's **database `id`**, not its issue **number** — they differ, and passing the
 number either fails or links the wrong issue:
@@ -188,8 +187,10 @@ Depends on #103, #104
 ```
 
 `Depends on #N` is scope-independent of `Part of #<epic>` and answers a different question: `Part of`
-says the child serves the epic's outcome, `Depends on` says it cannot merge first (IDD SPEC §2.1).
-`/auto-pilot`'s merge gate reads `Depends on` only, which is why the pass is worth the extra edits.
+says the child serves the epic's outcome, `Depends on` says it cannot merge first
+([SPEC.md](https://github.com/luongnv89/idd/blob/main/SPEC.md) §2.1).
+`/auto-pilot`'s merge gate reads `Depends on` and `Blocked by`, not `Part of`, which is why the pass
+is worth the extra edits.
 
 - Skip children with no dependencies — most of the backlog gets no edit.
 - A dependency id absent from the map is skipped and reported as `⚠ unknown dep <id>`; never emit a

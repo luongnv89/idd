@@ -29,10 +29,10 @@ if [ ! -f "$SKILL" ]; then
   exit 1
 fi
 
-if grep -qE 'Security label check \(SPEC §1\.4\)' "$SKILL"; then
-  pass "T1.1: Step 0d documents SPEC §1.4 security label check"
+if grep -qE 'Security label check\*\* — normalization rewrites' "$SKILL"; then
+  pass "T1.1: Step 0d documents the security label check and its reason"
 else
-  fail "T1.1: Step 0d missing SPEC §1.4 security label check"
+  fail "T1.1: Step 0d missing the security label check or its reason"
 fi
 
 if grep -qE 'security.*CVE.*vulnerability|CVE.*vulnerability' "$SKILL"; then

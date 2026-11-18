@@ -9,10 +9,8 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 re-derive — extraction, affected files, options, recommendation, complexity and
 risk — pinned to the commit it ran against. This gate decides whether that
 artifact is still true, so an analyze-then-resolve sequence on an unchanged tree
-researches the codebase **once** instead of twice. Every other mention of a
-*fresh* analysis in this skill — `references/report-templates.md` (*Lifting the
-Decision Record*) and the bug-repro mirror in *Step 3* (`references/steps/step-3-implement.md`) — defers to this
-section. Do not restate or re-derive a freshness rule anywhere else.
+researches the codebase **once** instead of twice. Wherever this skill calls an
+analysis *fresh*, it means fresh by this predicate and by no other test.
 
 Runs after *0g — Complexity gate*, before *Step 1 — Research*. It sets exactly
 one state variable:
@@ -24,22 +22,21 @@ analysis_reuse = fresh | stale | absent
 | Value | When | Effect |
 |-------|------|--------|
 | `fresh` | every condition below holds | Step 1 runs the seeded verify-first pass; Step 2 skips the synthesizer |
-| `stale` | the file exists but any condition fails | today's full pipeline, unchanged |
-| `absent` | no file, or it does not parse as JSON | today's full pipeline, unchanged |
+| `stale` | the file exists but any condition fails | the full pipeline |
+| `absent` | no file, or it does not parse as JSON | the full pipeline |
 
 `stale` and `absent` are distinguished for the operator's benefit only — they
-take the identical code path, which is the pipeline that already exists.
+take the identical code path: the full pipeline.
 
 When `resolve.adaptive_effort` is `false`, **skip this gate**: set
 `analysis_reuse = stale` and continue. That key already pins the pipeline to
 `full`, and reuse is the same class of saving, so the one key disables both.
-**No new config key is introduced.**
 
 ### The predicate — five conditions, all must hold <!-- a:rs-step0h-predicate -->
 
 `{base}` is **this run's synced base** — the branch the mandatory Repo Sync
 rebased onto, or the `origin/${base}` that `git worktree add` forked from. Never
-a bare `HEAD`: resolutions run in parallel worktrees (issue #260), where `HEAD`
+a bare `HEAD`: resolutions run in parallel worktrees, where `HEAD`
 can point at an unrelated branch and an ancestry test against the wrong tip
 passes silently.
 
@@ -104,9 +101,9 @@ never fire. *0a* runs **before** 0d and already fetches the issue, so it capture
 
 A missing key, a short or unknown SHA, an unparsable timestamp, a `git` command
 that errors for any reason, or any condition that cannot be evaluated ⇒ `stale`
-⇒ today's full pipeline, unchanged. The gate may only skip work it has
+⇒ the full pipeline. The gate may only skip work it has
 positively proven redundant. This default is what keeps a wrong answer cheap:
-the fallback is the pipeline that runs today.
+the fallback is the full pipeline.
 
 Surface the decision as one line so the saving is auditable:
 
@@ -133,8 +130,3 @@ Decision Record's *Options rejected* carries the analysis's own reasons, and
 option-less direct plan — and its silent approval gate — applies only to a
 `light` run **without** a `fresh` analysis. Step 1 runs the narrower of the two
 passes. Both keep the *Verify not already resolved* phase in full.
-
-Because the gate reads only an on-disk artifact and this run's own base, it
-needs no change from a caller: `/auto-pilot`'s explicit-list mode, which runs
-`/issue-analysis` and then `/issue-resolver` back to back on the same tree, gets
-the reuse purely by having written the file.

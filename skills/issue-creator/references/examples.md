@@ -49,29 +49,6 @@ If a write cannot be verified, use `PARTIAL` or `BLOCKED` as appropriate and
 name the uncertainty; never print the successful example unchanged. A dry run
 reports the preview as evidence and explicitly says that no changes were applied.
 
-### Evaluate report understanding
-
-When evaluating actual skill outputs, check all four criteria below in addition
-to issue-body correctness. Exclude negative-trigger cases where no skill runs.
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | Opening text states status and outcome; batch counts reconcile with every item. |
-| Facts and assumptions are separate | Verified writes cite observed reads; inferred fields, scan limits, and untested behavior are labeled. |
-| Claims are traceable | Issue/backup links and observed checks support the claimed scope; partial success never becomes an overall success claim. |
-| Next decision is clear | The report names a required decision or says no approval is needed, and lists remaining actions. |
-
-For repository evals, extend the existing `grade` assertions for the basic
-issue-creator case to inspect its report artifact. That case uses a deterministic
-stand-in: passing it verifies the fixture contract, not an agent following this
-skill. In live behavioral evaluations, grade the agent's own report and recorded
-tool results against the same criteria.
-
-Ask human reviewers whether they could find the result, separate facts from
-assumptions, trace claims, and identify the next decision. Record their answers
-in the evaluation's feedback record. Missing, blank, or nonresponsive feedback
-leaves human understanding **unconfirmed**; automated checks do not confirm it.
-
 ---
 
 Full example runs for batch creation and vague-description scenarios.
@@ -104,7 +81,8 @@ Here are the items from our sprint planning:
 
    Create 3 issues? [A]ll / [e]dit / [c]ancel
    ```
-5. On "All" → create each → `✓ 3/3 issues created`
+5. On "All" → create each, with per-item progress → the `◆ Batch Create — 3/3 issues`
+   report (`references/modes.md`, Batch Create Step 6), then the review contract and run-stats footer
 
 ---
 
@@ -122,10 +100,12 @@ Here are the items from our sprint planning:
    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
      Type:     bug (high)
      Title:    Fix checkout page broken on Safari
+     ⚡ Model:  {openai_model} (~${openai_cost}/task) · {anthropic_model} (~${anthropic_cost}/task)
      Labels:   bug, checkout
      Criteria: 3 acceptance criteria generated (medium)
 
    Create issue? [Y/n]
    ```
-6. On confirmation → `gh issue create` → `✓ Created issue #15`
+6. On confirmation → `gh issue create` → the `◆ Issue Created` block (Step 6),
+   then the review contract and run-stats footer
 

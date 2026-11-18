@@ -39,8 +39,7 @@ commit it waited on** — `passed@<sha40>` / `failed@<sha40>`, or a bare `no_ci`
 (*Binding the verdict to a commit* in that skill's
 `references/prepass-tests-ci-mechanics.md`). Re-running the whole wait here is
 duplicated work whenever the head has not moved since **and** the live rollup
-already reports every check green — both conditions, never the first alone
-(issue #256).
+already reports every check green — both conditions, never the first alone.
 
 Set exactly one variable:
 
@@ -51,8 +50,8 @@ ci_verdict = trusted | stale | absent
 | State | When | Effect |
 |-------|------|--------|
 | `trusted` | `ci_status` is `passed@<sha40>`, that SHA equals the PR's live head, **and** the same read's `statusCheckRollup` is non-empty with every check in it green | Step 5.1's wait is skipped; treat CI as green |
-| `stale` | the returned SHA differs from the live head | run the full wait below, unchanged |
-| `absent` | no `ci_status` field, a bare or unparsable value, `no_ci`, `failed@…`, or `review.check_ci: false` | run the full wait below, unchanged |
+| `stale` | the returned SHA differs from the live head | run the full wait below |
+| `absent` | no `ci_status` field, a bare or unparsable value, `no_ci`, `failed@…`, or `review.check_ci: false` | run the full wait below |
 
 The one verification, which replaces the poll: read `headRefOid` from **Step
 5.1's own `gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid`** — the
@@ -85,11 +84,11 @@ before any merge.
 **`failed@<sha40>` is never `trusted`.** A failing verdict already leaves the PR
 open under Step 5.1's own rules; routing it through this gate would only let a
 `trusted` label attach to a red build. Read it as `absent` and let the wait
-below reach the same "not mergeable" outcome it reaches today.
+below reach its own "not mergeable" outcome.
 
 **Fail-safe: any doubt is `absent`.** A missing field, a SHA that is not 40 hex
 characters, a `headRefOid` that cannot be read, a `pending` or `none` that
-somehow arrived here — every one of them runs today's wait, byte-for-byte. The
+somehow arrived here — every one of them runs the full wait. The
 gate can only ever *remove* a duplicate wait; it can never merge something the
 wait would have blocked.
 
@@ -109,7 +108,7 @@ GitHub itself, read here, already reports every check green. Trusting a verdict
 on those two conditions is not a loosening of the marker rule; a marker still
 buys nothing at this step.
 
-**No new config key.** `review.adaptive_depth: false` disables this gate — it
+`review.adaptive_depth: false` disables this gate — it
 already disables the QA handoff gate — and forces `absent`.
 
 One `○` line, per `references/docs/terminal-style.md`:
@@ -126,7 +125,7 @@ If `autopilot.respect_dependencies` is `true` (default), check whether the origi
 
 #### Parse dependency markers
 
-Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch with `python3 references/scripts/gi-issue.py N --fields body` — reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes: <!-- a:ap-deps-reuse-snapshot -->
+Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch it with the checked read below — `python3 references/scripts/gi-issue.py N --fields body`, reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`, reading `.body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes: <!-- a:ap-deps-reuse-snapshot -->
 
 ```
 - Depends on #12
@@ -134,7 +133,7 @@ Blocked by: #15, #20
 This depends on #8
 ```
 
-For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **local** issue numbers only (SPEC §2 MUST-ignore for cross-repo):
+For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **local** issue numbers only; cross-repo references are ignored:
 
 1. **Strip cross-repo tokens** on that line — remove every `\S+/\S+#\d+` match (e.g. `acme/lib#15`) so its trailing digits are never captured.
 2. **Capture bare refs** on the remainder with a negative lookbehind guard: `(?<![\w/])#(\d+)` — this matches `#12` and comma lists (`#12, #15`) but not the `#15` inside `acme/lib#15` if a token was missed.
@@ -146,12 +145,33 @@ output is never re-evaluated. A held compact-JSON snapshot is parsed as data wit
 `python3`; never paste its body into shell syntax:
 
 ```bash
-issue_body="$(python3 references/scripts/gi-issue.py N --fields body --jq .issue.body)"
-# Degrade form, when that exits 2 or 4 or there is no python3 — replace the
-# assignment above, do not add a second one:
-#   issue_body="$(gh issue view N --json body --jq .body)"
-printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py
+issue_json="$(python3 references/scripts/gi-issue.py N --fields body)"; ec=$?
+case "$ec" in
+  0) ;;
+  3) exit 3 ;;  # invalid input: apply the stop rule, never left_open
+  *) issue_json="$(gh issue view N --json body)"; ec=$? ;;  # 2, 4, no python3: degrade
+esac
+if [ "$ec" -eq 0 ]; then
+  # gi-issue.py prints {"issue": {"body": …}}; gh prints {"body": …}.
+  issue_body="$(printf '%s' "$issue_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); b=d.get("issue", d)["body"]; sys.stdout.write(b) if isinstance(b, str) else sys.exit(4)')"; ec=$?
+fi
+if [ "$ec" -eq 0 ]; then
+  printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py
+else
+  echo "⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})"
+fi
 ```
+
+With no `python3` at all, the parse above cannot run either: read the body with
+`issue_body="$(gh issue view N --json body --jq .body)"; ec=$?` instead — a
+non-zero `ec` is an unread body — and apply steps 1–2 above by hand.
+
+**A failed read is never an empty body.** When the read you kept exits
+non-zero, or no string body parses from it or from a held snapshot, do **not**
+run `gi-deps.py`: its empty answer reads as "no dependencies" and would merge
+a PR whose dependency is still open. Do not merge: print the `⚠ … left open`
+line above, record `left_open`, add `#{issue_number}` to the session skip list,
+and continue to the next eligible issue.
 
 When Step 1.2b's snapshot is the source, parse `.body` from that compact JSON on
 stdin and make **no** extra GitHub read. Passing JSON on stdin keeps attacker-
@@ -193,7 +213,7 @@ A dependency is **unsatisfied** when any of:
 - The issue's `state` is `OPEN` (regardless of PR state — the issue itself isn't done), OR
 - The issue is `CLOSED` but at least one referenced PR has `state: OPEN` (rare race window — treat as unsatisfied to be safe).
 
-For each unsatisfied dependency, record `{issue_number, issue_title, issue_state, pr_number, pr_state}` for the alert. If `closedByPullRequestsReferences` is unavailable on older `gh` versions (pre-2.45), fall back to:
+For each unsatisfied dependency, record `{issue_number, issue_title, issue_state, pr_number, pr_state}` for the alert. If the read does not return `closedByPullRequestsReferences` (the installed `gh` does not know the field), fall back to:
 
 ```bash
 gh search prs "is:open" "Closes #N" --json number,state,url --limit 5
@@ -231,9 +251,9 @@ When a dependency issue has no linked PR (`closedByPullRequestsReferences` is em
 
 Set the iteration outcome to `blocked_by_dependency`, leave the PR for the current issue **open and unchanged**, and **advance to the next eligible issue**. Not merging is already the safe outcome; the rest of the backlog rarely shares this dependency, and halting a 30-issue run at iteration 3 strands every remaining eligible issue.
 
-Before advancing, add `#{issue_number}` to the **session skip list** — the same in-memory list Phase 2.3 uses for failed issues. This is required, not cosmetic: when the dependency issue is `CLOSED` but its PR is still `OPEN` (the race case the gate treats as unsatisfied), Phase 1's triage graph sees the dependency as done and would re-pick `#{issue_number}` on the next iteration; the resolver would then abort on its "PR already targets this issue" guard and the run log would gain a second, bogus `failed` line for an issue that was already recorded. Skipping it for the rest of the session keeps the invariant of **exactly one run-log line per processed issue** (`outcome: blocked_by_dependency`, see `references/run-log.md`). In explicit-list mode Phase 1 does not run and the user-provided list is consumed in order, so re-picking is impossible there — the skip-list append is harmless and the same continue-to-the-next-entry behavior applies.
+Before advancing, add `#{issue_number}` to the **session skip list** — the same in-memory list Phase 2.3 uses for failed issues. This is required, not cosmetic: when the dependency issue is `CLOSED` but its PR is still `OPEN` (the race case the gate treats as unsatisfied), Phase 1's triage graph sees the dependency as done and would re-pick `#{issue_number}` on the next iteration; the resolver would then report `pr_in_progress` for the open PR, the loop would review and gate that same PR a second time, and the run log would gain a second line for an issue that was already recorded. Skipping it for the rest of the session keeps the invariant of **exactly one run-log line per processed issue** (`outcome: blocked_by_dependency`, see `references/run-log.md`). In explicit-list mode Phase 1 does not run and the user-provided list is consumed in order, so re-picking is impossible there — the skip-list append is harmless and the same continue-to-the-next-entry behavior applies.
 
-The loop therefore stops on dependency grounds **only when no eligible issue remains** — through the existing `⚠ No eligible issues to pick` stop condition in Phase 1, never from the gate itself.
+The loop therefore stops on dependency grounds **only when no eligible issue remains** — through Phase 1's `⚠ No eligible issues to pick` stop condition, never from the gate itself.
 
 If a referenced `#N` does not exist (404 from `gh issue view`), log a warning and treat that single reference as satisfied (skip it). Do not block on a typo.
 
@@ -251,7 +271,7 @@ Continue to Step 5.1c.
 
 ### Step 5.1c — Merge identity gate <!-- a:ap-merge-identity-gate -->
 
-**Single home of the merge-identity rule** (issue #516). A CI verdict authorizes
+**Single home of the merge-identity rule.** A CI verdict authorizes
 one commit merged onto one base. This gate refuses the merge when either has
 moved since that verdict. It runs last, immediately before `gh pr merge`, after
 the `trusted` fast path and after the full wait alike, and it guards every
@@ -263,7 +283,7 @@ read**, the head that Step 5.1a's verdict or the wait after it is about. Never
 take it from a later read: the guard pins the commit that was checked, so a SHA
 read after the wait would pin whatever the head became. `{merge_floor}` is
 check 3's value, pasted only as `met@<40 hex>:<40 hex>`: the floor must have
-classified this head on this live base tip (#605, #606).
+classified this head on this live base tip.
 
 Then one fresh read and one ancestry check. `{owner}` and `{repo}` are `gh api`'s
 own placeholders, filled from the current repository. The base name is bound
@@ -406,7 +426,7 @@ mode gate declines to merge — with the *Step 1.0b* procedure:
 During a parallel drain, include `"lanes": [{"issue": 42, "phase":
 "cleanup", "outcome": "merged"}]` in the same patch. A resume that reads `outcome: merged` never re-merges and never re-opens: the PR
 is gone and the issue is closed, so the iteration is finished and the loop moves
-to Step 5.3. **AC2 holds here too** — nothing in this phase closes an issue whose
+to Step 5.3. Likewise, nothing in this phase closes an issue whose
 PR is still open and unreviewed; the issue is closed by GitHub, as the
 consequence of merging the `Closes #N` PR, and by nothing else.
 
@@ -501,8 +521,8 @@ Read the JSON, never the exit status alone:
   manual procedure (it is idempotent).
 
 When the PR did not merge (`left_open`, `blocked_by_dependency`, `failed`),
-or as the degrade path above, use the original stash-first sync below
-byte-for-byte to protect any uncommitted changes that may have accumulated
+or as the degrade path above, run the stash-first sync below
+exactly as written to protect any uncommitted changes that may have accumulated
 between iterations (see `references/docs/sync-conventions.md`):
 
 ```bash
@@ -561,9 +581,6 @@ truth.
 
 ### Step 1.6 — Update the triage cache after a merge <!-- a:ap-step16-cache-update -->
 
-Numbered in Phase 1 because it maintains Phase 1's payload; executed here
-because a merge is what makes it necessary.
-
 It runs alongside *Step 5.3*'s **End-of-iteration checkpoint**, and the two own
 **different files**: this step owns the triage payload
 (`.idd/triage.json`), that checkpoint owns the run state
@@ -596,8 +613,7 @@ Run it after **any step that merged a PR and closed its issue** —
 *Step 5.2*'s clean merge, *Phase 3-4 Step 2b*'s `partial_followup` merge,
 which closes the issue exactly as finally, and *Phase 3-4 Option 1*'s
 user-chosen merge of a critical issue's partial PR, which is that same merge
-reached through a human decision. Three sites, one rule; each of the other two
-carries a pointer back here, because this step sits at the far end of the file.
+reached through a human decision. Three sites, one rule.
 A PR left open, a failed resolve, a
 dependency-blocked gate: none of those closed an issue, so none of them changes
 the backlog and none of them runs this step — the session skip list is already
@@ -610,16 +626,10 @@ longer carries is a no-op; skipping it leaves a closed issue in
 explicit-list skip above is the one thing this does not cover, and it is not an
 exception to it: the mode is known at invocation, so it is never a doubt.
 
-**Under `--dry-run`, compute the removal and print it, but write nothing.** This
-step is the one place in #258's work that persists anything, so it takes the same
-rule *Step 1.1*'s `--out` and every `gi-state.py` call take: a dry run mutates no
-file on disk. Apply the nine rules below in memory, print the `✓ Triage cache
-updated` line with the counts the update *would* have produced, and skip the
-write-back — never write `.idd/triage.json`. Nothing downstream is harmed:
-`--dry-run` stops at *Step 1.3* before any merge, so in practice this step is
-unreachable under it, and the rule is stated here so that it stays unreachable
-by design rather than by accident. *Step 1.1a*, the read side of this cache, is
-read-only and needs no such rule.
+**Under `--dry-run`, compute the removal and print it, but write nothing.**
+Apply the nine rules below in memory, print the `✓ Triage cache updated` line
+with the counts the update would have produced, and
+never write `.idd/triage.json`.
 
 Read `.idd/triage.json`, apply **removal only**, and write it back with the
 Write tool:
@@ -669,15 +679,10 @@ newly filed issue, a new dependency marker, a changed label — is outside what
 this step can honestly do and goes through a full re-triage instead.
 
 **When a full re-triage runs instead.** The `autopilot.retriage_every` trigger
-does **not** live here — it is evaluated at the top of every iteration from the
-1-based `{i}` counter, so it fires on non-merging iterations too. This step's
-only remaining `retriage_required` write is the degrade path below.
-
-**A pick miss is not a trigger here.** *Step 1.2* owns it, and handles it
-**in the same iteration** — re-enter Step 1.1 once, re-run the pick. A pick miss
-cannot reach this step in any case, because this step runs only after a merge.
-Stating it in both places with two different timings is how the two steps drift
-apart; *Step 1.2* is the single home of that retry.
+does **not** live here — Phase 1 evaluates it every iteration.
+**A pick miss is not a trigger here** either: *Step 1.2* retries it
+**in the same iteration**.
+This step's only `retriage_required` write is the degrade path below.
 
 **Degrade.** If the file cannot be parsed, or the write-back fails, print
 
@@ -688,7 +693,7 @@ apart; *Step 1.2* is the single home of that retry.
 set `retriage_required`, and carry on. This step never stops the loop: a cache
 that could not be updated costs **one** full triage — *Step 1.1* clears the flag
 as it runs, so the cost is the next iteration's scan and not every iteration's
-from here on — which is what every iteration paid before this gate existed.
+from here on.
 
 ```
 ✓ Triage cache updated — #{issue_number} resolved, {n} remain

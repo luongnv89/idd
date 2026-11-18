@@ -185,7 +185,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T5 (AC1): batch run-log fan-out compressed but rule-complete
 # ───────────────────────────────────────────────────────────
-fanout_len=$(awk '/^#### Run-log fan-out for the batch/{f=1} f{n++} f&&/^For non-batched issues/{print n; exit}' "$AP_LIST")
+fanout_len=$(awk '/^#### Run-log fan-out for the batch/{f=1} f{n++} f&&/^A non-batched issue runs/{print n; exit}' "$AP_LIST")
 if [ -n "$fanout_len" ] && [ "$fanout_len" -lt 60 ]; then
   pass "T5.1: fan-out section compressed to $fanout_len lines (was 86)"
 else
@@ -289,7 +289,7 @@ fi
 MERGE_RULE='`/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`.'
 PR_LOOP="src/skills/issue-pr-review/references/review-loop-mechanics.md"
 SCHEMA="docs/config-schema.md"
-AP_PROMPTS="src/skills/auto-pilot/references/subagent-prompts.md"
+AP_PROMPTS="$(spec_concat "src/skills/auto-pilot/references/spawning.md")"
 
 rule_src=$(grep -rlF -- "$MERGE_RULE" src docs | wc -l | tr -d ' ')
 rule_home=$(grep -cF -- "$MERGE_RULE" "$PR_SKILL")

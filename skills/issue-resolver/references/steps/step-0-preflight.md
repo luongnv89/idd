@@ -36,10 +36,10 @@ run that never captures it reports `elapsed: n/a` rather than a wrong number.
 
 ## Step 0e — Workspace
 
-Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
+Full procedure for the worktree offer described in SKILL.md *0e — Workspace (interactive only)*.
 **Interactive mode only** — ordinary auto mode is skipped. The offer and local
 creation procedure remain interactive; `--auto` / `IDD_AUTO_MODE=1` uses the
-in-place path (Repo Sync + *0f — Create branch*) byte-for-byte as before.
+in-place path (Repo Sync + *0f — Create branch*).
 The worktree prompt never appears in auto mode. The sole exception is a worktree
 auto-pilot already created for a parallel resolver lane; that caller-managed
 path validates and adopts the workspace below, without showing a prompt or
@@ -130,13 +130,12 @@ root and wrap each Bash repository operation in one command beginning
 may read, edit, stage, test, or commit through the ambient checkout. Do not
 invent Agent `cwd` or environment parameters — every spawn remains canonical
 `Agent(description, prompt)`. On every non-caller-managed path set both
-`workspace_contract = null` and `expected_lane_identity = null`, preserving
-ordinary behavior byte-for-byte.
+`workspace_contract = null` and `expected_lane_identity = null`.
 
 This handoff is structural, not a safety-gate waiver. The already-resolved
 checks, live issue re-verification, both secret scans, QA, final tests, and push
 still run in full. On auto-pilot's default single-lane path the signal is
-absent, so this section is unreachable and ordinary auto mode is unchanged.
+absent, so this section is unreachable there.
 
 ### Why a worktree
 
@@ -168,13 +167,13 @@ rules in `references/docs/naming-conventions.md` by hand — `"auto"` gives
 `{type}/{N}-{short-description}`, and any other `resolve.branch_prefix` is used
 verbatim as `{configured-prefix}{N}-{short-description}`.
 
-Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, before the user answers:
+Present the prompt from SKILL.md (*0e — Workspace (interactive only)*). It must state, before the user answers:
 
 - the derived **branch** name (`{branch_name}`),
 - the **worktree path** (the naming convention below), and
 - what **setup** will be copied/run (gitignored local config + the project's detected install/bootstrap).
 
-Default is **accept** (`[Y/n]`). This satisfies acceptance criterion 5 (the proposal states what is copied and the workspace/branch naming).
+Default is **accept** (`[Y/n]`).
 
 ### Naming convention
 

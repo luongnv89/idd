@@ -68,7 +68,7 @@ check_block_has() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if grep -qE "$pattern" <<<"$block"; then
     pass "$label"
   else
     fail "$label"
@@ -102,7 +102,7 @@ SRC_RESEARCHER="$REPO_ROOT/src/shared/agents/codebase-researcher.md"
 SRC_AP_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 SRC_AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
-SRC_AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+SRC_AP_PROMPTS="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
 SRC_AP_EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SRC_RES_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 SRC_RES_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
@@ -113,7 +113,7 @@ BUILT_CONV="$REPO_ROOT/skills/auto-pilot/references/docs/shared-agent-convention
 BUILT_RESEARCHER="$REPO_ROOT/skills/issue-resolver/references/agents/codebase-researcher.md"
 BUILT_AP_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_AP_PHASES="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/phases.md")"
-BUILT_AP_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+BUILT_AP_PROMPTS="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/spawning.md")"
 BUILT_AP_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
 BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 BUILT_RES_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
@@ -400,8 +400,8 @@ check_block_has "$STATE_BLOCK" 'under .resolve\.auto_test.\*\*, never over it' \
   "T4.6: both consumers layer under resolve.auto_test, never over it"
 check_block_has "$STATE_BLOCK" 'Fail-safe is .run.' \
   "T4.7: nothing recorded, or any doubt, runs the suite"
-check_block_has "$STATE_BLOCK" 'new config key is introduced' \
-  "T4.8: the existing adaptive switch is the off-switch — no new config key"
+check_block_has "$STATE_BLOCK" 'adaptive_effort: false. also forces .run.' \
+  "T4.8: the existing adaptive switch is the off-switch"
 anchor_check "$SRC_RES_SKILL" rs-deliver-clean-tree 'Under .auto_test., not over it' \
   "T4.9: the SKILL's Step 5 clause states the layering, first read wins"
 # The single home above declares itself the only place either definition is
@@ -426,7 +426,7 @@ check_has "$SRC_CONV" '^## Caller-supplied context payloads' \
   "T5.1: the shared conventions own the caller-payload rules"
 check_has "$SRC_CONV" 'may gate duplicated work, never a safety gate' \
   "T5.2: the rule is stated in its home"
-for excl in 'Repo Sync' 'gi-secscan' 'already-resolved check' 'Step 5 CI wait' '#36 hard-blocks'; do
+for excl in 'Repo Sync' 'gi-secscan' 'already-resolved check' 'Step 5 CI wait' 'AC and traceability hard-blocks'; do
   check_has "$SRC_CONV" "$excl" \
     "T5.3: the exclusion list names $excl"
 done
@@ -482,7 +482,7 @@ check_block_has "$REVIEWER_INSTR6" 'identifying fields only' \
 check_block_has "$REVIEWER_INSTR6" 'never take acceptance criteria out of it' \
   "T5.20: instruction 6 itself forbids taking acceptance criteria from the payload"
 check_block_has "$REVIEWER_INSTR6" 'always re-fetches the live issue body' \
-  "T5.21: the #36 acceptance_criteria hard-block always re-fetches the live body"
+  "T5.21: the acceptance_criteria hard-block always re-fetches the live body"
 # An instruction is only as good as the reader. The reviewer's block is TRIMMED
 # to number/title/labels at the spawn site, so "identifying fields only" is a
 # property of the data, not a rule an agent has to keep — and no untrusted issue
@@ -522,7 +522,7 @@ check_has "$SRC_CONV" 'may carry the subset that applies to their consumer, neve
 # line-oriented grep misses any weakening whose verb and object land on different
 # lines ("skip the already-resolved\ncheck") — the one guard protecting this
 # boundary must not be defeatable by reflowing a paragraph.
-WEAKEN='(skip|skips|skipped|bypass|bypasses|omit|omits|shorten|shortens|soften|softens|relax|relaxes) (the |both |either )?(Repo Sync|gi-secscan|already-resolved check|Step 5 CI wait|#36 hard-block)'
+WEAKEN='(skip|skips|skipped|bypass|bypasses|omit|omits|shorten|shortens|soften|softens|relax|relaxes) (the |both |either )?(Repo Sync|gi-secscan|already-resolved check|Step 5 CI wait|(AC and traceability |acceptance_criteria )?hard-block)'
 for pair in "resolver:$RESOLVER_PROMPT" "reviewer:$REVIEWER_PROMPT" "batch:$BATCH_PROMPT"; do
   tag="${pair%%:*}"
   blk="${pair#*:}"
@@ -548,13 +548,13 @@ check_lacks "$SRC_AP_PHASES" 'merge-base --is-ancestor' \
 # cannot say what it does on doubt has no degrade path at all.
 # ───────────────────────────────────────────────────────────
 check_block_has "$PAYLOAD_BLOCK" 'Any doubt is .absent.' \
-  "T6.1: the payload gate degrades to today's 0a fetch on any doubt"
-check_block_has "$PAYLOAD_BLOCK" "today's 0a fetch,\s*byte-for-byte" \
-  "T6.2: that degrade is today's pipeline byte-for-byte"
+  "T6.1: the payload gate degrades to 0a's own fetch on any doubt"
+check_block_has "$PAYLOAD_BLOCK" "0a.s own fetch, with no error and no stop" \
+  "T6.2: that degrade is 0a's own fetch, with no error and no stop"
 check_block_has "$TRIAGE_BLOCK" '^Degrade:' \
   "T6.3: the triage_context key names its degrade path"
 check_block_has "$CI_GATE_BLOCK" 'Fail-safe: any doubt is .absent.' \
-  "T6.4: the CI verdict gate degrades to today's full wait on any doubt"
+  "T6.4: the CI verdict gate degrades to the full wait on any doubt"
 check_block_has "$CAPTURE_BLOCK" 'omit that block entirely and spawn without it' \
   "T6.5: an uncapturable payload is omitted, never spawned half-formed"
 
@@ -618,13 +618,13 @@ check_block_has "$B_REVIEWER_PROMPT" "$SAFETY"    "T7.23: built reviewer prompt 
 check_block_has "$B_BATCH_PROMPT"    "$SAFETY"    "T7.24: built batch prompt carries the never-a-safety-gate rule"
 
 check_block_has "$B_PAYLOAD_BLOCK" 'Any doubt is .absent.' \
-  "T7.25: built payload gate degrades to today's 0a fetch on any doubt"
+  "T7.25: built payload gate degrades to 0a's own fetch on any doubt"
 check_block_has "$B_PAYLOAD_BLOCK" '0a.s own two stops are never decided from the payload' \
   "T7.26: built payload gate keeps 0a's closed / not-found stops live"
 check_block_has "$B_TRIAGE_BLOCK" '^Degrade:' \
   "T7.27: built triage_context key names its degrade path"
 check_block_has "$B_CI_GATE_BLOCK" 'Fail-safe: any doubt is .absent.' \
-  "T7.28: built CI verdict gate degrades to today's full wait on any doubt"
+  "T7.28: built CI verdict gate degrades to the full wait on any doubt"
 check_block_has "$B_CAPTURE_BLOCK" 'omit that block entirely and spawn without it' \
   "T7.29: built capture step omits an uncapturable payload"
 
@@ -632,8 +632,8 @@ check_block_has "$B_STATE_BLOCK" 'under .resolve\.auto_test.\*\*, never over it'
   "T7.30: built last-green state layers under resolve.auto_test"
 check_block_has "$B_STATE_BLOCK" 'Fail-safe is .run.' \
   "T7.31: built last-green state fail-safes to running the suite"
-check_block_has "$B_STATE_BLOCK" 'new config key is introduced' \
-  "T7.32: built last-green state introduces no new config key"
+check_block_has "$B_STATE_BLOCK" 'adaptive_effort: false. also forces .run.' \
+  "T7.32: built last-green state reuses the adaptive switch as its off-switch"
 check_block_has "$B_STATE_BLOCK" 'Both sides require a commit-relevant clean tree' \
   "T7.33: built last-green state requires a commit-relevant clean tree"
 check_block_has "$B_STATE_BLOCK" 'recorded green run' \
@@ -647,7 +647,7 @@ check_block_has "$B_REVIEWER_INSTR6" 'identifying fields only' \
 check_block_has "$B_REVIEWER_INSTR6" 'never take acceptance criteria out of it' \
   "T7.37: built instruction 6 forbids taking acceptance criteria from the payload"
 check_block_has "$B_REVIEWER_INSTR6" 'always re-fetches the live issue body' \
-  "T7.38: built reviewer prompt re-fetches the live body for the #36 hard-block"
+  "T7.38: built reviewer prompt re-fetches the live body for the acceptance_criteria hard-block"
 check_block_has  "$B_REVIEWER_PROMPT" '\{issue_payload_ids\}' \
   "T7.36b: built reviewer prompt substitutes the trimmed identifying-fields block"
 check_block_lacks "$B_REVIEWER_PROMPT" '\{issue_payload\}' \

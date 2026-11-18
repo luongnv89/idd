@@ -1,7 +1,7 @@
 # Phase Contracts (detail)
 
-The full prose for Phases 0–6, moved out of SKILL.md to keep it within the context budget.
-SKILL.md carries the contract in condensed form and points here; nothing below is optional.
+The full prose for Phases 0–6. SKILL.md carries the contract in condensed form and points here;
+nothing below is optional.
 
 ## Phase 0 — Preflight (gate)
 
@@ -19,7 +19,8 @@ fix, with the `asm` install command **plus** the command installing `asm` itself
 **Resolve the input here**, by the ordered rules in `references/input-resolution.md`: an explicit
 path wins, then `--from-conversation` (with `--epic <n>`, bind `source.kind=conversation` and
 record the epic number; skip the current-turns intent check), then *both available → ask once*,
-then plan discovery, then conversational fallback, then stop. Record `source.kind` and
+then plan discovery, then conversational fallback, then the requirements-document fallback, then
+stop. Record `source.kind` and
 `source.value` — Phase 3 binds the epic to them. Never guess between candidates, and never fall
 back from an unparseable plan file to the conversation.
 
@@ -44,8 +45,9 @@ breach.
 
 *Completion criteria:* the task count equals `grep -cE '^#{3,4} Task ' <plan>`; every task has an
 id, title, ≥ 1 acceptance criterion, a `Dependencies` value (`None` allowed), and an effort; every
-phase appears with its goal and milestone; the dependency table references only ids in the worklist;
-the critical path is recorded. Any mismatch is a **FAIL** — report the missing ids rather than
+phase appears, with its goal and milestone where the plan states them and `null` where it does not;
+the dependency table references only ids in the worklist; the critical path is recorded when the
+plan states one. Any mismatch is a **FAIL** — report the missing ids rather than
 filing a partial backlog silently.
 
 **`conversation`** — two sub-paths. Fresh (`--from-conversation` without `--epic`): draft from

@@ -226,8 +226,8 @@ for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
     "T4.2c ($tag): the fail-safe list is unparsable + duplicated only"
   check_has "$f" 'unknown extra field is \*not\* doubt' \
     "T4.2d ($tag): SKILL.md says so explicitly rather than leaving it ambiguous"
-  check_has "$f" "today's full pipeline, unchanged" \
-    "T4.3 ($tag): stale and absent run today's full pipeline unchanged"
+  check_has "$f" 'included . the full pipeline' \
+    "T4.3 ($tag): stale and absent run the full pipeline"
 done
 
 check_has "$SRC_LOOP" 'trusted\*\* \*\*iff\*\*|`trusted` \*\*iff\*\*' \
@@ -238,8 +238,8 @@ check_has "$SRC_LOOP" '[Mm]ore than one match.*stale|two markers is ambiguous' \
   "T4.6: more than one marker resolves to stale, never first-match-wins"
 check_has "$SRC_LOOP" 'or extra keys are \*\*ignored, never fatal\*\*' \
   "T4.7: unknown/extra fields are ignored rather than fatal"
-check_has "$SRC_LOOP" 'byte-identical' \
-  "T4.8: stale/absent are documented as byte-identical to today's pipeline"
+check_has "$SRC_LOOP" '`stale` and `absent` run the full pipeline' \
+  "T4.8: stale/absent are documented as running the full pipeline"
 
 # The verdict must be self-invalidating: a pushed fix moves head.
 check_has "$SRC_LOOP" 'self-invalidat' \
@@ -292,10 +292,12 @@ check_has "$SRC_TEMPLATES" '[Nn]o secret-scan field, ever' \
   "T5.2: the producer states the omission as a deliberate rule"
 check_has "$SRC_LOOP" 'no security-scan field, in any spelling, and none may be added' \
   "T5.3: the consumer forbids adding one later"
-check_has "$SRC_TEMPLATES" '#274' \
-  "T5.4: the producer cites #274 as the standing proof"
-check_has "$SRC_LOOP" '#274' \
-  "T5.5: the consumer cites #274 as the standing proof"
+# Neither side cites #274 (a PR disabling the secret scan through its own
+# .idd.yml) by number; both state the rule that ticket proved.
+check_has "$SRC_TEMPLATES" 'repo-controlled input' \
+  "T5.4: the producer states why a security gate must not trust repo-controlled input"
+check_has "$SRC_LOOP" 'repo-controlled input reaching a safety gate' \
+  "T5.5: the consumer states the secret-scan bypass a ticket number used to stand for"
 check_has "$SRC_LOOP" 'forgery is worthless, not impossible|worthless, not impossible' \
   "T5.6: the trust model says forgery is made worthless, not impossible"
 check_has "$SRC_LOOP" 'attacker-controlled' \
@@ -318,7 +320,7 @@ check_block_has "$NEVER_BLOCK" 'there is no diff-confirm mode' \
 check_block_has "$NEVER_BLOCK" 'marking your own homework' \
   "T5.13: the refusal states why — the resolver authored the table being trusted"
 check_block_has "$NEVER_BLOCK" 'hard-blocks' \
-  "T5.14: both #36 hard-blocks keep blocking under trusted"
+  "T5.14: both AC and traceability hard-blocks keep blocking under trusted"
 
 # 5c. The protected call sites carry NO marker conditional. Read each block and
 #     assert the gate variable never appears inside it.
@@ -396,14 +398,14 @@ check_has "$BUILT_LOOP" 'human-authored PR never' \
 # ───────────────────────────────────────────────────────────
 check_has "$SRC_PR" 'review\.adaptive_depth. is .false., skip this gate' \
   "T7.1: review.adaptive_depth=false disables the gate"
-check_has "$SRC_PR" '[Nn]o new config key is introduced' \
-  "T7.2: SKILL.md states no new config key is introduced"
+check_has "$SRC_PR" 'review\.adaptive_depth. is .false., skip this gate: set .qa_handoff = absent.' \
+  "T7.2: SKILL.md reuses review.adaptive_depth as the off-switch"
 check_lacks "$SRC_CONFIG_SCHEMA" 'qa_handoff|qa_trust|handoff_' \
   "T7.3: docs/config-schema.md gained no qa-handoff key"
 check_lacks "$SRC_CONFIG_TEMPLATE" 'qa_handoff|qa_trust|handoff_' \
   "T7.4: the /init-idd template gained no qa-handoff key"
-check_has "$BUILT_PR" '[Nn]o new config key is introduced' \
-  "T7.5: the built SKILL.md ships the no-new-key rule"
+check_has "$BUILT_PR" 'review\.adaptive_depth. is .false., skip this gate: set .qa_handoff = absent.' \
+  "T7.5: the built SKILL.md ships the review.adaptive_depth off-switch"
 
 # Precedence with the pre-existing light|full depth gate, stated once.
 PRECEDENCE_HITS="$(grep -rlE 'Precedence, stated once' "$REPO_ROOT/src" 2>/dev/null || true)"
@@ -520,7 +522,7 @@ check_has "$SRC_PR" 'idd:qa v1 … -->. marker are still present' \
 check_has "$BUILT_PR" 'idd:qa v1' \
   "T11.2: the built SKILL.md ships the preserved-content confirmation"
 
-AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/prompts/reviewer.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 check_has "$AP_PROMPTS" 'QA handoff marker' \

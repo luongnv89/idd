@@ -31,7 +31,7 @@ the *Bundled dependency precheck*, against the skill's directory.
 | `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
 | `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
 
-The traceability flags default to the values shown, preserving the issue #36 contract.
+The traceability flags default to the values shown, so both hard-blocks are on; the cases that excuse a missing `Closes #N` are listed once, under check 1 in `references/verification-checks.md` (*Traceability checks*).
 
 ## Binding the head-ref name
 
@@ -54,8 +54,8 @@ The plain `{branch_name}` placeholder still appears in this skill's **display
 templates** and in **spawn-variable lists** — neither is a shell word, and
 substituting there would only make the output wrong.
 
-This is the same rule already applied at the `gi-secscan` and `gi-branch` call
-sites; the head-ref name is the one untrusted value this skill cannot hand
+The `gi-secscan` call sites bind `base` the same way, with command
+substitution; the head-ref name is the one untrusted value this skill cannot hand
 straight to a script.
 
 ## Depth gate (adaptive review depth)
@@ -94,7 +94,7 @@ rather than a failed read, and this fail-safe **never** stops it. It proceeds to
 Step 3 like any other PR, where `references/verification-checks.md` already
 answers for it: `acceptance_criteria` reports `○ pass — none defined; manual
 review recommended`, traceability check 1 **fails** on the missing `Closes #N`
-(issue #36's canonical case — Step 6 fixes it by editing the PR body) unless the
+(the canonical traceability failure — Step 6 fixes it by editing the PR body) unless the
 *Refactor/chore exemption* applies, and check 2 reports `n/a — no linked issue`.
 Stopping those PRs would suppress the exact finding they exist to produce.
 
@@ -120,7 +120,7 @@ written down:
 
 - **Never proceed with an empty `linked_issue_snapshot` for a PR that links an
   issue.** Step 3 verifies acceptance criteria against that variable, and
-  `acceptance_criteria` is one of the two issue #36 hard-blocks. A dimension
+  `acceptance_criteria` is a hard-block. A dimension
   whose input is empty reports no failed criterion, so it renders as `pass` —
   turning a hard-block into a no-op while the report still shows five green
   dimensions. That `pass` is *correct* for a PR that defines no criteria and a
@@ -141,38 +141,18 @@ class as an exit-3 invalid input, and unlike the missing-`python3` case, which
 has a working second path and therefore degrades.
 
 **When `review.require_acceptance_criteria_check` is `false`, the stop still applies.** <!-- a:rvm-verification-flag-false -->
-The paragraphs above are written for the default configuration, and on the
-opt-out path their reasoning does not hold on its own terms — so this branch is
-decided here rather than left as an unstated consequence. With that flag
-`false`, `references/verification-checks.md` (*Acceptance-criteria
-verification*) skips per-criterion verification entirely and reports
-`○ acceptance_criteria: disabled`, so the hard-block cited
-above never runs. That does not leave the record unread. It still feeds the
-Depth gate signals this same refresh supplies — the `Effort` band taken out of
-`linked_issue_snapshot`, and the labels fetched alongside it — and those do
-fail safe on their own, a missing or ambiguous signal winning → `profile =
-full`. It also still feeds `issue_context`, the linked issue's details and
-acceptance criteria, which both the fixer spawn below and the ui-reviewer spawn
-in `references/ui-review-mechanics.md` receive; neither is gated on this flag,
-and the field is specified as *empty if none*. An unread issue therefore
-reaches them looking exactly like a PR that links no issue — the conflation the
-scope rule at the top of this section exists to prevent. The stop is kept, for
-three reasons:
-
-- **The flag governs reporting, not reading.** It is an opt-out from *verifying*
-  acceptance criteria, not a statement that the linked issue no longer matters
-  to the review. Whether the review boundary's read succeeded is a different
-  question from how one dimension is reported, and no flag answers it.
-- **It keeps the disabled note truthful.** `○ acceptance_criteria: disabled` names
-  exactly one reason the criteria went unverified: the operator switched the
-  check off. Continuing past an unreadable record would print that note while a
-  second, unchosen reason also applied, crediting a deliberate opt-out for a gap
-  nobody opted into. Stopping is what makes the note's single stated cause the
-  whole cause — the consistency `references/verification-checks.md` requires.
-- **The scope distinction is about the read, not the config.** This fail-safe
-  separates *nothing to read* (no linked issue — proceed) from *the read failed*
-  (stop). A configuration flag does not move a PR between those two states, so
-  it is not the thing that decides this branch.
+The flag governs reporting, not reading. With it `false`,
+`references/verification-checks.md` (*Acceptance-criteria verification*) skips
+per-criterion verification and reports `○ acceptance_criteria: disabled`, so the
+hard-block cited above never runs — but the record is still read. It feeds the
+Depth gate's `Effort` band and labels (which fail safe on their own: a missing
+or ambiguous signal → `profile = full`), and `issue_context`, which the fixer
+spawn below and the ui-reviewer spawn in `references/ui-review-mechanics.md`
+receive ungated and which is specified as *empty if none*. An unread issue would
+reach them looking exactly like a PR that links no issue. Continuing would also
+print the `disabled` note while a second, unchosen cause applied, crediting a
+deliberate opt-out for a gap nobody opted into. No flag moves a PR between
+*nothing to read* (no linked issue — proceed) and *the read failed* (stop).
 
 **Placeholder binding at the Depth gate.** SKILL.md's two review-boundary <!-- a:rvm-placeholder-binding -->
 command lines take `{linked_issue}` — the linked issue's number — because `{N}`
@@ -181,30 +161,11 @@ body edit and the Step 3 gate bullet that states it take `{linked_issue}` for
 the same reason: each names a number that gets written into the PR body, and
 `{N}` there would write the PR's own.
 
-The binding is decided per file, not once for the skill, so read every `{N}`
-against the document it sits in. Below, `{N}` means an issue or PR number; the
-counting uses that share the braces — `{N} tests passed`, `{N} checks failed`,
-`Cycle {N}` — are a different placeholder and are not catalogued here.
-
-- `references/verification-checks.md` — the linked issue throughout. That
-  uniformity is exactly why the one string the file hands outward, traceability
-  check 1's suggested fix, has to break with it and say `{linked_issue}`: the
-  fixer receives that string inside `findings_json`, where `{N}` is the PR.
-- `references/ui-review-mechanics.md` and
-  `references/prepass-tests-ci-mechanics.md` — the PR throughout.
-- This file, `references/error-messages.md`, and
-  `references/report-templates.md` — both bindings, mixed. The first two say so
-  where the issue-bound use appears (the rendered stop above; the *Linked issue
-  unreadable* entry's **Placeholders** paragraph).
-  `references/report-templates.md` does not: its `Closes #{N}` and
-  `no commit references #{N}` rows are the issue while `gh pr merge {N}` is the
-  PR, and only the surrounding line distinguishes them. None of it is the
-  suggested-fix payload the fixer receives — these are the report's rendered
-  lines plus the merge command, each read beside the row that names its number
-  — so the ambiguity costs a reader a moment, not a false-passing gate.
-- SKILL.md — the PR, with one prose exception: the *Review Loop*'s restatement
-  of the hard-block, "a missing `Closes #N`". It names the condition, not a
-  command or a fix string, so nothing downstream substitutes it.
+Elsewhere, read each `{N}` from its own line: a PR command (`gh pr …`,
+`/issue-pr-review …`) takes the PR number; a closing keyword, a `Refs` line,
+a commit reference or a `gh issue …` command takes the linked issue. The
+counting uses — `{N} tests passed`, `{N} checks failed`, `Cycle {N}` — are a
+different placeholder.
 
 **What `light` changes in the loop:**
 
@@ -223,7 +184,7 @@ value (default 3): on the `light` path the effective cap is still **1**, never t
 overridden 3. The cap governs **only** the loop iteration count; the cold-start
 reviewer, the fixer, and the fresh confirmation pass below all still apply — a
 `light` review is one review pass + at most one fix + confirmation, not a skipped
-review. The two #36 hard-blocks (`acceptance_criteria: fail`, missing
+review. The AC and traceability hard-blocks (`acceptance_criteria: fail`, missing
 `Closes #N`) are never relaxed by the profile — a trivial PR that fails them still
 blocks soft-pass and does not merge.
 
@@ -255,19 +216,18 @@ whoever opened the PR, so any author can write this marker. Binding `head=` does
 **not** authenticate it either — an author can read their own head SHA and paste
 a matching one. The verdict may gate **only duplicated work** — a second run of
 a check that already ran, unchanged, on this exact commit — and **never a safety
-gate**. Issue **#274** ("A PR can disable the secret-scanning gate via its
-own `.idd.yml`") is the standing proof that this repo can lose a security
-gate to repo-controlled input; that is the failure this design refuses to
-repeat. An edit that lets the marker suppress a secret scan, a CI wait, an
+gate**. A PR that rewrites the `.idd.yml` a secret scan reads can disable that
+scan: repo-controlled input reaching a safety gate is the failure this design
+refuses. An edit that lets the marker suppress a secret scan, a CI wait, an
 acceptance-criteria check, or a traceability check converts a token optimization
 into a bypass. Do not make it.
 
-"Only duplicated work" is not enough by itself (issue #515). A skip is a
+"Only duplicated work" is not enough by itself. A skip is a
 duplicate only if the first run really happened, and the marker cannot show
 that. A forged marker with `tests=<n>@<head>`, plus any unrelated green check
-in the rollup (`ci_leg_runnable` asks only that one exists), used to skip both
+in the rollup (`ci_leg_runnable` asks only that one exists), would skip both
 local test legs, the code UI review and cycle 1 on a commit no suite had ever
-run on. So `trusted` now also requires a **revision receipt**: a record the
+run on. So `trusted` also requires a **revision receipt**: a record the
 resolver writes outside the PR author's reach, for this exact SHA
 (*Verifying the receipt*). A forged marker with no receipt is `stale`, so
 forging the marker buys nothing.
@@ -309,7 +269,7 @@ grep -oE '<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->' <<<"$body"
   SHA verifies and agrees with the marker (*Verifying the receipt*). Any doubt
   ⇒ `stale`.
 
-`stale` and `absent` run today's pipeline **byte-identically** — no step
+`stale` and `absent` run the full pipeline — no step
 shortened, no cycle cap lowered, no pass skipped. A human-authored PR never
 carries the marker, so it is `absent` and is therefore unaffected by this gate in
 every particular.
@@ -378,7 +338,7 @@ is `true` AND that rollup is non-empty; otherwise false (`review.check_ci:
 false`, or an empty/absent/unreadable rollup — the early `no_ci`). An empty
 rollup is ambiguous (just-pushed vs no CI) and fail-safes to RUN the suite.
 When `ci_leg_runnable` is false, ignore `tests=` and run both local test legs
-as if the PR were unmarked. No new config key; Step 5's CI wait stays ungated.
+as if the PR were unmarked. Step 5's CI wait stays ungated.
 
 **`review.ignore_ci_billing_failures` does not enter this predicate — it is
 unchanged by that key, in either direction.** `ci_leg_runnable` asks whether CI
@@ -440,8 +400,7 @@ below — it runs only "after the fix cycle reports zero fixable issues"), so an
 unmarked clean PR already gets exactly one cold-start pass and no confirmation.
 What `trusted` changes is *which* single pass a clean PR gets — the unbiased,
 cold-memory one — not how many. The measured saving is the two duplicated local
-test legs. If the pass returns fixable findings they go to the fixer exactly as
-today; the fixer's commit then moves the head, so the next re-evaluation turns
+test legs. If the pass returns fixable findings they go to the fixer; the fixer's commit then moves the head, so the next re-evaluation turns
 the verdict `stale` and the remaining cycles are the full pipeline again.
 
 ### Re-evaluation after a push <!-- a:rvm-reeval-push -->
@@ -496,7 +455,7 @@ profile, for any marker, at any cycle:
 
 - **Step 2's `gi-secscan` pre-commit scan.** It guards a commit *this skill* is
   about to make from a checked-out untrusted branch. It is a safety gate, and
-  #274 is what happens when repo-controlled input reaches one.
+  repo-controlled input must never reach one.
 - **Step 2's lint/format auto-fix.** It mutates the working tree, so skipping it
   changes the PR's content, not merely the review's cost.
 - **Step 5's CI wait.** CI runs on the remote against the merge result; nothing
@@ -508,7 +467,7 @@ profile, for any marker, at any cycle:
 - **The four traceability checks.** Same reason: they check the body, and the
   body is the untrusted input.
 
-Both #36 hard-blocks — `acceptance_criteria: fail` and a missing `Closes #N` —
+Both hard-blocks — `acceptance_criteria: fail` and a missing `Closes #N` —
 keep blocking soft-pass and merge under `trusted`, exactly as they do under
 `light`.
 
@@ -521,7 +480,7 @@ check, never restored (`references/progress-record-mechanics.md`).
 To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.
 
 - **Cycle 1:** Spawn a new reviewer agent (cold start — reads diff, files, context).
-- **Cycles 2-3:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
+- **Cycles 2+:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
 - **Confirmation pass:** After the fixer reports all issues resolved, spawn a **fresh confirmation reviewer** (separate agent, no memory of prior cycles) for an unbiased final check. This is the only fresh spawn after cycle 1.
 
 This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.

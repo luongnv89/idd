@@ -1,7 +1,5 @@
 # Run Stats Footer
 
-The run-cost footer contract, authored once in `src/shared/references/`.
-
 ## The footer
 
 ```

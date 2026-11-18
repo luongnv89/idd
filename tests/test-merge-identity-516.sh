@@ -342,7 +342,7 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
   rt="$base/issue-pr-review/references/report-templates.md"
   check_has "$rt" 'is the \*Merge floor\*.s `git rev-parse "origin/\$\{base_ref\}"`' \
     "M11.4 (${rt#$REPO_ROOT/}): {floor_base} is the tip the floor fetched and classified"
-  check_has "$base/auto-pilot/references/subagent-prompts.md" '^  `met` returned whole as `met@<sha40>:<sha40>`' \
+  check_has "$base/auto-pilot/references/prompts/reviewer.md" '^  `met` returned whole as `met@<sha40>:<sha40>`' \
     "M11.5 (${base#$REPO_ROOT/}): the auto-pilot reviewer returns the floor's binding"
   anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'pasted only as `met@<40 hex>:<40 hex>`' \
     "M11.6 (${base#$REPO_ROOT/}): only a well-formed floor binding is pasted into the shell"

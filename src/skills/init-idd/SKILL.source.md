@@ -22,8 +22,6 @@ Initialize IDD Stack for the current repository. Scans the codebase to detect la
 - **Avoid** running it every session — it is a one-time setup skill.
 - **Never** modify or delete files outside the repo root, and never commit anything (leave that to the user). Inside it, write only `.idd.yml` and the repo's own `.gitignore` (*Ignore Rule*).
 
-**Context and token budget:** this skill stays small — it reads only a handful of files (`package.json`, `requirements.txt`, etc.) to keep the main agent's context window compact.
-
 ## Instructions
 
 1. Verify prerequisites (git repo present).
@@ -69,9 +67,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/review-contract.md` — report statuses, evidence, uncertainty, decision, format rule
 - `references/merge-strategy-check.md` — optional post-write merge-settings check
 - `references/docs/config-schema.md` — full configuration schema
-- `references/docs/naming-conventions.md` — naming conventions (referenced by generated config)
 - `references/docs/idd-methodology.md` — IDD methodology reference
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/docs/context-threshold.md` — context-threshold check contract
@@ -99,13 +95,13 @@ Each `created` / `added` line is a change; none means `○ already ignored`. Any
 
 ## Configuration Check
 
-This skill GENERATES the config — it does not read one. Check if `.idd.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+This skill writes the config rather than loading it at start; it reads an existing file only for the context threshold below and the merge path. Check if `.idd.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). This skill loads no config, so read `compaction.enabled` (default `true`) and `compaction.threshold.init-idd` (default `40`) from an existing `.idd.yml` when there is one, else use those defaults. Once, right after this check, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with that threshold. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and step only), then continue — no pause; auto mode prints only the `⚠` line.
 
 ### File does NOT exist — always create
 
-When the file is missing (and no legacy `.gitissue.yml` stands in for it — *Legacy names*), **always create it** without prompting. This happens regardless of context — even when the skill is invoked non-interactively from another skill. No early exit, no conditions, no cancel option.
+When the file is missing (and no legacy `.gitissue.yml` stands in for it — *Legacy names*), create it without prompting, including when another skill invokes this one non-interactively.
 
 ```
 ○ No .idd.yml found — generating config...
@@ -180,11 +176,11 @@ replaces the matching table outright.
 
 ### Language Detection
 
-Check for these files in the repo root (or nearby):
+Check for these files anywhere in the repository:
 
 | File | Language |
 |------|----------|
-| `package.json` | JavaScript / TypeScript (check for `"typescript"` in devDependencies to distinguish) |
+| `package.json` | JavaScript, or TypeScript when the file mentions `typescript` anywhere |
 | `requirements.txt`, `pyproject.toml`, `setup.py`, `Pipfile` | Python |
 | `go.mod` | Go |
 | `Cargo.toml` | Rust |
@@ -192,24 +188,24 @@ Check for these files in the repo root (or nearby):
 | `Gemfile` | Ruby |
 | `*.csproj`, `*.sln` | C# |
 
-If several language markers exist, use the one at the repo root. If several are at the root, use the language with the most source files. If none is detected, use empty state.
+If several language markers exist, use the shallowest one; at equal depth, the row that comes first in this table. If none is detected, use empty state.
 
 ### Framework Detection
 
-Parse dependency files to identify frameworks:
+Parse dependency files to identify frameworks. Test the rows in order and take the first match: `next` and `nuxt` come before `react` and `vue` because every Next.js or Nuxt project also depends on those.
 
 | Dependency name | Framework |
 |-----------------|-----------|
-| `react`, `react-dom` | React |
 | `next` | Next.js |
-| `vue` | Vue.js |
 | `nuxt` | Nuxt.js |
 | `angular`, `@angular/core` | Angular |
+| `react`, `react-dom` | React |
+| `vue` | Vue.js |
 | `express` | Express |
 | `fastify` | Fastify |
 | `django` | Django |
-| `flask` | Flask |
 | `fastapi` | FastAPI |
+| `flask` | Flask |
 | `rails`, `railties` | Rails |
 | `spring-boot`, `spring-core` | Spring |
 | `gin-gonic/gin` | Gin |
@@ -251,8 +247,8 @@ Count files in the repository (excluding `.git/`, `node_modules/`, `vendor/`, `_
 | Count | Size |
 |-------|------|
 | < 100 | small |
-| 100 - 1000 | medium |
-| > 1000 | large |
+| 100 – 999 | medium |
+| 1000 or more | large |
 
 Use `git ls-files` for an efficient count (only tracked files), or fall back to a find command excluding common vendor directories.
 
@@ -317,7 +313,7 @@ Write `.idd.yml` to the repo root. The file must include:
 
 ### Template
 
-Use the canonical template at `templates/idd-template.yml` — it contains every field from `docs/config-schema.md` with inline comments. At write time, substitute the placeholder tokens (`{language}`, `{framework}`, `{test_runner}`, `{repo_size}`, `{file_count}`, `{true_or_false}`, `{timeout_value}`, `{stale_value}`) with the values computed in Step 2. Read `templates/idd-template.yml` to see the exact field layout.
+Use the canonical template at `templates/idd-template.yml` — it contains every field from `docs/config-schema.md` with inline comments. At write time, substitute the placeholder tokens (`{language}`, `{framework}`, `{test_runner}`, `{repo_size}`, `{file_count}`, `{true_or_false}`, `{timeout_value}`, `{stale_value}`) with the Step 1 detection results and the Step 2 defaults. Read `templates/idd-template.yml` to see the exact field layout.
 
 In **merge** mode, write the existing file's values plus the missing fields, per the *File exists* rules.
 
@@ -453,7 +449,7 @@ Optional, propose-only. With no user present to approve (a subagent, unattended,
 
 ## Example Runs
 
-Full example outputs for three scenarios (TypeScript + Next.js project, minimal Python project, config-already-exists merge) live in `references/examples.md` — read that file when debugging detection or merge behavior.
+Full example outputs live in `references/examples.md` — read that file when debugging detection or merge behavior.
 
 ---
 
@@ -467,20 +463,17 @@ After a successful run the repo root contains a validated `.idd.yml`, a
 `.gitignore` that ignores `.idd/cache/`, and the terminal prints the *Step 4 —
 Report* block above — the `Validation:` row is the checkable bar: the run only reports `DONE` after the written file parsed as YAML
 with no placeholder tokens left and a `platform` key. Variations (merge mode,
-missing framework, missing test runner) are listed under that step. Grade report
-understanding — findable result, separated facts, traceable claims, clear next
-decision — with the criteria in `references/review-contract.md`.
+missing framework, missing test runner) are listed under that step.
 
 ## Edge Cases
 
 - **Config already exists** (or only legacy `.gitissue.yml`) — interactive runs show an overwrite / merge / cancel prompt; auto mode skips it, takes cancel, and prints the `⚠ Auto mode:` line. Neither prints a diff of detected vs current values, and neither skips the *Ignore Rule*.
-- **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
+- **Unrecognized language** — writes the full template with generic defaults; the Language row prints its `⚠ warn` variant.
 - **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
-- **Empty repo (no source files)** — writes a minimal default config; the Language and Test runner rows print their `⚠ warn` variants.
+- **Empty repo (no source files)** — writes the full template with the small-repo defaults; the Language and Test runner rows print their `⚠ warn` variants.
 
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced by generated config)
 - **`docs/config-schema.md`** — Full configuration schema that this skill generates
-- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
+- **`docs/terminal-style.md`** — Terminal output style contract
