@@ -281,6 +281,10 @@ refused "a reviewer key on a resolver record" issue-resolver 15 '{"findings": {"
 refused "an illegal forward jump (1 → 3)" issue-resolver 15 '{"step": 3}'
 refused "profile full → light" issue-resolver 15 '{"profile": "light"}'
 refused "a branch with shell metacharacters" issue-resolver 15 '{"effect": {"kind": "pr_create", "state": "intent", "key": {"branch": "feat/1-$(touch x)"}}}'
+# The refusal must come from the branch-name screen, not from treating
+# key.branch as a forbidden key — otherwise the case passes for the wrong reason.
+grep -q 'effect.key.branch is not a branch name' "$TMP/err"
+check "S4 the metacharacter branch is refused by the branch-name screen" "$?"
 refused "an unknown effect kind" issue-resolver 15 '{"effect": {"kind": "label", "state": "intent", "key": {}}}'
 refused "a malformed SHA" issue-resolver 15 '{"effect": {"kind": "push", "state": "intent", "key": {"sha": "abc"}}}'
 refused "resume that is not a boolean" issue-resolver 15 '{"resume": "yes"}'
@@ -493,7 +497,7 @@ BADP=""
 for bad in '{"criteria_covered": ["X1"]}' '{"criteria_covered": "AC1"}' '{"criteria_covered": [1]}' \
            '{"criteria": [{"id": "AC1"}]}' '{"criteria": [{"id": "1", "text": "t"}]}' \
            '{"criteria": [{"id": "AC1", "text": "t", "extra": 1}]}' '{"criteria": {"AC1": "t"}}' \
-           '{"selected": {"number": 0}}' '{"criteria_covered": ['"$(python3 -c 'print(",".join(["\"AC1\""] * 101))')"']}'; do
+           '{"selected": {"number": 0}}' '{"selected": {"number": "2"}}' '{"rejected": [{"number": 1.5}]}' '{"criteria_covered": ['"$(python3 -c 'print(",".join(["\"AC1\""] * 101))')"']}'; do
   put "$K" write issue-resolver 40 "{\"step\": 2, \"plan\": $bad}"
   [ "$RC" = 3 ] && [ "$(cat "$K/.git/idd/progress/issue-resolver-40.json")" = "$BEFORE" ] || BADP="$BADP $bad(rc=$RC)"
 done
@@ -504,6 +508,28 @@ gp "$K" --read --skill issue-resolver --number 41
 check "p584c-old-plan-loads: a plan recorded without the criteria fields still loads" "$?"
 put "$K" start issue-resolver 42 '{"step": 2, "number": 5}'
 [ "$RC" = 3 ]; check "p584d-top-number-forbidden: a top-level number stays forbidden (rc=$RC)" "$?"
+
+# ─── p613: a pr_create intent records its key.branch ─────────────────────────
+# effect.key.branch names the PR head the intent creates — effect data, not
+# the record's measured `branch` — so step-0j's documented patch is accepted.
+put "$K" start issue-resolver 43 '{"step": 0}'
+put "$K" write issue-resolver 43 '{"effect": {"kind": "pr_create", "state": "intent", "key": {"branch": "feat/43-pr-create"}}}'; RC1=$RC
+gp "$K" --read --skill issue-resolver --number 43
+[ "$RC1" = 0 ] && [ "$(js 'd["record"]["effect"]["key"]["branch"]')" = "feat/43-pr-create" ] \
+  && [ "$(js 'd["record"]["effect"]["kind"]')" = "pr_create" ]
+check "p613a-pr-create-branch: a pr_create intent with key.branch is recorded and read back (rc=$RC1)" "$?"
+put "$K" start issue-resolver 44 '{"step": 2, "branch": "feat/44-x"}'
+[ "$RC" = 3 ] && grep -q '^✗ gi-progress: branch is never recorded' "$TMP/err"
+check "p613b-top-branch-forbidden: a top-level branch stays forbidden (rc=$RC)" "$?"
+BEFORE="$(cat "$K/.git/idd/progress/issue-resolver-43.json")"
+BADB=""
+for bad in '"Feat/43 Bad"' '42' '""' '"feat/43-x;rm"'; do
+  put "$K" write issue-resolver 43 "{\"effect\": {\"kind\": \"pr_create\", \"state\": \"intent\", \"key\": {\"branch\": $bad}}}"
+  { [ "$RC" = 3 ] && grep -q 'effect.key.branch is not a branch name' "$TMP/err" \
+    && [ "$(cat "$K/.git/idd/progress/issue-resolver-43.json")" = "$BEFORE" ]; } || BADB="$BADB $bad(rc=$RC)"
+done
+[ -z "$BADB" ]; check "p613c-pr-create-branch-malformed: an invalid key.branch exits 3 and writes nothing${BADB:+ (accepted:$BADB)}" "$?"
+
 # The resumed gate: the recorded criteria against a body whose AC2 was edited
 # between sessions. Same count, same IDs — only the renumber check catches it.
 gp "$K" --read --skill issue-resolver --number 40
