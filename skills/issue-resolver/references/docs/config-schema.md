@@ -341,7 +341,7 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `triage.route.comment` | `false` | Route mode posts one comment |
 | `triage.route.label` | `false` | Route mode adds its label — the only route signal `/auto-pilot` and `/issue-resolver` read |
 | `triage.route.label_prefix` | `"route:"` | Route label prefix; must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,38}` |
-| `triage.route.questions` | all six | Route questions; distinct ids, each fullmatching `[a-z]+` |
+| `triage.route.questions` | all six | Route questions; a non-empty list of distinct ids, each fullmatching `[a-z]+` |
 | `projects.sync_enabled` | `false` | Enable project board sync |
 | `projects.project_number` | `null` | Explicit project number (null = auto-detect) |
 | `projects.status_field` | `"Status"` | Name of the Status field on the board |

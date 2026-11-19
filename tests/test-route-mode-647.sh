@@ -315,7 +315,7 @@ questions_rc() {
 for schema in "$FULL" "$EXCERPT"; do
   view="full"; [ "$schema" = "$EXCERPT" ] && view="excerpt"
   for bad in '["scope; id", "injection", "clarity", "criteria"]' '["$(id)", "injection", "clarity", "criteria"]' \
-             '"scope"' '[scope, scope, injection, clarity, criteria]'; do
+             '"scope"' '[scope, scope, injection, clarity, criteria]' '[]'; do
     rc="$(questions_rc "$bad" "$schema")"
     if [ "$rc" = 3 ] && grep -qF 'triage.route.questions' "$TMP/perr"; then
       pass "T8.1 $view: questions ${bad:0:14} is exit 3 naming the key"
@@ -329,7 +329,7 @@ done
 for f in "$MODE" "$ROOT/skills/issue-triage/references/route-mode.md"; do
   label_line="$(grep -F 'Confirm with `gh issue view {N} --json labels`' "$f")"
   case "$label_line" in
-    *'After each label add or removal on #N, run `rm -f .idd/cache/issue-{N}-*.json`'*'gi-backlog.py --invalidate`'*)
+    *'After each label add or removal on #N, run `find .idd/cache -name '\''issue-{N}-*.json'\'' -delete`'*'gi-backlog.py --invalidate`'*)
       pass "T8.3 ${f#"$ROOT"/}: a label write drops the issue cache and the backlog snapshot" ;;
     *) fail "T8.3 ${f#"$ROOT"/}: no cache invalidation after the label write" ;;
   esac

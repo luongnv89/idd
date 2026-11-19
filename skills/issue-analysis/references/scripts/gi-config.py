@@ -494,11 +494,12 @@ def merge(
         ids = accepted[_ROUTE_QUESTIONS]
         if (
             not isinstance(ids, list)
+            or not ids
             or not all(isinstance(i, str) and _ROUTE_QUESTION_RE.fullmatch(i) for i in ids)
             or len(set(ids)) != len(ids)
         ):
             errors.append(
-                f"{_ROUTE_QUESTIONS} — must be a list of distinct lowercase-letter ids"
+                f"{_ROUTE_QUESTIONS} — must be a non-empty list of distinct lowercase-letter ids"
             )
 
     merged = {**defaults, **accepted}

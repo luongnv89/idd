@@ -6,7 +6,7 @@ Route mode answers closed questions about each issue and turns the answers into 
 
 `triage.route.label_prefix` goes on a `gh` command line, so it must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,38}`. `gi-config.py` refuses anything else at config load (exit 3, stopping every skill); check it here for the manual config read. A failing prefix is *Invalid route config*: stop.
 
-Check that `triage.route.questions` holds distinct ids matching `^[a-z]+$` (anything else is *Invalid route config*: stop; `gi-config.py` refuses it too), then pass the ids as separate words — the default list shown:
+Check that `triage.route.questions` is a non-empty list of distinct ids matching `^[a-z]+$` (anything else is *Invalid route config*: stop; `gi-config.py` refuses it too), then pass the ids as separate words — the default list shown:
 
 ```bash
 python3 references/scripts/gi-route.py --questions --enabled scope clarity criteria duplicate size injection
@@ -46,7 +46,7 @@ With `triage.route.label` and `triage.route.comment` both false (the defaults), 
 - **Labels are only added.** Route mode never removes `{prefix}needs-human`, `{prefix}needs-info`, `{prefix}duplicate` or any other label; its one removal is its own `{prefix}agent-ready` when the new route is stricter (`gh issue edit {N} --remove-label "{prefix}agent-ready"`).
 - **Never add `{prefix}agent-ready` while a restrictive route label is on the issue** — print `⚠ #N keeps {label} — a human removes it to re-route`. The label is the verdict; a human clears it.
 - **`{prefix}agent-ready` grants nothing.** No consumer reads it as permission: `/auto-pilot` and `/issue-resolver` read only the three restrictive labels.
-- Add with `gh issue edit {N} --add-label "{prefix}{route}"`. If that fails, run `gh label create "{prefix}{route}"` whatever it returns, then retry the add once. Confirm with `gh issue view {N} --json labels`: the route label is present and, after a removal, `{prefix}agent-ready` is gone. After each label add or removal on #N, run `rm -f .idd/cache/issue-{N}-*.json` (gi-issue's cache files) and `python3 references/scripts/gi-backlog.py --invalidate`, so a consumer's cached read sees the new label.
+- Add with `gh issue edit {N} --add-label "{prefix}{route}"`. If that fails, run `gh label create "{prefix}{route}"` whatever it returns, then retry the add once. Confirm with `gh issue view {N} --json labels`: the route label is present and, after a removal, `{prefix}agent-ready` is gone. After each label add or removal on #N, run `find .idd/cache -name 'issue-{N}-*.json' -delete` (gi-issue's cache files) and `python3 references/scripts/gi-backlog.py --invalidate`, so a consumer's cached read sees the new label.
 
 **Comment** (`triage.route.comment: true`): post only the script's `comment` field. Skip when the latest `<!-- idd:route v1` comment by `gh api user --jq .login` (unreadable: post nothing) in `gh issue view {N} --json comments` carries the same `route=`. Otherwise write the field to `.idd/cache/route-{N}.md` with the Write tool, run `gh issue comment {N} --body-file .idd/cache/route-{N}.md`, and delete the file.
 
