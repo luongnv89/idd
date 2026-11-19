@@ -357,8 +357,8 @@ metacharacters, and it is the only free-form config **string** in the
 distribution that reaches a command line unchecked by `gi-config.py`.
 `review.merge_method` reaches one too, but
 `gi-config.py` accepts only `squash`, `merge` or `rebase` for it, and it
-shape-checks `triage.route.label_prefix`, the other free-form string; every
-other substituted config value is an integer. The
+shape-checks the other free-form values, `triage.route.label_prefix` and each
+`triage.route.questions` id; every other substituted config value is an integer. The
 double quotes above stop word-splitting and globbing but do **not** neutralize
 `$(…)` or a backtick, so the check is what makes the substitution safe. Anything
 else is the first degrade path below: skip the write and continue.

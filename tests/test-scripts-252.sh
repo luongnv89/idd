@@ -1293,7 +1293,9 @@ EXPECTED_SITES = {
     # snapshot, and /issue-creator Step 6 invalidates it after each create.
     # 3 since issue #553: /issue-triage Step 1 re-reads that snapshot into
     # gi-ready.py for the readiness check.
-    "gi-backlog.py": 3,
+    # 4 since issue #647: /issue-triage route mode invalidates the snapshot
+    # after each route-label write.
+    "gi-backlog.py": 4,
     # 3 since issue #502: /plan-to-issues Phase 5 renders the epic plan map.
     "gi-plan-map.py": 3,
     # 3 since issue #515: the resolver writes the revision receipt at Deliver;
