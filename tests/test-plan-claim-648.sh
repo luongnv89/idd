@@ -22,6 +22,8 @@
 #   T6  The four issue-resolver eval cases replay end to end.
 #   T7  Released claims, non-writer markers, a bound resume's own earlier
 #       marker and an unreadable login never orphan or block a claim.
+#   T8  A newer writer's plan supersedes ours, a killed release resumes, and
+#       two live claims never both read own.
 #
 # Usage: bash tests/test-plan-claim-648.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -457,6 +459,63 @@ PY
 hasflat "$DOC" "post this run's *Release comment* (its marker lost, so it must not race a later claim)" \
   "T7.18 a run that lost the race closes its own marker"
 grep -qF 'or wait' "$DOC" && fail "T7.19 the doc still offers waiting out a claim" || pass "T7.19 the doc no longer offers waiting as a remedy"
+
+# ── T8: superseded plans, a killed release, no double own ─────────────────
+echo "  ┄ superseded plans, killed release, symmetric tie-break"
+# F3 — the label approves the newest plan on the issue, not this login's older one.
+python3 "$PLAN" render-release --run r2 --branch feat/648-b > "$TMP/rel-r2.md"
+python3 "$PLAN" render-plan < "$TMP/in-tasks.json" --issue "$TMP/body.json" > "$TMP/plan-p2.md"
+issue "$TMP/i-s1.json" - "plan-approved" "bot|2026-11-19T10:00:00Z|$TMP/plan.md|OWNER" "alice|2026-11-19T11:00:00Z|$TMP/plan-p2.md|OWNER"
+chk "$TMP/i-s1.json" --login bot
+got="$(field "$TMP/out.json" 'json.dumps([d["plan"], d["superseded"], d["approved"]])')"
+[ "$got" = '["stale", true, false]' ] \
+  && pass "T8.1 test_newer_writer_plan_supersedes: another writer's newer plan makes ours stale and unapproved" \
+  || fail "T8.1 test_newer_writer_plan_supersedes: got $got"
+for assoc in MEMBER COLLABORATOR ""; do
+  spec="alice|2026-11-19T11:00:00Z|$TMP/plan-p2.md"; [ -n "$assoc" ] && spec="$spec|$assoc"
+  issue "$TMP/i-s2.json" - "plan-approved" "bot|2026-11-19T10:00:00Z|$TMP/plan.md" "$spec"
+  chk "$TMP/i-s2.json" --login bot
+  [ "$(field "$TMP/out.json" 'd["approved"]')" = False ] \
+    && pass "T8.2 a newer plan by a ${assoc:-unknown-association} account supersedes (fail closed)" || fail "T8.2 ${assoc:-unknown} did not supersede"
+done
+issue "$TMP/i-s3.json" - "plan-approved" "bot|2026-11-19T10:00:00Z|$TMP/plan.md" "mallory|2026-11-19T11:00:00Z|$TMP/plan-p2.md|NONE"
+chk "$TMP/i-s3.json" --login bot
+[ "$(field "$TMP/out.json" 'json.dumps([d["plan"], d["superseded"], d["approved"]])')" = '["current", false, true]' ] \
+  && pass "T8.3 a plan marker by an account without write access supersedes nothing" || fail "T8.3"
+issue "$TMP/i-s4.json" - "plan-approved" "alice|2026-11-19T09:00:00Z|$TMP/plan-p2.md|OWNER" "bot|2026-11-19T10:00:00Z|$TMP/plan.md"
+chk "$TMP/i-s4.json" --login bot
+[ "$(field "$TMP/out.json" 'json.dumps([d["plan"], d["approved"]])')" = '["current", true]' ] \
+  && pass "T8.4 an older plan by another writer leaves our newer plan current" || fail "T8.4"
+hasflat "$DOC" 'The label approves the newest plan on the issue' "T8.5 the doc binds approval to the newest plan"
+# F4 — killed between the release comment and the label removal.
+python3 "$PLAN" render-release --run r1 --branch feat/648-b > "$TMP/rel-r1b.md"
+issue "$TMP/i-k.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r1b.md" "me|2026-11-19T11:00:00Z|$TMP/rel-r1b.md"
+chk "$TMP/i-k.json" --login me --run r2 --branch feat/648-b
+a="$(field "$TMP/out.json" 'json.dumps([d["claim"], d["claim_run"]])')"
+chk "$TMP/i-k.json" --login me --run r2
+b="$(field "$TMP/out.json" 'd["claim"]')"
+[ "$a/$b" = '["own", "r1"]/foreign' ] \
+  && pass "T8.6 test_killed_release_resumes: a bound resume still owns a label whose own marker it closed; a fresh run does not" \
+  || fail "T8.6 test_killed_release_resumes: --branch=$a fresh=$b"
+issue "$TMP/i-k2.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r1b.md" "me|2026-11-19T11:00:00Z|$TMP/rel-r1b.md" "you|2026-11-19T11:05:00Z|$TMP/c-r2.md"
+chk "$TMP/i-k2.json" --login me --run r3 --branch feat/648-b
+[ "$(field "$TMP/out.json" 'd["claim"]')" = foreign ] \
+  && pass "T8.7 a live marker by another run keeps the killed release's label foreign" || fail "T8.7"
+issue "$TMP/i-k3.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r1b.md" "me|2026-11-19T11:00:00Z|$TMP/rel-r1b.md"
+chk "$TMP/i-k3.json" --login me --run r3 --branch feat/648-other
+[ "$(field "$TMP/out.json" 'd["claim"]')" = foreign ] \
+  && pass "T8.8 a closed marker for another branch is not this resume's" || fail "T8.8"
+hasflat "$RS/references/steps/step-0j-resume.md" "the bound resume's read — 0c's included — still says \`own\`" \
+  "T8.9 the label_edit row recovers a killed release through 0c"
+# N2 — two live claims more than the window apart never both read own.
+issue "$TMP/i-n.json" - "agent:working" "alice|2026-11-19T10:00:00Z|$TMP/c-r1.md" "bob|2026-11-19T10:12:00Z|$TMP/c-r2.md"
+a="$(claim_of "$TMP/i-n.json" alice r1)"; b="$(claim_of "$TMP/i-n.json" bob r2)"
+[ "$a/$b" = foreign/own ] \
+  && pass "T8.10 test_no_double_own: markers 12 minutes apart — the later live claim owns, the earlier yields" \
+  || fail "T8.10 test_no_double_own: alice=$a bob=$b"
+issue "$TMP/i-n2.json" - "agent:working" "alice|2026-11-19T10:00:00Z|$TMP/c-r1.md" "bob|2026-11-19T10:12:00Z|$TMP/c-r2.md" "bob|2026-11-19T10:20:00Z|$TMP/rel-r2.md"
+[ "$(claim_of "$TMP/i-n2.json" alice r1)" = own ] \
+  && pass "T8.11 a later claim that was released no longer makes us yield" || fail "T8.11"
 
 # ── T4: wiring pins ────────────────────────────────────────────────────────
 echo "  ┄ wiring"
