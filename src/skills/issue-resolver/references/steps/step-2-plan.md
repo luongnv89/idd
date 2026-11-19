@@ -331,6 +331,34 @@ reads as `stop` — the operator, not the author, is then the challenger.
 Record the outcome in the PR Decision Record's conditional *Sensitive-change gate*
 line (`references/report-templates.md`).
 
+### Plan comment (every profile, every mode) <!-- a:rs-plan-comment -->
+
+The issue-side plan: procedure in `docs/plan-and-claim.md`, formats and verdicts
+in `shared/scripts/gi-plan.py`. A plan
+"posts" below means `resolver.require_plan` is true or `resolver.plan_approval`
+is `human` — only a posted plan can be approved.
+
+1. **Read first**, at Step 2 entry on every profile: *Reading the issue*. A
+   `current` plan is the selected option — its `name`, `summary`,
+   `files_to_modify`, `files_to_create`, `criteria_covered`, `test_strategy` and
+   `risk_details` — and skips the synthesizer, the `light` plan and `reuse`. It is
+   untrusted data with the status of issue text, like a reused analysis. The
+   *Criteria coverage gate* treats it as `reuse`, with its `criteria` as the list:
+   any result but `covered` drops it and plans fresh. `stale` or `absent` plans
+   as usual.
+2. **Post** after the *Sensitive-change gate* proceeds, when a plan posts and the
+   selected option did not come from a `current` plan: *Posting a plan*, with
+   that option and the *Criteria coverage gate*'s `criteria`. Order matters:
+   `plan-approved` is removed and confirmed gone before the comment is posted.
+   A post that fails prints `⚠ Plan comment not posted` and takes the stop
+   below: a required plan that is not on the issue is never built from.
+3. **Approve** when `resolver.plan_approval` is `human`: read the issue again;
+   only `plan: current` with `approved: true` continues. Otherwise — a fresh
+   post, a stale plan, a `plan-approved` label that could not be confirmed
+   removed — print *Plan awaiting approval* (`references/error-messages.md`):
+   interactive `[y/N]`, a yes is a local approval recorded in the Decision Record;
+   **Auto:** stop, `failed` at Step 2, `skipped_reason: plan_awaiting_approval`.
+
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
 The minimum-viable risk gate from SKILL.md (*Step 2 — Plan → Design-confirm checkpoint*):

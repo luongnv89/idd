@@ -117,6 +117,29 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Issue labels include `triage.route.label_prefix` + `needs-human` (default `route:needs-human`).
 **Auto:** takes the default No — stop, `skipped_reason: route_needs_human`. <!-- auto:no -->
 
+### Claimed elsewhere
+```
+⚠ Issue #N is claimed by run {claim_run} on {claim_branch} ({claim_age})
+
+  Another agent may be working on it; a claim never expires on its own.
+  To release:  gh issue edit N --remove-label "{claim_label}"
+  Continue anyway? [y/N]
+```
+**Trigger:** `gi-plan.py check` reads `claim: foreign` at *0c* or in the *Claim write* (`references/docs/plan-and-claim.md`). A yes continues without a claim and never removes the label.
+**Auto:** takes the default No — stop, `skipped_reason: claimed_elsewhere`. <!-- auto:no -->
+
+### Plan awaiting approval
+```
+⚠ Plan for issue #N awaits approval
+
+  The plan comment must be current, and under resolver.plan_approval:
+  human approved with the plan-approved label. Then run
+  /issue-resolver N again.
+  Approve it here and continue? [y/N]
+```
+**Trigger:** Step 2's *Plan comment*: a plan that had to post could not be posted, or, under `human`, no `current` plan with `approved: true` — a fresh post, a stale plan, or a `plan-approved` label that could not be confirmed removed.
+**Auto:** takes the default No — stop, `skipped_reason: plan_awaiting_approval`. <!-- auto:no -->
+
 ### Issue needs clarification
 ```
 ⚠ Issue #N needs clarification: {reasons}

@@ -36,6 +36,12 @@ Reading it as a degrade inverts the verdict and pushes the secret. The one excep
 exit 1 with no parsable JSON on stdout — that is a crash, not a verdict, and is handled
 as exit 2.
 
+### Claim release
+
+Right after `gh pr create` succeeds, release the claim (*Release* in
+`references/docs/plan-and-claim.md`): only a claim that reads `own` is removed, and a failed
+release is a `⚠` that never changes the outcome.
+
 ### Progress record at Deliver
 
 Write each effect's intent to the progress record **before** the effect — the push,

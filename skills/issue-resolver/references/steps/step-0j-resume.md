@@ -155,9 +155,11 @@ repeated, so a resume never duplicates it:
 | `push` (Step 5) | `gh pr view {pr_number} --json headRefOid,isCrossRepository,headRepositoryOwner`, once a PR exists | `headRefOid` equals the local HEAD. A re-push is idempotent, but always behind a fresh `gi-secscan` pass |
 | `pr_create` (Step 5) | `gh pr list --head "$branch_name" --state all --json number,state,headRefName,headRefOid,isCrossRepository,headRepositoryOwner` | an `OPEN` PR on the recorded branch with `isCrossRepository: false` and `headRefOid` equal to the local HEAD → adopt its number and skip `gh pr create`. A matching `CLOSED` PR → stop and report; never open a second PR |
 | `run_log` | — | `closing` is recorded → never append again |
+| `label_edit` (claim, release) | `gh issue view {N} --json labels` | the label's presence matches `key.op` (`add`: on the issue; `remove`: gone). An `add` not done re-runs the *Claim write* from its first read; a `remove` not done re-runs the *Release* (`references/docs/plan-and-claim.md`) |
 
-**No label edit exists in this skill today; a future one must add an intent row
-here.**
+**Every label edit in this skill is the `label_edit` row above; a new one must
+record an intent the same way.** A bound resume passes `--branch "$branch_name"`
+to every claim read, so its own claim reads `own`.
 
 **0b ownership exception.** On a resume, 0b's open-PR list also reads
 `headRefOid,isCrossRepository,headRepositoryOwner`. An open PR that targets the
