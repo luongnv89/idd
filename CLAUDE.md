@@ -60,7 +60,8 @@ src/
 │       ├── gi-gh.py               # Shared subprocess boundary for GitHub CLI calls
 │       ├── gi-stats.py            # Read-only run outcomes + post-merge look-back report
 │       ├── gi-ready.py            # Judge whether an issue is ready for an unattended resolve
-│       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
+│       ├── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
+│       └── gi-route.py            # Route mode: closed-question answers → one route (routing table)
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
 │       ├── practice-packs.md      # Practice-pack selection (issue-resolver, issue-pr-review)
 │       ├── practice-*.md          # Eight per-domain practice checklists
