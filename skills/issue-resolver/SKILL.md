@@ -4,7 +4,7 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.21.1
+  version: 0.22.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: max
 ---
@@ -149,6 +149,8 @@ references/scripts/gi-recipe.py
 references/scripts/gi-progress.py
 references/scripts/gi-ready.py
 ```
+
+The practice packs, checked the same way: `references/practice-packs.md`, `references/practice-tests.md`, `references/practice-code.md`, `references/practice-performance.md`, `references/practice-security.md`, `references/practice-frontend.md`, `references/practice-ci-cd.md`, `references/practice-cli.md`, `references/practice-docs.md`.
 
 ---
 
@@ -296,7 +298,7 @@ Size never exempts a change. Once an option is selected, `references/scripts/gi-
 
 Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/steps/step-3-implement.md` (*Step 3 — Propose relevant skills*).
 
-Then spawn the implementer (`references/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*; `light`: profile table in *Step 0g*.
+Then spawn the implementer (`references/agents/implementer.md`) with the plan, branch name, naming conventions, `selected_skills` and the *Step 3 — Practice packs*. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*; `light`: profile table in *Step 0g*.
 
 ---
 
@@ -326,7 +328,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Update documentation
 
-Update every passage in `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings that describes a user-visible name the diff changes (a command, flag, config key, public function or output string), and add a `CHANGELOG` entry if that file exists. With nothing to update, record `docs: none found` in the Evidence row.
+Update every passage in `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings that describes a user-visible name the diff changes (a command, flag, config key, public function or output string), by the rules in `references/practice-docs.md`, and add a `CHANGELOG` entry if that file exists. With nothing to update, record `docs: none found` in the Evidence row.
 
 ### Push branch and create PR
 

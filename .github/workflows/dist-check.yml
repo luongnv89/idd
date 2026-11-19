@@ -468,6 +468,9 @@ jobs:
       - name: test-plan-to-issues-prd-fallback-643
         run: bash tests/test-plan-to-issues-prd-fallback-643.sh
 
+      - name: test-practice-packs-649
+        run: bash tests/test-practice-packs-649.sh
+
       - name: test-runs-jsonl
         run: bash tests/test-runs-jsonl.sh
 

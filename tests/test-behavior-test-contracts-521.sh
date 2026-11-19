@@ -142,7 +142,7 @@ anchor_check_flat "$STEP3" rs-test-sensitivity 'no blanket ban' \
   "B5: Step 3 states removal is justified, not banned"
 anchor_check_flat "$STEP3" rs-test-sensitivity '\*\*Auto mode never blocks:\*\*.*`not_verified`' \
   "B5: Step 3 never blocks auto mode"
-anchor_check_flat "$STEP4" rs-step4-qa 'bind `\{pr_context\}` to the issue.s acceptance criteria, the selected plan and the implementer.s \*Test Integrity\* record' \
+anchor_check_flat "$STEP4" rs-step4-qa 'bind `\{pr_context\}` to the issue.s acceptance criteria, the selected plan and the implementer.s \*Test Integrity\* and \*Practices\* records' \
   "B5: Step 4 gives the reviewer the criteria and the Test Integrity record"
 grep -qF 'Sensitive: <test> fails with <mutation> → restored green' "$TEMPLATES"
 check "B5: the PR body cites sensitivity evidence per criterion" "$?"

@@ -122,12 +122,12 @@ only when QA exited clean in this session. A resume never pops a stash that
 `/auto-pilot` made.
 
 **Provenance a `k` = 4 resume cannot restore.** Step 3's implementer is the
-only producer of the *Sensitivity* and *Test Integrity* records, and neither is
+only producer of the *Sensitivity*, *Test Integrity* and *Practices* records, and none is
 recorded. At `k` = 4 Step 3 is skipped, so the Step 4 reviewer's `{pr_context}`
 carries the acceptance criteria and the restored plan but no *Test Integrity*
 record: the reviewer checks each removed or weakened test against the plan and
 the branch's commit messages instead. The PR body's *Test integrity* and
-*Sensitivity* entries read `not restored (resumed at QA)`, and every criterion
+*Sensitivity* entries read `not restored (resumed at QA)`, *Residual risk* reads `practice departures: not restored (resumed at QA)`, and every criterion
 whose evidence would cite a *Sensitivity* row is `unverified`.
 
 ### Monotone restore <!-- a:rs-0j-monotone -->

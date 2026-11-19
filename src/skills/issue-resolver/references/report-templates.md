@@ -25,7 +25,7 @@ Closes #{issue_number}
 - **Options considered:** Option 1 — {name}; Option 2 — {name}; Option 3 — {name}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
-- **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
+- **Residual risk:** {what remains uncertain or accepted as known limitation, including each practice-pack departure the implementer reported, or "none identified"}
 - **Effort profile:** {"light — fast path (pre-work Effort {band}); synthesis skipped, QA capped at 1 cycle" when the run used the light profile; omit this line entirely on the full profile — the default — so it appears only when the fast path actually fired}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
 - **Sensitive-change gate:** {only when it triggered — "triggered by {reasons}; probes {id held | id → test obligation}; blockers {id amended+cleared | id rebutted ({citation})}; verdict {proceed | stop | operator override}"; omit this line when it did not trigger}
