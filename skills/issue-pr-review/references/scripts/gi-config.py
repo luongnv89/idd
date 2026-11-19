@@ -50,7 +50,7 @@ accepted value outside squash, merge and rebase is exit 3, in view or not.
 and `._:-` (fullmatch), else exit 3, in view or not. 39 keeps the longest
 route label within GitHub's 50-character limit; a leading `-` would read as a
 flag. `triage.route.questions` is passed to `gi-route.py --enabled` as separate
-words, so it must be a list of distinct strings that each fullmatch `[a-z]+`,
+words, so it must be a non-empty list of distinct strings that each fullmatch `[a-z]+`,
 else exit 3, in view or not; gi-route.py owns which ids exist and are required.
 
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working

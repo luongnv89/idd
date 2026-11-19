@@ -166,7 +166,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  {fix for that key}
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** `{key}` = `triage.route.questions` — an id fails `^[a-z]+$`, or `gi-route.py --questions --enabled` exits 3; fix: keep injection, clarity and criteria in the list. `{key}` = `triage.route.label_prefix` — the prefix fails the check in `references/route-mode.md` (§1); fix: match that check. A **stop**.
+**Trigger:** `{key}` = `triage.route.questions` — the list fails the check in `references/route-mode.md` (§1), or `gi-route.py --questions --enabled` exits 3; fix: match that check and keep injection, clarity and criteria in the list. `{key}` = `triage.route.label_prefix` — the prefix fails the check in `references/route-mode.md` (§1); fix: match that check. A **stop**.
 
 ### Route answers rejected
 ```
