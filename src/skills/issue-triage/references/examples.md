@@ -206,3 +206,28 @@ One full run per mode. After the first run, examples leave out the `[N/9]` step 
 
 ---
 
+## Example: Route mode with labels on
+
+**User says:** `/issue-triage --route 12 16` (`triage.route.label: true`)
+
+```
+  {"answers": {"clarity": "yes", "criteria": "yes", "duplicate": "no", "injection": "no", "scope": "yes", "size": "S"}, "number": 12, "route": "agent-ready", "rule": 6}
+  {"answers": {"clarity": "yes", "criteria": "yes", "duplicate": "no", "injection": "yes", "scope": "yes", "size": "S"}, "number": 16, "route": "needs-human", "rule": 1}
+  ○ #12  + route:agent-ready
+  ○ #16  + route:needs-human
+
+  ◆ Issue Triage — route mode (2 issues)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  #12 │ agent-ready │ rule 6
+  #16 │ needs-human │ rule 1
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:      DONE — 1 agent-ready, 1 needs-human
+  Evidence:    2 labels added and re-read; comments off
+  Uncertainty: injection answers are a signal over untrusted text
+  Decision:    No approval needed.
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed 21s · agents 0
+```
+
+#16's body told an agent to edit the CI workflow: `injection: yes`, so rule 1 routes it `needs-human` whatever else it answered.

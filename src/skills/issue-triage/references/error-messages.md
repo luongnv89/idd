@@ -155,6 +155,39 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** `gi-triage-graph.py` exits 3 — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, or an out-of-range `triage.*` value. This is a **stop**, never a degrade: the scan is wrong, and computing the same order by hand would compute it from the same wrong input.
 
+## Route mode
+
+### Invalid route config
+```
+✗ Invalid route config: triage.route.questions
+
+  {reason from gi-route on stderr}
+
+  To fix:  keep injection, clarity and criteria in the list
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** an id fails `^[a-z]+$`, or `gi-route.py --questions --enabled` exits 3. A **stop**.
+
+### Route answers rejected
+```
+⚠ #{N} answers rejected — routed needs-human: {reason}
+```
+**Trigger:** a judge call exits 3. No comment, never `{prefix}agent-ready`; the run continues.
+
+### gi-route unavailable
+```
+⚠ gi-route unavailable — routing needs-human
+```
+**Trigger:** no `python3`, an exit other than 0 or 3, or unparsable stdout. No comment (only the script renders one), never `{prefix}agent-ready`.
+
+### Route write failed
+```
+⚠ Could not write the route for #{N}: {label | comment}
+
+  To fix:  check write access: gh repo view --json viewerPermission
+```
+**Trigger:** a route-mode `gh issue edit`, `gh label create` or `gh issue comment` fails, or the re-read lacks the label. The run continues.
+
 ## Configuration
 
 ### Invalid config
