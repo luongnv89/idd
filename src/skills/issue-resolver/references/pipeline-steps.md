@@ -99,7 +99,7 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 
 | Step | Auto behavior |
 |------|---------------|
-| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `needs_clarification`. |
+| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label, a `route:needs-human` label or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `route_needs_human` / `needs_clarification`. |
 | *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |

@@ -183,6 +183,7 @@ Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` 
 
 - **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` runs sequentially.
 - **Quarantine label:** add it to the effective `skip_labels` at config load, so picks skip quarantined issues.
+- **Route labels:** add `{prefix}needs-human`, `{prefix}needs-info` and `{prefix}duplicate` (`{prefix}` = `triage.route.label_prefix`, default `route:`) to the effective `skip_labels` at config load, so picks and explicit lists skip what `/issue-triage --route` held back. `{prefix}agent-ready` grants nothing and is never read.
 
 ### Merge Modes
 
