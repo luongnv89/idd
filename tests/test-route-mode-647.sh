@@ -303,6 +303,38 @@ has "$AP/references/phases/phase-1-triage-pick.md" 'The route labels — `{prefi
   "T7.11 the pick-phase skip_labels paragraph covers the route labels"
 has "$ROOT/docs/config-schema.md" 'the only route signal `/auto-pilot` and `/issue-resolver` read' "T7.12 config-schema documents the label-only gate"
 
+# ── T8: questions guard and cache invalidation after a label write ────────
+# questions_rc <yaml-value> <schema> — the ids become words of `gi-route.py --enabled`
+questions_rc() {
+  mkdir -p "$TMP/cfg"
+  printf 'triage:\n  route:\n    questions: %s\n' "$1" > "$TMP/cfg/.idd.yml"
+  local rc=0
+  (cd "$TMP/cfg" && python3 "$CONFIG" --schema "$2" >/dev/null 2>"$TMP/perr") || rc=$?
+  echo "$rc"
+}
+for schema in "$FULL" "$EXCERPT"; do
+  view="full"; [ "$schema" = "$EXCERPT" ] && view="excerpt"
+  for bad in '["scope; id", "injection", "clarity", "criteria"]' '["$(id)", "injection", "clarity", "criteria"]' \
+             '"scope"' '[scope, scope, injection, clarity, criteria]'; do
+    rc="$(questions_rc "$bad" "$schema")"
+    if [ "$rc" = 3 ] && grep -qF 'triage.route.questions' "$TMP/perr"; then
+      pass "T8.1 $view: questions ${bad:0:14} is exit 3 naming the key"
+    else
+      fail "T8.1 $view: questions ${bad:0:14} gave exit $rc"
+    fi
+  done
+  rc="$(questions_rc '[scope, clarity, criteria, duplicate, size, injection]' "$schema")"
+  [ "$rc" = 0 ] && pass "T8.2 $view: the default six ids are accepted" || fail "T8.2 $view: default ids gave exit $rc"
+done
+for f in "$MODE" "$ROOT/skills/issue-triage/references/route-mode.md"; do
+  label_line="$(grep -F 'Confirm with `gh issue view {N} --json labels`' "$f")"
+  case "$label_line" in
+    *'After each label add or removal on #N, run `rm -f .idd/cache/issue-{N}-*.json`'*'gi-backlog.py --invalidate`'*)
+      pass "T8.3 ${f#"$ROOT"/}: a label write drops the issue cache and the backlog snapshot" ;;
+    *) fail "T8.3 ${f#"$ROOT"/}: no cache invalidation after the label write" ;;
+  esac
+done
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"
