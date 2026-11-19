@@ -280,8 +280,10 @@ FAIL=0
 # its 2 skills: issue-analysis, issue-resolver), and the new `resolver` config
 # section in each config-schema excerpt that names it. HEAD measured 602,490;
 # the measured total is now 620,864 (+18,374), and the line keeps its six bytes
-# of headroom, so the ratchet is not widened.
-BUDGET=620870
+# of headroom, so the ratchet is not widened. Its QA fixes (released claims,
+# non-writer markers, an unreadable login) grow that doc by 2,312 bytes per
+# copy: 620,864 + 4,624 = 625,488, again with six bytes of headroom.
+BUDGET=625494
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

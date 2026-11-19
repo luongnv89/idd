@@ -4,13 +4,13 @@ Two issue-side signals a person can see without opening a terminal: a **plan com
 
 ## Reading the issue
 
-Run from the workspace root. `"$login"` is `login="$(gh api user --jq .login)"`, read once per run; when it is empty, skip the script: every claim reads `foreign` (none can be proven own) and every plan `absent`. `"$claim_run"` is the run id (*Claim*), `"$claim_label"` is `resolver.claim_label`, and a resolver on a bound `--resume` adds `--branch "$branch_name"`. Shell variables do not outlive one command: keep the three values and set them again ahead of each command that uses them.
+Run from the workspace root. `"$login"` is `login="$(gh api user --jq .login)"`, read once per run. **An empty login** (an app or installation token cannot read it) prints `⚠ GitHub login unreadable — claim off, plan comments not read` once and is still passed as `--login ""`: the script then trusts no comment, so every plan reads `absent` and the claim `foreign` when the label is on the issue, else `none`. For the rest of that run the claim is off as with `resolver.claim_label: ""` — never written, never released — except that a label already on the issue still stops with *Claimed elsewhere*; and a resolver plan step that must post a plan takes *Plan awaiting approval* instead of posting, because a plan the run cannot read back would be reposted, and `plan-approved` stripped, on every run. `"$claim_run"` is the run id (*Claim*), `"$claim_label"` is `resolver.claim_label`, and a resolver on a bound `--resume` adds `--branch "$branch_name"`. Shell variables do not outlive one command: keep the three values and set them again ahead of each command that uses them.
 
 ```bash
 mkdir -p .idd/cache && gh issue view {N} --json body,labels,comments > .idd/cache/plan-{N}.json && python3 shared/scripts/gi-plan.py check --login "$login" --run "$claim_run" --claim-label "$claim_label" < .idd/cache/plan-{N}.json; ec=$?; rm -f .idd/cache/plan-{N}.json; exit "$ec"
 ```
 
-Every read is live, never the issue cache. Only comments by `$login` can make a plan current or a claim own; a marker by another account can only make a claim `foreign`.
+Every read is live, never the issue cache. Only comments by `$login` can make a plan current or a claim own; a marker by another account can only make a claim `foreign`, and only a live one: a claim marker closed by its run's release comment, or written by an account that cannot add labels, never counts (`gi-plan.py` docstring, *Check rules*).
 
 - **Exit 0** — read `plan` (`absent` · `current` · `stale`), `approved` and `claim` (`none` · `own` · `foreign`).
 - **Exit 3** — a value outside its grammar: stop and report it.
@@ -37,7 +37,7 @@ Every read is live, never the issue cache. Only comments by `$login` can make a 
 
 ## Claim
 
-`/issue-resolver` only; `resolver.claim_label: ""` skips this section. **Run id** (`$claim_run`): under `/auto-pilot`, the spawn prompt's `run_id`; standalone, generated once at *0c* as `claim_run="resolver-$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"`.
+`/issue-resolver` only; `resolver.claim_label: ""` or an empty `$login` (*Reading the issue*) skips this section. **Run id** (`$claim_run`): under `/auto-pilot`, the spawn prompt's `run_id`; standalone, generated once at *0c* as `claim_run="resolver-$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"`.
 
 **Claim write** — after the branch is derived (*0f* or the worktree path), before *0g*:
 
@@ -48,13 +48,21 @@ Every read is live, never the issue cache. Only comments by `$login` can make a 
    ```bash
    mkdir -p .idd/cache && python3 shared/scripts/gi-plan.py render-claim --run "$claim_run" --branch "$branch_name" > .idd/cache/claim-{N}.md && gh issue comment {N} --body-file .idd/cache/claim-{N}.md; ec=$?; rm -f .idd/cache/claim-{N}.md; exit "$ec"
    ```
-4. Add `"$claim_label"` with the *Label write*. A failed write leaves no claim: print `⚠ Claim not written — continuing unclaimed`, skip step 5, and never release.
-5. Read the issue again: it must read `own`. Two runs that claimed at once both see each other's markers and the first writer wins, so the loser reads `foreign`: stop with *Claimed elsewhere* and leave the label — it belongs to the winner.
+
+   A non-zero exit claimed nothing: print `⚠ Claim not written — continuing unclaimed`, skip steps 4–5 (no label is added), and never release.
+4. Add `"$claim_label"` with the *Label write*. A failed write leaves no claim: post this run's *Release comment*, print `⚠ Claim not written — continuing unclaimed`, skip step 5, and never release.
+5. Read the issue again: it must read `own`. Two runs that claimed at once both see each other's markers and the first writer wins, so the loser reads `foreign`: post this run's *Release comment* (its marker lost, so it must not race a later claim), stop with *Claimed elsewhere* and leave the label — it belongs to the winner, whose live marker the read named.
 6. `python3 shared/scripts/gi-issue.py {N} --invalidate`.
 
-**Release** — right after `gh pr create` succeeds, and at every terminal outcome without a PR once the claim write ran: read the issue, and only when it reads `own`, record `{"op": "remove"}` the same way, run `gh issue edit {N} --remove-label "$claim_label"`, confirm with `gh issue view {N} --json labels`, then invalidate as in step 6. Never remove a claim that does not read `own`. A failed release prints `⚠ Claim not released — gh issue edit {N} --remove-label "{claim_label}"` and never changes the outcome.
+**Release comment** — closes this run's claim marker, so a claim that ended never races a later one. `$claim_run` is the run that wrote the marker: this run's id, or on a bound resume the read's `claim_run`:
 
-**No expiry.** A claim lasts until it is released or a person removes the label; nothing takes one over automatically. A claim released less than ten minutes before a new run's claim still reads `foreign` to that run (the race window): continue at the interactive prompt, or wait.
+```bash
+mkdir -p .idd/cache && python3 shared/scripts/gi-plan.py render-release --run "$claim_run" --branch "$branch_name" > .idd/cache/release-{N}.md && gh issue comment {N} --body-file .idd/cache/release-{N}.md; ec=$?; rm -f .idd/cache/release-{N}.md; exit "$ec"
+```
+
+**Release** — right after `gh pr create` succeeds, and at every terminal outcome without a PR once the claim write ran: read the issue, and only when it reads `own`, record `{"op": "remove"}` the same way, post the *Release comment*, then run `gh issue edit {N} --remove-label "$claim_label"`, confirm with `gh issue view {N} --json labels`, and invalidate as in step 6. The comment goes first: a label removed with its marker still live would make a claim posted in the next ten minutes read `foreign` and stop with the label on. Never remove a claim that does not read `own`. A failed release prints `⚠ Claim not released — gh issue edit {N} --remove-label "{claim_label}"` and never changes the outcome.
+
+**No expiry.** A claim lasts until it is released or a person removes the label; nothing takes one over automatically. A label with no live marker behind it — its run died before releasing — reads `foreign` to every run until a person removes it with the command *Claimed elsewhere* prints.
 
 ## Label write
 
@@ -62,4 +70,4 @@ Every read is live, never the issue cache. Only comments by `$login` can make a 
 
 ## Manual reading
 
-When `gi-plan.py` cannot run: every plan reads `stale` (the hash cannot be checked), so nothing is approved, and a plan step that must post one stops instead (*Plan awaiting approval*); `/issue-analysis --plan` posts nothing. The claim: the label absent → `none`. Present → `own` only when the newest comment by `$login` whose first line is `<!-- idd:claim v1 run=<run> branch=<branch> -->` names this run (or, on a bound resume, this branch) and no claim marker for another run, by anyone, comes before it within ten minutes; anything else is `foreign`. Write the claim comment by hand as that marker line plus `Claimed by IDD Stack run \`<run>\` on branch \`<branch>\`.`
+When `gi-plan.py` cannot run: every plan reads `stale` (the hash cannot be checked), so nothing is approved, and a plan step that must post one stops instead (*Plan awaiting approval*); `/issue-analysis --plan` posts nothing. The claim: the label absent → `none`. Present → `own` only when the newest comment by `$login` whose first line is `<!-- idd:claim v1 run=<run> branch=<branch> -->` names this run (or, on a bound resume, this branch) and no live claim marker for another run, by anyone, comes before it within ten minutes; anything else is `foreign`. A marker is not live when a later comment by its author opens `<!-- idd:claim-released v1 run=<same run> branch=<branch> -->`, or when its author is another account whose `authorAssociation` is not `OWNER`, `MEMBER` or `COLLABORATOR`; on a bound resume an earlier `$login` marker for this branch is not a racer. With an empty `$login` every claim marker is untrusted. Write the claim comment by hand as that marker line plus `Claimed by IDD Stack run \`<run>\` on branch \`<branch>\`.`, and the release comment as the `idd:claim-released` line plus `Released by IDD Stack run \`<run>\` on branch \`<branch>\`.`

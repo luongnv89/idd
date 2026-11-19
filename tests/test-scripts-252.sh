@@ -1339,7 +1339,8 @@ EXPECTED_SITES = {
     # 5 since issue #648: plan-and-claim.md reads the issue (check), posts a
     # plan (render-plan) and a claim (render-claim); pr-review's plan
     # conformance reads the plan (check) and compares it with the diff (conform).
-    "gi-plan.py": 5,
+    # 6: plan-and-claim.md also closes a claim marker (render-release).
+    "gi-plan.py": 6,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

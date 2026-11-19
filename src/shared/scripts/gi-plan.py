@@ -34,10 +34,16 @@ Plan comment (render-plan writes it; check reads it back)
   the readiness script numbers. Without `tasks`, each file becomes one task
   carrying the option's `criteria_covered`.
 
-Claim comment (render-claim writes it)
+Claim comment (render-claim writes it) and release comment (render-release)
 
   <!-- idd:claim v1 run=<run> branch=<branch> -->
   <one line naming the run and the branch>
+
+  <!-- idd:claim-released v1 run=<run> branch=<branch> -->
+  <one line naming the run that let its claim go>
+
+  A release comment closes every earlier claim marker by the same login for
+  the same run, so a claim that ended stops counting the moment it is closed.
 
 Subcommands
   render-plan   [--issue FILE] stdin {"body", "criteria": [{"id", "text"}], "option": {"name",
@@ -50,6 +56,7 @@ Subcommands
                 envelope) instead of stdin's `body`, so the hash is the live
                 body's, never a retyped copy.
   render-claim  --run R --branch B → the claim comment on stdout.
+  render-release --run R --branch B → the release comment on stdout.
   check         --login L [--run R] [--branch B] [--claim-label X]
                 [--approved-label A] [--race-window S]; stdin the issue as
                 `gh issue view --json body,labels,comments` prints it, or a
@@ -72,15 +79,25 @@ Check rules
     `plan-approved`) is on the issue and the plan is `current`.
   * Claim. No `--claim-label` value on the issue (or `--claim-label ""`) →
     `none`: a marker without the label claims nothing. With the label, `mine`
-    is the newest claim marker by `--login` whose run is `--run` (or whose
-    branch is `--branch`, when given). No `mine` → `foreign`. Otherwise
-    `own`, unless a marker for another run, by any login, precedes `mine`
-    within `--race-window` seconds (default 600) — the first writer wins, so
-    two racing runs read exactly one `own`. A marker by another login can
-    make a claim `foreign`, never `own`. `claim_run`, `claim_branch` and
+    is the newest live claim marker by `--login` whose run is `--run` (or
+    whose branch is `--branch`, when given). No `mine` → `foreign`. Otherwise
+    `own`, unless a live marker for another run, by any login, precedes
+    `mine` within `--race-window` seconds (default 600) — the first writer
+    wins, so two racing runs read exactly one `own`. A marker by another
+    login can make a claim `foreign`, never `own`. On a bound resume
+    (`--branch`), an earlier marker by `--login` for that branch is this
+    run's own earlier attempt, never a racer. `claim_run`, `claim_branch` and
     `claim_age_s` describe the claim read: `mine` when own, else the marker
-    it yields to (the earliest racer, or the newest marker), null when none.
-  * A marker whose run or branch does not match its grammar is ignored.
+    it yields to (the earliest racer, or the newest live marker), null when
+    none.
+  * Live markers only. A claim marker never counts when its run or branch is
+    outside its grammar, when a release comment closed it, or when its
+    author is another login whose `authorAssociation` is present and is not
+    OWNER, MEMBER or COLLABORATOR — an account that cannot add the label
+    cannot hold the claim.
+  * `--login ""` (the login could not be read): no comment is trusted, so
+    every plan reads `absent` and the claim `foreign` when the label is on
+    the issue, `none` otherwise.
 
 Exit codes
   0  rendered or judged — read the JSON, never the exit status. This script
@@ -112,6 +129,8 @@ LABEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,49}")
 ID_RE = re.compile(r"AC[1-9][0-9]{0,3}")
 PLAN_MARKER_RE = re.compile(r"<!-- idd:plan v1 body=([0-9a-f]{16}) -->")
 CLAIM_MARKER_RE = re.compile(r"<!-- idd:claim v1 run=(\S+) branch=(\S+) -->")
+RELEASE_MARKER_RE = re.compile(r"<!-- idd:claim-released v1 run=(\S+) branch=(\S+) -->")
+WRITERS = {"OWNER", "MEMBER", "COLLABORATOR"}
 FILE_LINE_RE = re.compile(r"- (modify|create) `([^`]+)`(?: — (.*))?")
 TASK_LINE_RE = re.compile(r"- \[[ xX]\] (.+) \(criteria: ([A-Za-z0-9, ]*); files: (.*)\)")
 CRITERION_LINE_RE = re.compile(r"- (AC[1-9][0-9]{0,3}): (.*)")
@@ -260,6 +279,11 @@ def render_claim(run: str, branch: str) -> str:
             "Removing the claim label releases it.\n")
 
 
+def render_release(run: str, branch: str) -> str:
+    return (f"<!-- idd:claim-released v1 run={run} branch={branch} -->\n"
+            f"Released by IDD Stack run `{run}` on branch `{branch}`.\n")
+
+
 def parse_plan(text: str) -> dict:
     plan: dict = {"name": None, "summary": None, "files_to_modify": [], "files_to_create": [],
                   "tasks": [], "criteria": [], "criteria_covered": [], "test_strategy": None,
@@ -321,14 +345,16 @@ def _issue(payload: object) -> dict:
 
 
 def _markers(comments: list) -> list[dict]:
-    """Every comment as {login, body, at, order}, oldest first."""
+    """Every comment as {login, assoc, body, at, index}, oldest first."""
     rows = []
     for index, comment in enumerate(comments):
         if not isinstance(comment, dict) or not isinstance(comment.get("body"), str):
             continue
         author = comment.get("author")
         login = author.get("login") if isinstance(author, dict) else None
+        assoc = comment.get("authorAssociation")
         rows.append({"login": login if isinstance(login, str) else None, "body": comment["body"],
+                     "assoc": assoc if isinstance(assoc, str) else None,
                      "at": _when(comment.get("createdAt")), "index": index})
     if all(row["at"] is not None for row in rows):
         rows.sort(key=lambda row: (row["at"], row["index"]))
@@ -344,7 +370,7 @@ def check(payload: object, args: argparse.Namespace) -> dict:
     labels = {item.get("name") if isinstance(item, dict) else item for item in issue.get("labels", [])}
     rows = _markers(issue.get("comments", []))
     live = body_hash(issue.get("body") or "")
-    plans = [row for row in rows if row["login"] == args.login
+    plans = [row for row in rows if args.login and row["login"] == args.login
              and PLAN_MARKER_RE.fullmatch(_first_line(row["body"]))]
     result: dict = {"plan": "absent", "approved": False, "plan_hash": None, "body_hash": live}
     parsed = parse_plan("")
@@ -360,12 +386,18 @@ def check(payload: object, args: argparse.Namespace) -> dict:
         return result
     claims = []
     for row in rows:
-        m = CLAIM_MARKER_RE.fullmatch(_first_line(row["body"]))
-        if m and RUN_RE.fullmatch(m.group(1)) and BRANCH_RE.fullmatch(m.group(2)):
+        first = _first_line(row["body"])
+        released = RELEASE_MARKER_RE.fullmatch(first)
+        if released and row["login"]:
+            claims = [c for c in claims if not (c["login"] == row["login"] and c["run"] == released.group(1))]
+            continue
+        m = CLAIM_MARKER_RE.fullmatch(first)
+        writer = (args.login and row["login"] == args.login) or row["assoc"] is None or row["assoc"] in WRITERS
+        if m and writer and RUN_RE.fullmatch(m.group(1)) and BRANCH_RE.fullmatch(m.group(2)):
             claims.append({**row, "run": m.group(1), "branch": m.group(2)})
     mine = None
     for pos, row in enumerate(claims):
-        if row["login"] == args.login and (
+        if args.login and row["login"] == args.login and (
             (args.branch is not None and row["branch"] == args.branch)
             or (args.run is not None and row["run"] == args.run)
         ):
@@ -376,8 +408,9 @@ def check(payload: object, args: argparse.Namespace) -> dict:
         held = claims[-1] if claims else None
     else:
         pos, own = mine
-        racers = [row for row in claims[:pos] if row["run"] != own["run"] and (
-            row["at"] is None or own["at"] is None or own["at"] - row["at"] <= args.race_window)]
+        racers = [row for row in claims[:pos] if row["run"] != own["run"] and not (
+            args.branch is not None and row["login"] == args.login and row["branch"] == args.branch
+        ) and (row["at"] is None or own["at"] is None or own["at"] - row["at"] <= args.race_window)]
         result["claim"] = "foreign" if racers else "own"
         held = racers[0] if racers else own
     if held is not None:
@@ -435,11 +468,12 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     plan = sub.add_parser("render-plan", help="render a plan comment from stdin JSON")
     plan.add_argument("--issue", metavar="FILE", help="read the issue body from this JSON file")
-    claim = sub.add_parser("render-claim", help="render a claim comment")
-    claim.add_argument("--run", required=True)
-    claim.add_argument("--branch", required=True)
+    for name, what in (("render-claim", "a claim"), ("render-release", "a release")):
+        claim = sub.add_parser(name, help=f"render {what} comment")
+        claim.add_argument("--run", required=True)
+        claim.add_argument("--branch", required=True)
     chk = sub.add_parser("check", help="read the plan and claim state of an issue on stdin")
-    chk.add_argument("--login", required=True, help="the authenticated GitHub login")
+    chk.add_argument("--login", required=True, help='the authenticated GitHub login; "" when it cannot be read')
     chk.add_argument("--run", help="this run's id")
     chk.add_argument("--branch", help="this run's branch (a bound resume)")
     chk.add_argument("--claim-label", default="agent:working", help='claim label; "" turns the claim off')
@@ -448,13 +482,14 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("conform", help="compare a plan with a PR's changed files")
     args = parser.parse_args(argv)
     try:
-        if args.command == "render-claim":
+        if args.command in ("render-claim", "render-release"):
             _screen(args.run, RUN_RE, "--run")
             _screen(args.branch, BRANCH_RE, "--branch")
-            sys.stdout.write(render_claim(args.run, args.branch))
+            render = render_claim if args.command == "render-claim" else render_release
+            sys.stdout.write(render(args.run, args.branch))
             return 0
         if args.command == "check":
-            _screen(args.login, LOGIN_RE, "--login")
+            _screen(args.login, LOGIN_RE, "--login", empty_ok=True)
             _screen(args.run, RUN_RE, "--run")
             _screen(args.branch, BRANCH_RE, "--branch")
             _screen(args.claim_label, LABEL_RE, "--claim-label", empty_ok=True)

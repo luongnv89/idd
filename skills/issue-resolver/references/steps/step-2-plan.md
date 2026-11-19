@@ -351,7 +351,8 @@ is `human` — only a posted plan can be approved.
    that option and the *Criteria coverage gate*'s `criteria`. Order matters:
    `plan-approved` is removed and confirmed gone before the comment is posted.
    A post that fails prints `⚠ Plan comment not posted` and takes the stop
-   below: a required plan that is not on the issue is never built from.
+   below: a required plan that is not on the issue is never built from. An
+   empty `$login` posts nothing and takes the same stop (*Reading the issue*).
 3. **Approve** when `resolver.plan_approval` is `human`: read the issue again;
    only `plan: current` with `approved: true` continues. Otherwise — a fresh
    post, a stale plan, a `plan-approved` label that could not be confirmed

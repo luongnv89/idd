@@ -238,7 +238,7 @@ Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs
 
 The **in-place path**; worktree paths already checked out the branch. Reuse the derived `{branch_name}` (*0e — Workspace*, `references/docs/naming-conventions.md`). **If it exists:** interactive asks `continue` or `fresh`, auto takes `continue`.
 
-**Claim, every path:** with `{branch_name}` checked out, run the *Claim write* in `references/docs/plan-and-claim.md` before *0g*, unless `resolver.claim_label` is `""`. From here on, every terminal outcome without a PR runs its *Release*.
+**Claim, every path:** with `{branch_name}` checked out, run the *Claim write* in `references/docs/plan-and-claim.md` before *0g*, unless its *Claim* section skips it. From here on, every terminal outcome without a PR runs its *Release*.
 
 ### 0g — Complexity gate (select the pipeline profile)
 

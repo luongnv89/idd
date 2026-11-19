@@ -137,7 +137,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   /issue-resolver N again.
   Approve it here and continue? [y/N]
 ```
-**Trigger:** Step 2's *Plan comment*: a plan that had to post could not be posted, or, under `human`, no `current` plan with `approved: true` — a fresh post, a stale plan, or a `plan-approved` label that could not be confirmed removed.
+**Trigger:** Step 2's *Plan comment*: a plan that had to post could not be posted (an unreadable login included), or, under `human`, no `current` plan with `approved: true` — a fresh post, a stale plan, or a `plan-approved` label that could not be confirmed removed.
 **Auto:** takes the default No — stop, `skipped_reason: plan_awaiting_approval`. <!-- auto:no -->
 
 ### Issue needs clarification
