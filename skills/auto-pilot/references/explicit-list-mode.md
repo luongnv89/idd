@@ -59,7 +59,9 @@ For each issue, check:
   named by hand with a line in a validation banner and nothing else. Keep a
   quarantined issue in the list; *Loop behavior* below owns that skip, and owning
   it there is what gives it an `[Issue {i}/{total}]` slot and its one run-log
-  line. Nothing else is exempt: `wontfix` and the rest are still removed here.
+  line. The claim label (`resolver.claim_label`) is kept only for an issue in
+  *Step 1.0*'s resume set, whose resolver this run resumes and owns that claim.
+  Nothing else is exempt: `wontfix` and the rest are still removed here.
 - **Ready** — pipe the retained `explicit_issue_records[N]` (it carries
   `number` and `body`) into `python3 references/scripts/gi-ready.py`; never read the
   body again (non-zero exit: `references/docs/idd-methodology.md`, *Issue Readiness*). An issue not

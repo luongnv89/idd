@@ -330,7 +330,10 @@ load, so a run that starts with the label removed picks the issue again on its
 very next pass. The route labels — `{prefix}needs-human`, `{prefix}needs-info`
 and `{prefix}duplicate` — are appended at the same load, so the same question
 skips them and both readings below apply. They are the only route signal: with
-`triage.route.label: false` (the default) none exist.
+`triage.route.label: false` (the default) none exist. The claim label
+(`resolver.claim_label`) is appended at the same load and read the same way,
+except for an issue in *Step 1.0*'s resume set: both readings let it through,
+because the resolver this run resumes owns that claim.
 
 **But the labels this step reads are the triage row's, so a reused cache answers
 with old ones.** *Step 1.1*'s scan reads `labels` live and `gi-triage-graph.py`
