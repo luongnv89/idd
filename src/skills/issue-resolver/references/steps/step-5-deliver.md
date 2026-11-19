@@ -38,9 +38,10 @@ as exit 2.
 
 ### Claim release
 
-Right after `gh pr create` succeeds, release the claim (*Release* in
-`docs/plan-and-claim.md`): only a claim that reads `own` is removed, and a failed
-release is a `⚠` that never changes the outcome.
+Right after the PR exists — `gh pr create` just succeeded, or a resume's
+`pr_create` reconcile adopted the open PR and skipped it — release the claim
+(*Release* in `docs/plan-and-claim.md`): only a claim that reads `own` is
+removed, and a failed release is a `⚠` that never changes the outcome.
 
 ### Progress record at Deliver
 

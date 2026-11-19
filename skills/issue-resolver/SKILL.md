@@ -352,7 +352,7 @@ git push -u origin {branch_name}
 gh pr create --title "{pr_title}" --body "{pr_body}"
 ```
 
-Right after `gh pr create` succeeds, run the claim's *Release* (`references/docs/plan-and-claim.md`).
+Once the PR is created or adopted, run the claim's *Release* (`references/docs/plan-and-claim.md`).
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`references/docs/naming-conventions.md`)
 

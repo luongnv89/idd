@@ -119,10 +119,12 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Claimed elsewhere
 ```
-⚠ Issue #N is claimed by run {claim_run} on {claim_branch} ({claim_age})
+⚠ Issue #N is claimed by run {claim_run} ({claim_login}) on {claim_branch} ({claim_age})
 
   Another agent may be working on it; a claim never expires on its own.
   To release:  gh issue edit N --remove-label "{claim_label}"
+  A dead run's marker under ten minutes old: close it first
+  (docs/plan-and-claim.md → No expiry).
   Continue anyway? [y/N]
 ```
 **Trigger:** `gi-plan.py check` reads `claim: foreign` at *0c* or in the *Claim write* (`docs/plan-and-claim.md`). A yes continues without a claim and never removes the label.

@@ -285,7 +285,9 @@ FAIL=0
 # copy: 620,864 + 4,624 = 625,488, again with six bytes of headroom. The
 # second QA cycle (superseded plans, a killed release, the symmetric
 # tie-break) adds 409 bytes per copy: 625,488 + 818 = 626,306, six to spare.
-BUDGET=626312
+# The third (closing a dead run's marker before its label goes, release on
+# an adopted PR) adds 460 per copy: 626,306 + 920 = 627,226, six to spare.
+BUDGET=627232
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

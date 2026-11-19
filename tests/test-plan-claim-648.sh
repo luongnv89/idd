@@ -372,8 +372,8 @@ chk "$TMP/i-c3.json" --login me --run r1 --claim-label ""
 chk "$TMP/i-c3.json" --login me --run r1 --claim-label other:label
 [ "$(field "$TMP/out.json" 'd["claim"]')" = none ] && pass "T3.6 the configured claim label is the one read" || fail "T3.6"
 chk "$TMP/i-c3.json" --login me --run r1
-got="$(field "$TMP/out.json" 'json.dumps([d["claim_run"], d["claim_branch"], isinstance(d["claim_age_s"], int) and d["claim_age_s"] >= 0])')"
-[ "$got" = '["r2", "feat/648-b", true]' ] && pass "T3.7 a foreign claim names its run, branch and age" || fail "T3.7 $got"
+got="$(field "$TMP/out.json" 'json.dumps([d["claim_run"], d["claim_branch"], d["claim_login"], isinstance(d["claim_age_s"], int) and d["claim_age_s"] >= 0])')"
+[ "$got" = '["r2", "feat/648-b", "me", true]' ] && pass "T3.7 a foreign claim names its run, branch, author and age" || fail "T3.7 $got"
 printf '{"issue": %s}' "$(cat "$TMP/i-c3.json")" > "$TMP/i-env.json"
 [ "$(claim_of "$TMP/i-env.json" me r2)" = own ] && pass "T3.8 a gi-issue.py envelope is read like a bare issue" || fail "T3.8"
 n="$(grep -c -- '<!--' "$TMP/plan.md")"
@@ -531,7 +531,15 @@ has "$RS/references/error-messages.md" 'skipped_reason: plan_awaiting_approval`.
 has "$RS/references/error-messages.md" 'gh issue edit N --remove-label "{claim_label}"' "T4.10 the foreign-claim stop prints the fix command"
 has "$RS/SKILL.source.md" '`claimed_elsewhere`' "T4.11 the 0c guard lists claimed_elsewhere"
 has "$RS/SKILL.source.md" 'run the *Claim write* in `docs/plan-and-claim.md` before *0g*' "T4.12 the claim is written after the branch, before 0g"
-has "$RS/SKILL.source.md" 'Right after `gh pr create` succeeds, run the claim'"'"'s *Release*' "T4.13 the claim is released on PR open"
+has "$RS/SKILL.source.md" 'Once the PR is created or adopted, run the claim'"'"'s *Release*' "T4.13 the claim is released on PR open"
+hasflat "$RS/references/steps/step-5-deliver.md" 'Right after the PR exists — `gh pr create` just succeeded, or a resume'"'"'s `pr_create` reconcile adopted the open PR and skipped it — release the claim' \
+  "T4.13b test_release_on_adopted_pr: Step 5 releases after a created or an adopted PR"
+has "$RS/references/steps/step-0j-resume.md" 'adopt its number, skip `gh pr create`, then release the claim (*Claim release*' \
+  "T4.13c test_release_on_adopted_pr: the pr_create reconcile row releases after adopting"
+hasflat "$DOC" 'When the read'"'"'s `claim_login` is `$login`, close the marker first — the *Release comment* with `claim_run` and `branch_name` set to the read'"'"'s `claim_run` and `claim_branch` — then remove the label' \
+  "T4.13d test_dead_own_marker_closed_first: No expiry closes a dead own marker before the label goes"
+hasflat "$RS/references/error-messages.md" 'A dead run'"'"'s marker under ten minutes old: close it first (docs/plan-and-claim.md → No expiry).' \
+  "T4.13e Claimed elsewhere points to the No expiry rule"
 has "$RS/SKILL.source.md" 'An outcome without a PR first runs the claim'"'"'s *Release*' "T4.14 the claim is released at every no-PR outcome"
 has "$RS/references/steps/step-0j-resume.md" '| `label_edit` (claim, release) | `gh issue view {N} --json labels` |' "T4.15 label_edit has a Reconciling row"
 has "$RS/references/run-log-fields.md" '`claimed_elsewhere`, `plan_awaiting_approval`' "T4.16 run-log-fields lists both skip reasons"

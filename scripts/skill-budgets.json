@@ -42,8 +42,8 @@
         ],
         "measured": 34668
       },
-      "budget": 179412,
-      "measured": 179412,
+      "budget": 179872,
+      "measured": 179872,
       "skill_md": {
         "budget": 24543,
         "measured": 24543
@@ -98,11 +98,11 @@
         ],
         "measured": 11179
       },
-      "budget": 468474,
-      "measured": 468474,
+      "budget": 469237,
+      "measured": 469237,
       "skill_md": {
         "budget": 35213,
-        "measured": 35211
+        "measured": 35209
       }
     },
     "issue-triage": {

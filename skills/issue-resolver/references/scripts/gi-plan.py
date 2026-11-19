@@ -66,7 +66,7 @@ Subcommands
                    "files_to_modify", "files_to_create", "tasks", "criteria",
                    "criteria_covered", "test_strategy", "risk_details",
                    "claim": "none|own|foreign", "claim_run", "claim_branch",
-                   "claim_age_s"}
+                   "claim_login", "claim_age_s"}
   conform       stdin {"files_to_modify", "files_to_create", "tasks",
                 "changed": [path]} (check's output plus `changed`) → one JSON
                 line {"out_of_plan": [path], "tasks_without_change": [task]}.
@@ -95,7 +95,7 @@ Check rules
     left and the newest closed one is `--login`'s for that branch, the claim
     reads `own` — a resume killed between its release comment and the label
     removal still owns the label. `claim_run`, `claim_branch` and
-    `claim_age_s` describe the claim read: `mine` when own, else the marker
+    `claim_age_s` (and `claim_login`, its author) describe the claim read: `mine` when own, else the marker
     it yields to (the earliest racer, or the newest live marker), null when
     none.
   * Live markers only. A claim marker never counts when its run or branch is
@@ -397,7 +397,8 @@ def check(payload: object, args: argparse.Namespace) -> dict:
         parsed = parse_plan(newest["body"].lstrip())
         result["approved"] = args.approved_label in labels and result["plan"] == "current"
     result.update(parsed)
-    result.update({"claim": "none", "claim_run": None, "claim_branch": None, "claim_age_s": None})
+    result.update({"claim": "none", "claim_run": None, "claim_branch": None, "claim_login": None,
+                   "claim_age_s": None})
     if not args.claim_label or args.claim_label not in labels:
         return result
     claims, closed = [], []
@@ -446,6 +447,7 @@ def check(payload: object, args: argparse.Namespace) -> dict:
         held = racers[0] if racers else own
     if held is not None:
         result["claim_run"], result["claim_branch"] = held["run"], held["branch"]
+        result["claim_login"] = held["login"]
         if held["at"] is not None:
             now = datetime.now(timezone.utc).timestamp()
             result["claim_age_s"] = max(0, int(now - held["at"]))
