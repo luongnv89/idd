@@ -187,7 +187,7 @@ done
 # The Depth gate names the linked issue with a token that is not the PR's (#298).
 for f in "$RV" "$BRV"; do
   n="${f#"$ROOT/"}"
-  anchor_check "$f" rv-depth-gate-refresh 'gi-issue\.py \{linked_issue\} --fields number,title,body,labels --refresh' "depth gate refresh takes the linked-issue token: $n"
+  anchor_check "$f" rv-depth-gate-refresh 'gi-issue\.py \{linked_issue\} --fields number,title,body,labels,comments --refresh' "depth gate refresh takes the linked-issue token: $n"
   anchor_check "$f" rv-depth-gate-refresh 'gh issue view \{linked_issue\} --json number,title,body,labels' "depth gate degrade takes the linked-issue token: $n"
   lacks "$f" 'gi-issue\.py \{N\}' "no script call site binds \{N\} to a linked issue: $n"
   lacks "$f" 'gh issue view \{N\}' "no gh call site binds \{N\} to a linked issue: $n"

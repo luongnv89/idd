@@ -82,6 +82,7 @@ references/scripts/gi-progress.py
 references/scripts/gi-criteria.py
 references/scripts/gi-runlog.py
 references/scripts/gi-sensitive.py
+references/scripts/gi-plan.py
 ```
 
 The practice packs, checked the same way: `references/practice-packs.md`, `references/practice-tests.md`, `references/practice-code.md`, `references/practice-performance.md`, `references/practice-security.md`, `references/practice-frontend.md`, `references/practice-ci-cd.md`, `references/practice-cli.md`, `references/practice-docs.md`.
@@ -167,9 +168,9 @@ Set `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
 `light` changes: `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*) — **read and apply both**.
 
 1. When the PR body links an issue, refresh it (`references/scripts/gi-gh.py` ships as its helper):
-   `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels --refresh`, then read `.issue`.
-2. On exit 3, stop. On no `python3`, exit 2, or exit 4, run `gh issue view {linked_issue} --json number,title,body,labels` instead.
-3. Retain the successful record as `linked_issue_snapshot`.
+   `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels,comments --refresh`, then read `.issue`.
+2. On exit 3, stop. On no `python3`, exit 2, or exit 4, run `gh issue view {linked_issue} --json number,title,body,labels,comments` instead.
+3. Retain the successful record as `linked_issue_snapshot`, and read its plan comment into `plan_state` now (*Plan conformance* in `references/verification-checks.md`, step 1).
    **If neither path yields a usable record, apply the empty-record fail-safe in `references/review-loop-mechanics.md` (*Depth gate*) — never review a linked issue on an empty snapshot.**
 4. **Risk tier, always:** bind `base_ref="$(gh pr view {N} --json baseRefName --jq .baseRefName)"`, `git fetch origin -- "$base_ref"`, set `sensitive_json` to `{"labels": <PR + snapshot labels>, "paths": [], "diff": "origin/${base_ref}...HEAD"}` and from the repo root run `printf '%s' "$sensitive_json" | python3 references/scripts/gi-sensitive.py --classify`. `tier: sensitive`, any non-zero exit, unparsable output, or no `python3` sets `profile = full`. The refresh runs even when `review.adaptive_depth` is `false`; then set `profile = full` after the refresh and skip step 5.
 5. Weigh diff size and the snapshot's `## Metadata` `Effort` band; `Effort` never lowers a `full` from step 4. Set `light` only when **every** signal agrees; otherwise `full`.
