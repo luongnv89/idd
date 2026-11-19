@@ -159,14 +159,14 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Invalid route config
 ```
-✗ Invalid route config: triage.route.questions
+✗ Invalid route config: {key}
 
-  {reason from gi-route on stderr}
+  {reason: gi-route's stderr, or the failed check}
 
-  To fix:  keep injection, clarity and criteria in the list
+  To fix:  {fix for that key}
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** an id fails `^[a-z]+$`, or `gi-route.py --questions --enabled` exits 3. A **stop**.
+**Trigger:** `{key}` = `triage.route.questions` — an id fails `^[a-z]+$`, or `gi-route.py --questions --enabled` exits 3; fix: keep injection, clarity and criteria in the list. `{key}` = `triage.route.label_prefix` — the prefix fails the check in `references/route-mode.md` (§1); fix: match that check. A **stop**.
 
 ### Route answers rejected
 ```
@@ -186,7 +186,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   To fix:  check write access: gh repo view --json viewerPermission
 ```
-**Trigger:** a route-mode `gh issue edit`, `gh label create` or `gh issue comment` fails, or the re-read lacks the label. The run continues.
+**Trigger:** the add still fails after its one create-and-retry, the `{prefix}agent-ready` removal fails, `gh issue comment` fails, or the re-read lacks the route label (or still carries `{prefix}agent-ready` after its removal). A failed first add or a failed `gh label create` alone is not a write failure. The run continues.
 
 ## Configuration
 

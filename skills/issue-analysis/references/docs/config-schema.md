@@ -227,8 +227,8 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `triage.include_closed` | `false` | Exclude closed from triage |
 | `triage.scan_timeout_per_issue` | `30` | Max seconds per issue scan |
 | `triage.route.comment` | `false` | Route mode posts one comment |
-| `triage.route.label` | `false` | Route mode adds its label |
-| `triage.route.label_prefix` | `"route:"` | Route label prefix |
+| `triage.route.label` | `false` | Route mode adds its label — the only route signal `/auto-pilot` and `/issue-resolver` read |
+| `triage.route.label_prefix` | `"route:"` | Route label prefix; must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,38}` |
 | `triage.route.questions` | all six | Route questions |
 | `analysis.max_files` | `30` | Max files to read during analysis |
 | `analysis.trace_depth` | `3` | Import trace depth levels |

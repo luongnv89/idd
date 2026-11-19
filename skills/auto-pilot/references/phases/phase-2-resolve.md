@@ -354,9 +354,11 @@ recorded branch and the *Runtime budget check* checks a recorded `started_at`:
 it must match `^[A-Za-z0-9._:-]+$`. `gi-config.py` validates that
 `autopilot.quarantine_label` is a *string*, never that it is free of shell
 metacharacters, and it is the only free-form config **string** in the
-distribution that reaches a command line. `review.merge_method` reaches one too,
-but `gi-config.py` accepts only `squash`, `merge` or `rebase` for it; every other
-substituted config value is an integer. The
+distribution that reaches a command line unchecked by `gi-config.py`.
+`review.merge_method` reaches one too, but
+`gi-config.py` accepts only `squash`, `merge` or `rebase` for it, and it
+shape-checks `triage.route.label_prefix`, the other free-form string; every
+other substituted config value is an integer. The
 double quotes above stop word-splitting and globbing but do **not** neutralize
 `$(…)` or a backtick, so the check is what makes the substitution safe. Anything
 else is the first degrade path below: skip the write and continue.

@@ -305,6 +305,17 @@ PATH="$TMP/stats-bin:$PATH" st
 PATH="$TMP/stats-bad:$PATH" st
 st --no-github --branch no-such-ref
 
+# gi-route — the question set, then judge and comment modes (issue #647).
+run "$SCRIPTS/gi-route.py" --questions --enabled scope clarity criteria duplicate size injection
+run "$SCRIPTS/gi-route.py" --questions --enabled clarity criteria
+for answers in \
+  '{"number":5,"answers":{"scope":"yes","clarity":"yes","criteria":"yes","duplicate":"no","size":"S","injection":"yes"}}' \
+  '{"number":5,"answers":{"scope":"yes","clarity":"yes","criteria":"yes","duplicate":"yes:#3","size":"S","injection":"no"}}' \
+  '{"number":5,"answers":{"scope":"yes","clarity":"partly","criteria":"yes","duplicate":"no","size":"M","injection":"no"}}' \
+  '{"number":5,"answers":{"scope":"yes","clarity":"yes","criteria":"yes","duplicate":"yes:#5","size":"S","injection":"no"}}'; do
+  printf '%s' "$answers" | run "$SCRIPTS/gi-route.py" --comment
+done
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

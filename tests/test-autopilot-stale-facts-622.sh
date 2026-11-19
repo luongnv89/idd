@@ -58,6 +58,7 @@ grep -qxF '.idd/runs.jsonl' "$ROOT/.gitignore" \
 P2="$AP/references/phases/phase-2-resolve.md"
 lacks "$P2" 'it is the only config **string** in the distribution' "T3.1: the old 'only config string' claim is gone"
 has "$P2" 'only free-form config **string** in the' "T3.2: the label is the only free-form config string"
+has "$P2" 'shape-checks `triage.route.label_prefix`, the other free-form string' "T3.2b: the route label prefix is named as gi-config-checked"
 has "$P2" '`gi-config.py` accepts only `squash`, `merge` or `rebase` for it' "T3.3: merge_method is named with its enum"
 has "$P2" '**Check the label before you substitute it**' "T3.4: the label check still leads the paragraph"
 methods="$(python3 - "$GI_CONFIG" <<'PY'

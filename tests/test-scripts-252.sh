@@ -1325,8 +1325,9 @@ EXPECTED_SITES = {
     # validation and the resolver's 0c gate. 6 since issue #554: the resolver's
     # Step 2 Criteria coverage gate runs --criteria and --coverage. 8 since
     # issue #584: issue-analysis numbers the criteria for its synthesizer
-    # (subagent-steps.md) and its inline fallback (inline-fallback.md).
-    "gi-ready.py": 8,
+    # (subagent-steps.md) and its inline fallback (inline-fallback.md). 9 since
+    # issue #647: /issue-triage route mode answers `criteria` from its reasons.
+    "gi-ready.py": 9,
     # 2 since issue #647: /issue-triage route mode validates the question set
     # once (--questions --enabled) and judges each issue (--comment).
     "gi-route.py": 2,

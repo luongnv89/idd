@@ -781,8 +781,9 @@ expect_grep "AC1: the threshold is substituted from the configured key" \
 expect_grep "AC1: the label is applied with gh issue edit --add-label" \
   'gh issue edit {issue_number} --add-label "{autopilot.quarantine_label}"' "$AP_PHASES"
 # That label is the only free-form config *string* in the distribution that
-# reaches a command line (review.merge_method does too, but gi-config restricts
-# it to squash/merge/rebase), and gi-config only checks the label's type — so
+# reaches a command line unchecked by gi-config (review.merge_method is limited
+# to squash/merge/rebase and triage.route.label_prefix is shape-checked there),
+# and gi-config only checks the label's type — so
 # the substitution site has to check its shape, exactly as the recorded branch
 # and started_at do.
 expect_grep "AC1: the quarantine label is format-checked before it is substituted" \

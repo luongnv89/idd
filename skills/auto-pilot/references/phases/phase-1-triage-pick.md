@@ -327,7 +327,10 @@ it, so without that append the label would be inert and quarantine would do
 nothing across runs. There is no separate quarantine gate to evaluate: **Not
 skipped** above already asks the question. The append happens once, at config
 load, so a run that starts with the label removed picks the issue again on its
-very next pass.
+very next pass. The route labels — `{prefix}needs-human`, `{prefix}needs-info`
+and `{prefix}duplicate` — are appended at the same load, so the same question
+skips them and both readings below apply. They are the only route signal: with
+`triage.route.label: false` (the default) none exist.
 
 **But the labels this step reads are the triage row's, so a reused cache answers
 with old ones.** *Step 1.1*'s scan reads `labels` live and `gi-triage-graph.py`

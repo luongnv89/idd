@@ -12,7 +12,10 @@
 #       agent-ready beside a restrictive label, the up-front validation, the
 #       consumers' gates, config defaults — and no prose copy of the table;
 #   T5  the built bundle ships the script and the procedure;
-#   T6  CI: dist-check.yml keeps its trigger/permission shape and runs this.
+#   T6  CI: dist-check.yml keeps its trigger/permission shape and runs this;
+#   T7  gi-config refuses a label_prefix that is unsafe on a gh command line,
+#       in view (full schema) and out of view (a skill excerpt with no triage
+#       section), and the route-mode label write and its catalog agree.
 #
 # Usage: bash tests/test-route-mode-647.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -249,6 +252,56 @@ n="$(grep -c 'contents: read' "$WORKFLOW")"
 [ "$n" -eq 2 ] && pass "T6.2 both permission blocks are contents: read" || fail "T6.2 contents: read count $n"
 grep -qE '^      - name: test-route-mode-647$' "$WORKFLOW" && has "$WORKFLOW" 'run: bash tests/test-route-mode-647.sh' \
   "T6.3 dist-check runs this test as a named step" || fail "T6.3 no named step for this test"
+
+# ── T7: label_prefix guard and the label write ────────────────────────────
+FULL="$ROOT/docs/config-schema.md"
+EXCERPT="$ROOT/skills/issue-pr-review/references/docs/config-schema.md"
+if grep -q '^triage:' "$EXCERPT"; then
+  fail "T7.0 the excerpt fixture now carries triage — pick a skill excerpt without it"
+else
+  pass "T7.0 the issue-pr-review excerpt has no triage section (out-of-view fixture)"
+fi
+# prefix_rc <yaml-value> <schema> — prints the exit code; stderr kept in $TMP/perr
+prefix_rc() {
+  mkdir -p "$TMP/cfg"
+  printf 'triage:\n  route:\n    label_prefix: %s\n' "$1" > "$TMP/cfg/.idd.yml"
+  local rc=0
+  (cd "$TMP/cfg" && python3 "$CONFIG" --schema "$2" >/dev/null 2>"$TMP/perr") || rc=$?
+  echo "$rc"
+}
+p39="\"$(printf 'a%.0s' $(seq 39))\""
+p40="\"$(printf 'a%.0s' $(seq 40))\""
+for schema in "$FULL" "$EXCERPT"; do
+  view="full"; [ "$schema" = "$EXCERPT" ] && view="excerpt"
+  for bad in '"route; rm -rf x"' '"$(x)"' '"-d"' '".x"' '""' "$p40" '5'; do
+    rc="$(prefix_rc "$bad" "$schema")"
+    if [ "$rc" = 3 ] && grep -qF 'triage.route.label_prefix' "$TMP/perr"; then
+      pass "T7.1 $view: label_prefix ${bad:0:12} is exit 3 naming the key"
+    else
+      fail "T7.1 $view: label_prefix ${bad:0:12} gave exit $rc"
+    fi
+  done
+  for good in '"route:"' "$p39"; do
+    rc="$(prefix_rc "$good" "$schema")"
+    [ "$rc" = 0 ] && pass "T7.2 $view: label_prefix ${good:0:12} is accepted" \
+      || fail "T7.2 $view: label_prefix ${good:0:12} gave exit $rc"
+  done
+done
+has "$MODE" 'fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,38}`' "T7.3 route-mode checks the prefix on the manual-read path"
+grep -qF -- '--help' "$MODE" && fail "T7.4 route-mode still claims --help prints the table" \
+  || pass "T7.4 route-mode makes no --help claim"
+grep -qF 'gh label list' "$MODE" && fail "T7.5 route-mode still lists labels" \
+  || pass "T7.5 route-mode needs no label listing"
+has "$MODE" 'run `gh label create "{prefix}{route}"` whatever it returns, then retry the add once' \
+  "T7.6 the add comes first; create and one retry only on failure"
+has "$TR/references/error-messages.md" 'A failed first add or a failed `gh label create` alone is not a write failure' \
+  "T7.7 the catalog does not call the expected first failure a write failure"
+has "$TR/references/error-messages.md" 'the `{prefix}agent-ready` removal fails' "T7.8 a failed agent-ready removal is reported"
+has "$MODE" '**The label is the only verdict a consumer reads.**' "T7.9 route-mode states the label-only gate"
+has "$MODE" '○ Labels off — /auto-pilot and /issue-resolver will not see these routes' "T7.10 labels off prints the inert-gate note"
+has "$AP/references/phases/phase-1-triage-pick.md" 'The route labels — `{prefix}needs-human`, `{prefix}needs-info`' \
+  "T7.11 the pick-phase skip_labels paragraph covers the route labels"
+has "$ROOT/docs/config-schema.md" 'the only route signal `/auto-pilot` and `/issue-resolver` read' "T7.12 config-schema documents the label-only gate"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Passed: $PASS"
