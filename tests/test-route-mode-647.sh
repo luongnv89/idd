@@ -304,27 +304,66 @@ has "$AP/references/phases/phase-1-triage-pick.md" 'The route labels — `{prefi
 has "$ROOT/docs/config-schema.md" 'the only route signal `/auto-pilot` and `/issue-resolver` read' "T7.12 config-schema documents the label-only gate"
 
 # ── T8: questions guard and cache invalidation after a label write ────────
-# questions_rc <yaml-value> <schema> — the ids become words of `gi-route.py --enabled`
+# The ids become words of `gi-route.py --enabled`. gi-config reads `.idd.yml`
+# with PyYAML when it is installed and with its stdlib restricted parser
+# otherwise; the restricted parser rejects flow lists like `[a, b]` as a parser
+# limit (exit 4, a documented degrade). So the lists here are YAML block lists,
+# which both parsers read, and every case runs twice: with the default
+# interpreter, and with `python3 -S`, which hides site-packages (PyYAML) and so
+# takes the restricted-parser path CI takes. gi-config.py is stdlib-only.
+# questions_rc <yaml-tail> <schema> [python-flag] — <yaml-tail> follows `questions:`
 questions_rc() {
   mkdir -p "$TMP/cfg"
-  printf 'triage:\n  route:\n    questions: %s\n' "$1" > "$TMP/cfg/.idd.yml"
+  printf 'triage:\n  route:\n    questions:%s\n' "$1" > "$TMP/cfg/.idd.yml"
   local rc=0
-  (cd "$TMP/cfg" && python3 "$CONFIG" --schema "$2" >/dev/null 2>"$TMP/perr") || rc=$?
+  (cd "$TMP/cfg" && python3 ${3:+"$3"} "$CONFIG" --schema "$2" >/dev/null 2>"$TMP/perr") || rc=$?
   echo "$rc"
 }
+# block '<item>|<item>|…' — the items as a YAML block list under `questions:`
+block() {
+  local out="" item IFS='|'
+  for item in $1; do out="$out"$'\n'"      - $item"; done
+  printf '%s' "$out"
+}
+if python3 -S -c 'import yaml' 2>/dev/null; then
+  fail "T8.0 python3 -S still imports PyYAML — the restricted-parser runs below do not reach it"
+else
+  pass "T8.0 python3 -S hides PyYAML, so the -S runs take the restricted parser"
+fi
+bad_yaml=("$(block '"scope; id"|injection|clarity|criteria')" "$(block '"$(id)"|injection|clarity|criteria')" \
+          ' "scope"' "$(block 'scope|scope|injection|clarity|criteria')")
+bad_name=('"scope; id" item' '"$(id)" item' 'scalar "scope"' 'duplicate scope')
 for schema in "$FULL" "$EXCERPT"; do
-  view="full"; [ "$schema" = "$EXCERPT" ] && view="excerpt"
-  for bad in '["scope; id", "injection", "clarity", "criteria"]' '["$(id)", "injection", "clarity", "criteria"]' \
-             '"scope"' '[scope, scope, injection, clarity, criteria]' '[]'; do
-    rc="$(questions_rc "$bad" "$schema")"
-    if [ "$rc" = 3 ] && grep -qF 'triage.route.questions' "$TMP/perr"; then
-      pass "T8.1 $view: questions ${bad:0:14} is exit 3 naming the key"
+  for py in "" "-S"; do
+    view="full"; [ "$schema" = "$EXCERPT" ] && view="excerpt"
+    if [ -n "$py" ]; then view="$view, no PyYAML"; else view="$view, default python"; fi
+    for i in "${!bad_yaml[@]}"; do
+      rc="$(questions_rc "${bad_yaml[$i]}" "$schema" "$py")"
+      if [ "$rc" = 3 ] && grep -qF 'triage.route.questions' "$TMP/perr"; then
+        pass "T8.1 $view: questions ${bad_name[$i]} is exit 3 naming the key"
+      else
+        fail "T8.1 $view: questions ${bad_name[$i]} gave exit $rc"
+      fi
+    done
+    # An empty list has no block-list form (a bare `questions:` sets no key),
+    # so `[]` is a flow list: PyYAML reads it and gi-config refuses it (exit 3
+    # naming the key); the restricted parser cannot read it and gi-config
+    # degrades (exit 4, "without PyYAML") rather than calling the file invalid.
+    rc="$(questions_rc ' []' "$schema" "$py")"
+    if python3 ${py:+"$py"} -c 'import yaml' 2>/dev/null; then
+      if [ "$rc" = 3 ] && grep -qF 'triage.route.questions' "$TMP/perr"; then
+        pass "T8.1 $view: questions [] is exit 3 naming the key"
+      else
+        fail "T8.1 $view: questions [] gave exit $rc"
+      fi
+    elif [ "$rc" = 4 ] && grep -qF 'without PyYAML' "$TMP/perr"; then
+      pass "T8.1 $view: questions [] degrades (exit 4) on the restricted parser"
     else
-      fail "T8.1 $view: questions ${bad:0:14} gave exit $rc"
+      fail "T8.1 $view: questions [] gave exit $rc on the restricted parser"
     fi
+    rc="$(questions_rc "$(block 'scope|clarity|criteria|duplicate|size|injection')" "$schema" "$py")"
+    [ "$rc" = 0 ] && pass "T8.2 $view: the default six ids are accepted" || fail "T8.2 $view: default ids gave exit $rc"
   done
-  rc="$(questions_rc '[scope, clarity, criteria, duplicate, size, injection]' "$schema")"
-  [ "$rc" = 0 ] && pass "T8.2 $view: the default six ids are accepted" || fail "T8.2 $view: default ids gave exit $rc"
 done
 for f in "$MODE" "$ROOT/skills/issue-triage/references/route-mode.md"; do
   label_line="$(grep -F 'Confirm with `gh issue view {N} --json labels`' "$f")"
