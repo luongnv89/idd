@@ -345,6 +345,9 @@ run "$SCRIPTS/gi-plan.py" render-release --run r1 --branch feat/1-x
 printf '%s' '{"body":"x","labels":["agent:working"],"comments":[{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:00:00Z"},{"author":{"login":"me"},"body":"<!-- idd:claim-released v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:01:00Z"},{"author":{"login":"you"},"authorAssociation":"NONE","body":"<!-- idd:claim v1 run=r2 branch=feat/1-y -->","createdAt":"2026-11-19T10:01:30Z"},{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r1 branch=feat/1-x -->","createdAt":"2026-11-19T10:02:00Z"}]}' | \
   run "$SCRIPTS/gi-plan.py" check --login me --run r1 --branch feat/1-x
 run "$SCRIPTS/gi-plan.py" check --login "" --run r1 < "$TMP/issue.json"
+printf '%s' '{"body":"x","labels":["agent:working"],"comments":[{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:00:00Z"},{"author":{"login":"me"},"body":"<!-- idd:claim-released v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:01:00Z"}]}' | \
+  run "$SCRIPTS/gi-plan.py" check --login me --run r1 --branch feat/1-x
+run "$SCRIPTS/gi-plan.py" check --login you --run r0 < "$TMP/issue.json"
 printf '' | run "$SCRIPTS/gi-plan.py" check --login me
 printf '%s' '{"option":{"name":"","files_to_modify":[]}}' | run "$SCRIPTS/gi-plan.py" render-plan
 

@@ -86,7 +86,7 @@ Compares the PR with the linked issue's plan comment (`shared/scripts/gi-plan.py
    Keep the JSON as `plan_state`. Only comments by `$login` count, so a plan someone else wrote is never read. An empty login, any non-zero exit or unparsable output: `plan_state` is unknown, and step 2 reports `○ plan conformance: skipped (plan unreadable)`.
 2. **Step 3** — by `plan_state.plan`:
    - `absent` — `○ plan conformance: skipped (no plan comment)`.
-   - `stale` — one note: `the plan comment predates the current issue body (stale); conformance not checked`.
+   - `stale` — one note: `the plan comment is stale (body edited, or superseded); conformance not checked`.
    - `current` — write `plan_state` plus `"changed": [<Step 1's files[].path>]` to `.idd/cache/plan-conform-{N}.json` with the Write tool, then:
      ```bash
      python3 shared/scripts/gi-plan.py conform < .idd/cache/plan-conform-{N}.json; ec=$?; rm -f .idd/cache/plan-conform-{N}.json; exit "$ec"

@@ -61,7 +61,7 @@ Subcommands
                 [--approved-label A] [--race-window S]; stdin the issue as
                 `gh issue view --json body,labels,comments` prints it, or a
                 gi-issue.py envelope {"issue": {...}} → one JSON line:
-                  {"plan": "absent|current|stale", "approved": bool,
+                  {"plan": "absent|current|stale", "superseded": bool, "approved": bool,
                    "plan_hash", "body_hash", "name", "summary",
                    "files_to_modify", "files_to_create", "tasks", "criteria",
                    "criteria_covered", "test_strategy", "risk_details",
@@ -75,6 +75,10 @@ Check rules
   * Trust: a plan marker counts only in a comment whose author login is
     `--login`. Of those, the newest wins (by createdAt; list order when a
     timestamp is missing). `current` when its hash equals the live body's.
+    A plan marker posted after it by another writer login (the claim rule's
+    authorAssociation filter) supersedes it: `plan` reads `stale` and
+    `superseded` true, because `plan-approved` is issue-wide and approves the
+    newest plan, never an older one.
   * `approved` is true only when the `--approved-label` (default
     `plan-approved`) is on the issue and the plan is `current`.
   * Claim. No `--claim-label` value on the issue (or `--claim-label ""`) →
@@ -83,10 +87,14 @@ Check rules
     whose branch is `--branch`, when given). No `mine` → `foreign`. Otherwise
     `own`, unless a live marker for another run, by any login, precedes
     `mine` within `--race-window` seconds (default 600) — the first writer
-    wins, so two racing runs read exactly one `own`. A marker by another
+    wins — or follows it by more than that window (that later claim reads
+    itself own), so two live claims never both read `own`. A marker by another
     login can make a claim `foreign`, never `own`. On a bound resume
     (`--branch`), an earlier marker by `--login` for that branch is this
-    run's own earlier attempt, never a racer. `claim_run`, `claim_branch` and
+    run's own earlier attempt, never a racer; and when no live marker is
+    left and the newest closed one is `--login`'s for that branch, the claim
+    reads `own` — a resume killed between its release comment and the label
+    removal still owns the label. `claim_run`, `claim_branch` and
     `claim_age_s` describe the claim read: `mine` when own, else the marker
     it yields to (the earliest racer, or the newest live marker), null when
     none.
@@ -370,31 +378,40 @@ def check(payload: object, args: argparse.Namespace) -> dict:
     labels = {item.get("name") if isinstance(item, dict) else item for item in issue.get("labels", [])}
     rows = _markers(issue.get("comments", []))
     live = body_hash(issue.get("body") or "")
+    def writer(row: dict) -> bool:
+        return bool(args.login and row["login"] == args.login) or row["assoc"] is None or row["assoc"] in WRITERS
+
     plans = [row for row in rows if args.login and row["login"] == args.login
              and PLAN_MARKER_RE.fullmatch(_first_line(row["body"]))]
-    result: dict = {"plan": "absent", "approved": False, "plan_hash": None, "body_hash": live}
+    result: dict = {"plan": "absent", "approved": False, "plan_hash": None, "body_hash": live,
+                    "superseded": False}
     parsed = parse_plan("")
     if plans:
         newest = plans[-1]
         result["plan_hash"] = PLAN_MARKER_RE.fullmatch(_first_line(newest["body"])).group(1)
         result["plan"] = "current" if result["plan_hash"] == live else "stale"
+        later = rows[rows.index(newest) + 1:]
+        if any(row["login"] != args.login and writer(row)
+               and PLAN_MARKER_RE.fullmatch(_first_line(row["body"])) for row in later):
+            result["plan"], result["superseded"] = "stale", True
         parsed = parse_plan(newest["body"].lstrip())
         result["approved"] = args.approved_label in labels and result["plan"] == "current"
     result.update(parsed)
     result.update({"claim": "none", "claim_run": None, "claim_branch": None, "claim_age_s": None})
     if not args.claim_label or args.claim_label not in labels:
         return result
-    claims = []
-    for row in rows:
+    claims, closed = [], []
+    for seq, row in enumerate(rows):
         first = _first_line(row["body"])
         released = RELEASE_MARKER_RE.fullmatch(first)
         if released and row["login"]:
-            claims = [c for c in claims if not (c["login"] == row["login"] and c["run"] == released.group(1))]
+            ended = [c for c in claims if c["login"] == row["login"] and c["run"] == released.group(1)]
+            closed += ended
+            claims = [c for c in claims if c not in ended]
             continue
         m = CLAIM_MARKER_RE.fullmatch(first)
-        writer = (args.login and row["login"] == args.login) or row["assoc"] is None or row["assoc"] in WRITERS
-        if m and writer and RUN_RE.fullmatch(m.group(1)) and BRANCH_RE.fullmatch(m.group(2)):
-            claims.append({**row, "run": m.group(1), "branch": m.group(2)})
+        if m and writer(row) and RUN_RE.fullmatch(m.group(1)) and BRANCH_RE.fullmatch(m.group(2)):
+            claims.append({**row, "run": m.group(1), "branch": m.group(2), "seq": seq})
     mine = None
     for pos, row in enumerate(claims):
         if args.login and row["login"] == args.login and (
@@ -402,15 +419,29 @@ def check(payload: object, args: argparse.Namespace) -> dict:
             or (args.run is not None and row["run"] == args.run)
         ):
             mine = (pos, row)
+    def other(row: dict, own: dict) -> bool:
+        return row["run"] != own["run"] and not (
+            args.branch is not None and row["login"] == args.login and row["branch"] == args.branch)
+
     held = None
-    if mine is None:
+    last_closed = max(closed, key=lambda c: c["seq"]) if closed else None
+    if mine is None and not claims and args.branch is not None and last_closed is not None \
+            and last_closed["login"] == args.login and last_closed["branch"] == args.branch:
+        # A bound resume killed between its release comment and the label
+        # removal: no live marker is left, so the label is still its own.
+        result["claim"] = "own"
+        held = last_closed
+    elif mine is None:
         result["claim"] = "foreign"
         held = claims[-1] if claims else None
     else:
         pos, own = mine
-        racers = [row for row in claims[:pos] if row["run"] != own["run"] and not (
-            args.branch is not None and row["login"] == args.login and row["branch"] == args.branch
-        ) and (row["at"] is None or own["at"] is None or own["at"] - row["at"] <= args.race_window)]
+        racers = [row for row in claims[:pos] if other(row, own) and (
+            row["at"] is None or own["at"] is None or own["at"] - row["at"] <= args.race_window)]
+        # A live marker posted more than the window after mine reads itself
+        # own, so mine yields to it: two live claims never both read own.
+        racers += [row for row in claims[pos + 1:] if other(row, own) and row["at"] is not None
+                   and own["at"] is not None and row["at"] - own["at"] > args.race_window]
         result["claim"] = "foreign" if racers else "own"
         held = racers[0] if racers else own
     if held is not None:

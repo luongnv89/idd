@@ -282,8 +282,10 @@ FAIL=0
 # the measured total is now 620,864 (+18,374), and the line keeps its six bytes
 # of headroom, so the ratchet is not widened. Its QA fixes (released claims,
 # non-writer markers, an unreadable login) grow that doc by 2,312 bytes per
-# copy: 620,864 + 4,624 = 625,488, again with six bytes of headroom.
-BUDGET=625494
+# copy: 620,864 + 4,624 = 625,488, again with six bytes of headroom. The
+# second QA cycle (superseded plans, a killed release, the symmetric
+# tie-break) adds 409 bytes per copy: 625,488 + 818 = 626,306, six to spare.
+BUDGET=626312
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
