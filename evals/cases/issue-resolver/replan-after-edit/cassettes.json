@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  \u2713 Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "api",
+        "user",
+        "--jq",
+        ".login"
+      ],
+      "stdout": "eval-bot\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "648",
+        "--json",
+        "body,labels,comments"
+      ],
+      "stdout": "{\"body\": \"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nfeature (high confidence)\\n\\n## Description\\n\\nAdd a dark mode toggle to the settings page.\\n\\n## Acceptance Criteria\\n\\n- [ ] The settings page shows a dark mode toggle\\n- [ ] The choice persists across reloads\\n- [ ] The toggle is keyboard accessible\\n\", \"labels\": [{\"name\": \"planned\"}, {\"name\": \"plan-approved\"}], \"comments\": [{\"author\": {\"login\": \"eval-bot\"}, \"body\": \"<!-- idd:plan v1 body=19a4d42dcd5a0022 -->\\n### Plan: Minimal toggle\\nSummary: Add the toggle and persist it in local storage\\n\\n**Files**\\n\\n- modify `src/settings.js` \\u2014 render the toggle\\n- create `tests/settings.test.js` \\u2014 toggle tests\\n\\n**Tasks**\\n\\n- [ ] Modify `src/settings.js`: render the toggle (criteria: AC1, AC2; files: `src/settings.js`)\\n- [ ] Create `tests/settings.test.js`: toggle tests (criteria: AC1, AC2; files: `tests/settings.test.js`)\\n\\n**Acceptance criteria**\\n\\n- AC1: The settings page shows a dark mode toggle\\n- AC2: The choice persists across reloads\\n\\n**Covers:** AC1, AC2\\n**Tests:** unit tests for the toggle and persistence\\n**Risks:** low: settings page only\\n\\n_Approve with the `plan-approved` label. Editing the issue body makes this plan stale._\\n\", \"createdAt\": \"2026-11-18T09:00:00Z\"}]}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "648",
+        "--json",
+        "body"
+      ],
+      "stdout": "{\"body\": \"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nfeature (high confidence)\\n\\n## Description\\n\\nAdd a dark mode toggle to the settings page.\\n\\n## Acceptance Criteria\\n\\n- [ ] The settings page shows a dark mode toggle\\n- [ ] The choice persists across reloads\\n- [ ] The toggle is keyboard accessible\\n\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "issue-resolver/plan-required",
+  "skill": "issue-resolver",
+  "prompt": "Resolve issue #648 with resolver.require_plan: true and plan_approval: human when no plan comment exists (issue #648)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-plan.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/plan-absent.txt",
+      "expect_exit": 0,
+      "label": "no current plan before the run"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/plan-marker.txt",
+      "expect_exit": 0,
+      "label": "the posted comment opens with the idd:plan v1 marker"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/after-plan-current.txt",
+      "expect_exit": 0,
+      "label": "the posted plan reads current against the live body"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/after-approved.txt",
+      "expect_exit": 1,
+      "label": "a fresh plan is not approved (negative)"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run.json",
+      "expect_exit": 0,
+      "label": "the auto-mode stop is a valid failed record with plan_awaiting_approval"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The plan is posted before any code is written.",
+      "plan-approved is removed before the post, so no approval carries over.",
+      "Auto mode stops instead of building an unapproved plan."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-plan.py on recorded issue reads; whether a live agent follows the plan-and-claim procedure is out of its scope."
+  }
+}

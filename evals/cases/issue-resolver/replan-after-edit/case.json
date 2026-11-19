@@ -1,0 +1,42 @@
+{
+  "name": "issue-resolver/replan-after-edit",
+  "skill": "issue-resolver",
+  "prompt": "Resolve issue #648 after its body was edited since the plan comment was posted (issue #648)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-plan.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/plan-stale.txt",
+      "expect_exit": 0,
+      "label": "the plan made for the earlier body reads stale"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/approved.txt",
+      "expect_exit": 1,
+      "label": "plan-approved on a stale plan approves nothing (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/after-plan-current.txt",
+      "expect_exit": 0,
+      "label": "the re-plan reads current against the edited body"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/after-approved.txt",
+      "expect_exit": 1,
+      "label": "the re-plan's post removed the old approval (negative)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "An edit to the issue body makes the old plan stale.",
+      "The old approval does not carry over to the new plan."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-plan.py on recorded issue reads; whether a live agent follows the plan-and-claim procedure is out of its scope."
+  }
+}

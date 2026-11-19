@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  \u2713 Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "api",
+        "user",
+        "--jq",
+        ".login"
+      ],
+      "stdout": "eval-bot\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "648",
+        "--json",
+        "body,labels,comments"
+      ],
+      "stdout": "{\"body\": \"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nfeature (high confidence)\\n\\n## Description\\n\\nAdd a dark mode toggle to the settings page.\\n\\n## Acceptance Criteria\\n\\n- [ ] The settings page shows a dark mode toggle\\n- [ ] The choice persists across reloads\\n\", \"labels\": [{\"name\": \"agent:working\"}], \"comments\": [{\"author\": {\"login\": \"eval-bot\"}, \"body\": \"<!-- idd:claim v1 run=resolver-20261119T120000Z-a1b2 branch=feat/648-dark-mode -->\\nClaimed by IDD Stack run `resolver-20261119T120000Z-a1b2` on branch `feat/648-dark-mode`. Removing the claim label releases it.\\n\", \"createdAt\": \"2026-11-19T12:00:00Z\"}]}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "648",
+        "--json",
+        "body"
+      ],
+      "stdout": "{\"body\": \"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nfeature (high confidence)\\n\\n## Description\\n\\nAdd a dark mode toggle to the settings page.\\n\\n## Acceptance Criteria\\n\\n- [ ] The settings page shows a dark mode toggle\\n- [ ] The choice persists across reloads\\n\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

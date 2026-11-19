@@ -530,3 +530,6 @@ jobs:
 
       - name: test-route-mode-647
         run: bash tests/test-route-mode-647.sh
+
+      - name: test-plan-claim-648
+        run: bash tests/test-plan-claim-648.sh

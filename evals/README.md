@@ -166,6 +166,14 @@ runs `gi-premise.py`. Two fixes that fail under one premise block the third
 fix. A diagnostic that the subject reruns for real, and whose rerun matches
 its record, lifts the block. A mismatched rerun leaves the block in place.
 
+## Plan and claim fixtures (#648)
+
+Four resolver cases run the real `gi-plan.py` on recorded issue reads.
+`issue-resolver/plan-required` posts a plan when none exists and stops for
+approval; `replan-after-edit` reads a plan made for an earlier body as stale,
+ignores its approval and re-plans; `foreign-claim` stops on another run's
+claim; `claim-release` releases only a claim that reads own.
+
 ## Adding a case
 
 1. Create `evals/cases/<skill>/<case-name>/` with `case.json`, `cassettes.json`,

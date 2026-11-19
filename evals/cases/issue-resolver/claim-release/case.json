@@ -1,0 +1,36 @@
+{
+  "name": "issue-resolver/claim-release",
+  "skill": "issue-resolver",
+  "prompt": "Release the agent:working claim after opening the PR for issue #648 (issue #648)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-plan.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/claim-own.txt",
+      "expect_exit": 0,
+      "label": "this run's claim reads own"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/release.txt",
+      "expect_exit": 0,
+      "label": "Release removes an own claim"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/release-foreign.txt",
+      "expect_exit": 1,
+      "label": "Release never removes a claim another run holds (negative)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The claim label is removed right after the PR opens.",
+      "Only a claim that reads own is ever removed."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-plan.py on recorded issue reads; whether a live agent follows the plan-and-claim procedure is out of its scope."
+  }
+}
