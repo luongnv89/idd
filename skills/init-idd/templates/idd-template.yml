@@ -80,6 +80,18 @@ resolve:
   ui_review:
     browser_review: ask
 
+# Resolver plan comment and claim label (written to the issue). Protocol:
+# https://github.com/luongnv89/idd/blob/main/docs/plan-and-claim.md
+resolver:
+  # true: post or reuse a plan comment before writing code
+  require_plan: false
+
+  # "auto" (no wait) | "human" (wait for the plan-approved label)
+  plan_approval: auto
+
+  # Label held while a resolver works on the issue; "" turns the claim off
+  claim_label: "agent:working"
+
 # Triage settings
 triage:
   # Flag issues with no activity beyond this threshold (days)
