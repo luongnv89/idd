@@ -49,7 +49,9 @@ accepted value outside squash, merge and rebase is exit 3, in view or not.
 1-39 characters, start with a letter or digit, and hold only letters, digits
 and `._:-` (fullmatch), else exit 3, in view or not. 39 keeps the longest
 route label within GitHub's 50-character limit; a leading `-` would read as a
-flag.
+flag. `triage.route.questions` is passed to `gi-route.py --enabled` as separate
+words, so it must be a list of distinct strings that each fullmatch `[a-z]+`,
+else exit 3, in view or not; gi-route.py owns which ids exist and are required.
 
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
 directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
@@ -142,6 +144,10 @@ _MERGE_METHODS = ("squash", "merge", "rebase")
 # 50-character label limit.
 _ROUTE_PREFIX = "triage.route.label_prefix"
 _ROUTE_PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,38}")
+# The question ids become separate words of `gi-route.py --enabled`, so each
+# is a bare lowercase word; gi-route.py decides which ids are known.
+_ROUTE_QUESTIONS = "triage.route.questions"
+_ROUTE_QUESTION_RE = re.compile(r"[a-z]+")
 
 
 class ConfigError(Exception):
@@ -482,6 +488,17 @@ def merge(
             errors.append(
                 f"{_ROUTE_PREFIX} — must be 1-39 letters, digits and ._:- that "
                 "starts with a letter or digit"
+            )
+
+    if _ROUTE_QUESTIONS in accepted:
+        ids = accepted[_ROUTE_QUESTIONS]
+        if (
+            not isinstance(ids, list)
+            or not all(isinstance(i, str) and _ROUTE_QUESTION_RE.fullmatch(i) for i in ids)
+            or len(set(ids)) != len(ids)
+        ):
+            errors.append(
+                f"{_ROUTE_QUESTIONS} — must be a list of distinct lowercase-letter ids"
             )
 
     merged = {**defaults, **accepted}
