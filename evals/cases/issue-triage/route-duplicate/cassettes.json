@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "40",
+        "--json",
+        "number,title,body,labels,state"
+      ],
+      "stdout": "{\"number\":40,\"title\":\"Last row missing on the final reports page\",\"body\":\"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nbug (high confidence)\\n\\n## Description\\n\\nOn the last page of the reports table one row never shows.\\n\\n## Acceptance Criteria\\n\\n- [ ] Every row appears on the last page\\n- [ ] No row appears twice across pages\\n\",\"labels\":[{\"name\":\"bug\"}],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

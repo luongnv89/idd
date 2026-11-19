@@ -1327,6 +1327,9 @@ EXPECTED_SITES = {
     # issue #584: issue-analysis numbers the criteria for its synthesizer
     # (subagent-steps.md) and its inline fallback (inline-fallback.md).
     "gi-ready.py": 8,
+    # 2 since issue #647: /issue-triage route mode validates the question set
+    # once (--questions --enabled) and judges each issue (--comment).
+    "gi-route.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

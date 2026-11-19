@@ -183,7 +183,7 @@ its record, lifts the block. A mismatched rerun leaves the block in place.
 
 Aim toward **≥5 prompts per skill**, including **negative-trigger** cases (empty
 body, missing `Closes #N`, non-conventional branch, invalid run-log record).
-Today's floor ships creator (2), resolver (2), pr-review (3), triage (1),
+Today's floor ships creator (2), resolver (2), pr-review (3), triage (5),
 auto-pilot (1) and plan-to-issues (2), plus harness unit tests.
 
 ### Cases on a host without a sandbox

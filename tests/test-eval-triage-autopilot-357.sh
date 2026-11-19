@@ -7,7 +7,7 @@
 # is deliberate (#342) and is neither weakened nor bypassed here: T6 invokes
 # run_eval.sh unchanged, and skips only when the host cannot sandbox at all.
 #
-# Everything before T6 is host-independent, so the two new cases stay guarded
+# Everything before T6 is host-independent, so the cases stay guarded
 # on a developer machine that has no user+network namespaces:
 #   T1  case manifests are well formed and only name tools the grader has
 #   T2  cassettes are replayable — every recorded argv matched by the shim
@@ -29,7 +29,13 @@ SHIM="$REPO_ROOT/evals/harness/gh_shim.py"
 GRADE="$REPO_ROOT/evals/harness/grade.py"
 TRIAGE_CASE="$REPO_ROOT/evals/cases/issue-triage/ordering"
 AUTOPILOT_CASE="$REPO_ROOT/evals/cases/auto-pilot/merge-gating"
-CASES=("$TRIAGE_CASE" "$AUTOPILOT_CASE")
+# Route mode (#647): a clear bug, a vague request, a duplicate and an embedded
+# agent instruction, each run through the real gi-route.py via repo_scripts.
+ROUTE_CASES=()
+for route_case in route-clear-bug route-vague route-duplicate route-injection; do
+  ROUTE_CASES+=("$REPO_ROOT/evals/cases/issue-triage/$route_case")
+done
+CASES=("$TRIAGE_CASE" "$AUTOPILOT_CASE" "${ROUTE_CASES[@]}")
 
 PASS=0
 FAIL=0
@@ -342,9 +348,14 @@ fi
 # ───────────────────────────────────────────────────────────
 replay_case() {
   local case_dir="$1" work="$2"
-  local bin="$work/bin" out="$work/out"
-  mkdir -p "$bin" "$out" "$work/state" "$work/repo" "$work/home" "$work/case"
+  local bin="$work/bin" out="$work/out" rel
+  mkdir -p "$bin" "$out" "$work/state" "$work/repo" "$work/home" "$work/case" "$work/scripts"
   cp -R "$case_dir"/. "$work/case"/
+  # repo_scripts are copied, as run_eval.sh copies them, so the subject never
+  # reaches the checkout.
+  while IFS= read -r rel; do
+    [ -n "$rel" ] && cp "$REPO_ROOT/$rel" "$work/scripts/"
+  done < <("$PYTHON_BIN" -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1])).get("repo_scripts", [])))' "$case_dir/case.json")
   {
     echo '#!/usr/bin/env bash'
     echo "exec \"$PYTHON_BIN\" \"$SHIM\" \"\$@\""
@@ -365,6 +376,7 @@ replay_case() {
       EVAL_OUT="$out" \
       EVAL_CASE_DIR="$work/case" \
       EVAL_WORK="$work" \
+      EVAL_SCRIPTS_DIR="$work/scripts" \
       bash "$work/case/subject.sh" ) >"$work/subject.log" 2>&1 || return 1
   REPO_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$GRADE" \
     --case "$case_dir" --out "$out" >"$work/grade.log" 2>&1
