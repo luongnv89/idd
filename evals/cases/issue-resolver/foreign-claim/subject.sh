@@ -21,6 +21,9 @@ state() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.ar
 [ "$(state approved)" = True ] && : > "$EVAL_OUT/approved.txt"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if (d["claim_run"], d["claim_branch"]) == ("resolver-20261119T110000Z-ffff", "feat/648-other") else 1)' "$EVAL_OUT/check.json" \
   && : > "$EVAL_OUT/claim-named.txt"
-cat > "$EVAL_OUT/run.json" <<'JSON'
+# The auto-mode stop is written only when the claim reads foreign.
+if [ "$(state claim)" = foreign ]; then
+  cat > "$EVAL_OUT/run.json" <<'JSON'
 {"ts": "2026-11-19T12:00:00Z", "issue": 648, "mode": "auto", "skill": "issue-resolver", "outcome": "failed", "pr": null, "skipped_reason": "claimed_elsewhere", "duration_s": 7}
 JSON
+fi

@@ -20,6 +20,8 @@
 #   T4  Skill wiring pins (resolver, analysis, pr-review, auto-pilot, config).
 #   T5  Built bundles and CI.
 #   T6  The four issue-resolver eval cases replay end to end.
+#   T7  Released claims, non-writer markers, a bound resume's own earlier
+#       marker and an unreadable login never orphan or block a claim.
 #
 # Usage: bash tests/test-plan-claim-648.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -88,7 +90,7 @@ PY
 python3 "$PLAN" render-plan < "$TMP/in.json" > "$TMP/plan.md"
 
 # issue <out> <body-file|-> <labels-csv> <comment-spec>... — write an issue JSON.
-# A comment spec is login|createdAt|file-with-the-comment-body.
+# A comment spec is login|createdAt|file-with-the-comment-body[|authorAssociation].
 issue() {
   local out="$1" body="$2" labels="$3"; shift 3
   python3 - "$out" "$body" "$labels" "$BODY" "$@" <<'PY'
@@ -97,9 +99,10 @@ out, body_src, labels, default_body, *specs = sys.argv[1:]
 body = default_body if body_src == "-" else open(body_src).read()
 comments = []
 for spec in specs:
-    login, at, path = spec.split("|", 2)
+    login, at, path, *assoc = spec.split("|", 3)
     comments.append({"author": {"login": login}, "body": open(path).read(),
-                     **({"createdAt": at} if at else {})})
+                     **({"createdAt": at} if at else {}),
+                     **({"authorAssociation": assoc[0]} if assoc else {})})
 json.dump({"body": body, "labels": [{"name": l} for l in labels.split(",") if l],
            "comments": comments}, open(out, "w"))
 PY
@@ -376,6 +379,84 @@ n="$(grep -c -- '<!--' "$TMP/plan.md")"
   && pass "T3.9 rendered values cannot forge a marker: the only comment delimiter is line 1" || fail "T3.9 $n delimiters"
 grep -qx '\*\*Tasks\*\*' "$TMP/plan.md" && [ "$(grep -cx '\*\*Tasks\*\*' "$TMP/plan.md")" = 1 ] \
   && pass "T3.10 a value cannot start a section (newlines are flattened)" || fail "T3.10"
+
+# ── T7: no orphaned or blocked claim ───────────────────────────────────────
+echo "  ┄ released claims, non-writers, resume, unreadable login"
+python3 "$PLAN" render-release --run r0 --branch feat/648-old > "$TMP/rel-r0.md"
+[ "$(head -1 "$TMP/rel-r0.md")" = '<!-- idd:claim-released v1 run=r0 branch=feat/648-old -->' ] \
+  && pass "T7.1 render-release writes the release marker line first" || fail "T7.1 $(head -1 "$TMP/rel-r0.md")"
+rc=0; python3 "$PLAN" render-release --run 'r;0' --branch feat/1 >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] && pass "T7.2 render-release refuses a bad run (exit 3)" || fail "T7.2 gave $rc"
+# The plan-approval loop: r0 claimed, stopped and released at 10:05; r1 claims at 10:07.
+issue "$TMP/i-r1.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r0.md" \
+  "me|2026-11-19T10:05:00Z|$TMP/rel-r0.md" "me|2026-11-19T10:07:00Z|$TMP/c-r1.md"
+[ "$(claim_of "$TMP/i-r1.json" me r1)" = own ] \
+  && pass "T7.3 test_released_marker_never_races: a claim released inside the race window does not orphan the next claim" \
+  || fail "T7.3 test_released_marker_never_races: a released marker still blocks"
+[ "$(claim_of "$TMP/i-r1.json" me r9)" = foreign ] && [ "$(field "$TMP/out.json" 'd["claim_run"]')" = r1 ] \
+  && pass "T7.4 a later run yields to the live claim, never to the released one" || fail "T7.4 claim_run=$(field "$TMP/out.json" 'd["claim_run"]')"
+issue "$TMP/i-r2.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r0.md" \
+  "mallory|2026-11-19T10:05:00Z|$TMP/rel-r0.md" "me|2026-11-19T10:07:00Z|$TMP/c-r1.md"
+[ "$(claim_of "$TMP/i-r2.json" me r1)" = foreign ] \
+  && pass "T7.5 a release comment by another login closes nothing" || fail "T7.5 a forged release closed our marker"
+issue "$TMP/i-r3.json" - "agent:working" "me|2026-11-19T10:05:00Z|$TMP/rel-r0.md" \
+  "me|2026-11-19T10:06:00Z|$TMP/c-r0.md" "me|2026-11-19T10:07:00Z|$TMP/c-r1.md"
+[ "$(claim_of "$TMP/i-r3.json" me r1)" = foreign ] \
+  && pass "T7.6 a release closes only the markers before it" || fail "T7.6 an earlier release closed a later marker"
+# Markers by accounts that cannot add the label.
+for assoc in NONE CONTRIBUTOR FIRST_TIME_CONTRIBUTOR; do
+  issue "$TMP/i-a.json" - "agent:working" "mallory|2026-11-19T10:00:00Z|$TMP/c-r2.md|$assoc" "me|2026-11-19T10:00:30Z|$TMP/c-r1.md|OWNER"
+  [ "$(claim_of "$TMP/i-a.json" me r1)" = own ] \
+    && pass "T7.7 test_non_writer_marker_never_races: an earlier $assoc marker cannot orphan our label" \
+    || fail "T7.7 test_non_writer_marker_never_races: $assoc marker blocked"
+done
+for assoc in OWNER MEMBER COLLABORATOR; do
+  issue "$TMP/i-a.json" - "agent:working" "you|2026-11-19T10:00:00Z|$TMP/c-r2.md|$assoc" "me|2026-11-19T10:00:30Z|$TMP/c-r1.md|OWNER"
+  [ "$(claim_of "$TMP/i-a.json" me r1)" = foreign ] \
+    && pass "T7.8 an earlier $assoc racer still wins (first writer)" || fail "T7.8 $assoc racer ignored"
+done
+issue "$TMP/i-a2.json" - "agent:working" "mallory|2026-11-19T10:00:00Z|$TMP/c-r1.md|NONE"
+[ "$(claim_of "$TMP/i-a2.json" me r9)" = foreign ] && [ "$(field "$TMP/out.json" 'd["claim_run"]')" = None ] \
+  && pass "T7.9 a non-writer's marker is never named as the holder" || fail "T7.9"
+# A bound resume after a crash between the claim comment and the label: the
+# crashed attempt r1 and the resume r2 both wrote markers for feat/648-b.
+claim_md "$TMP/c-r1b.md" r1 feat/648-b
+issue "$TMP/i-b.json" - "agent:working" "me|2026-11-19T10:00:00Z|$TMP/c-r1b.md" "me|2026-11-19T10:01:00Z|$TMP/c-r2.md"
+chk "$TMP/i-b.json" --login me --run r2 --branch feat/648-b
+a="$(field "$TMP/out.json" 'd["claim"]')"
+chk "$TMP/i-b.json" --login me --run r2
+b="$(field "$TMP/out.json" 'd["claim"]')"
+[ "$a/$b" = own/foreign ] \
+  && pass "T7.10 test_bound_resume_own_marker: a bound resume's earlier marker on its branch is not a racer; a fresh run still yields" \
+  || fail "T7.10 test_bound_resume_own_marker: --branch=$a, fresh=$b"
+# An unreadable login (an app token): nothing is trusted, nothing is own.
+issue "$TMP/i-l.json" - "agent:working,plan-approved" "me|2026-11-19T10:00:00Z|$TMP/plan.md" "me|2026-11-19T10:00:30Z|$TMP/c-r1.md"
+chk "$TMP/i-l.json" --login "" --run r1
+got="$RC $(field "$TMP/out.json" 'json.dumps([d["plan"], d["approved"], d["claim"]])')"
+[ "$got" = '0 ["absent", false, "foreign"]' ] \
+  && pass "T7.11 test_unreadable_login: --login \"\" reads the plan absent and a labelled claim foreign" \
+  || fail "T7.11 test_unreadable_login: got $got"
+issue "$TMP/i-l2.json" - "" "me|2026-11-19T10:00:30Z|$TMP/c-r1.md"
+chk "$TMP/i-l2.json" --login "" --run r1
+[ "$RC/$(field "$TMP/out.json" 'd["claim"]')" = 0/none ] \
+  && pass "T7.12 test_unreadable_login: no label reads none" || fail "T7.12 rc=$RC"
+hasflat "$DOC" 'For the rest of that run the claim is off as with `resolver.claim_label: ""` — never written, never released — except that a label already on the issue still stops with *Claimed elsewhere*' \
+  "T7.13 an unreadable login turns the claim off but still stops on a present label"
+hasflat "$DOC" 'a resolver plan step that must post a plan takes *Plan awaiting approval* instead of posting' \
+  "T7.14 an unreadable login never reposts a plan"
+hasflat "$RS/references/steps/step-2-plan.md" 'empty `$login` posts nothing and takes the same stop' \
+  "T7.15 the resolver's plan step stops on an unreadable login"
+has "$DOC" 'A non-zero exit claimed nothing: print `⚠ Claim not written — continuing unclaimed`, skip steps 4–5 (no label is added), and never release.' \
+  "T7.16 a failed claim comment adds no label"
+python3 - "$DOC" <<'PY' && pass "T7.17 Release posts the release comment before it removes the label" || fail "T7.17 release order"
+import sys
+t = open(sys.argv[1]).read()
+r = t[t.index("**Release** —"):]
+assert r.index("post the *Release comment*") < r.index("--remove-label")
+PY
+hasflat "$DOC" "post this run's *Release comment* (its marker lost, so it must not race a later claim)" \
+  "T7.18 a run that lost the race closes its own marker"
+grep -qF 'or wait' "$DOC" && fail "T7.19 the doc still offers waiting out a claim" || pass "T7.19 the doc no longer offers waiting as a remedy"
 
 # ── T4: wiring pins ────────────────────────────────────────────────────────
 echo "  ┄ wiring"

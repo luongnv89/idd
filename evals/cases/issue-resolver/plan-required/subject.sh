@@ -40,6 +40,9 @@ after() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.ar
 : > "$EVAL_OUT/after-plan-$(after plan).txt"
 [ "$(after approved)" = True ] && : > "$EVAL_OUT/after-approved.txt"
 head -1 "$EVAL_OUT/plan.md" | grep -qE '^<!-- idd:plan v1 body=[0-9a-f]{16} -->$' && : > "$EVAL_OUT/plan-marker.txt"
-cat > "$EVAL_OUT/run.json" <<'JSON'
+# Under plan_approval: human the run stops only when the posted plan is not approved.
+if [ "$(after approved)" != True ]; then
+  cat > "$EVAL_OUT/run.json" <<'JSON'
 {"ts": "2026-11-19T12:00:00Z", "issue": 648, "mode": "auto", "skill": "issue-resolver", "outcome": "failed", "pr": null, "skipped_reason": "plan_awaiting_approval", "duration_s": 7}
 JSON
+fi

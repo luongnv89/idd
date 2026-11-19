@@ -28,7 +28,7 @@
       "tool": "file-exists",
       "file": "OUT/after-approved.txt",
       "expect_exit": 1,
-      "label": "the re-plan's post removed the old approval (negative)"
+      "label": "with plan-approved removed, the re-plan reads unapproved (negative)"
     }
   ],
   "human_review": {

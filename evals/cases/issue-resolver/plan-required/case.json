@@ -28,7 +28,7 @@
       "tool": "file-exists",
       "file": "OUT/after-approved.txt",
       "expect_exit": 1,
-      "label": "a fresh plan is not approved (negative)"
+      "label": "a fresh plan reads unapproved once plan-approved is off the issue (negative)"
     },
     {
       "tool": "gi-runlog-echo",
