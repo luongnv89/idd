@@ -112,6 +112,36 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** File write to `.idd/analysis-N.json` fails (permission denied, disk full, etc.).
 
+## Plan Comment (`--plan`)
+
+### Plan refused — issue not normalized
+```
+✗ Plan refused — issue #N is not normalized
+
+  A plan is bound to the body it was made for, and /issue-resolver
+  normalizes an un-normalized body before reading its plan.
+  To fix:  /issue-creator N   (normalize it), then /issue-analysis N --plan
+```
+**Trigger:** `--plan` on a body without `<!-- idd:normalized v1 -->` (or a legacy `gitissue:normalized` marker). Nothing is posted; the saved analysis stands.
+
+### Plan approval label not removed
+```
+✗ Plan not posted — plan-approved is still on issue #N
+
+  An approval must never carry over to a new plan.
+  To fix:  gh issue edit N --remove-label plan-approved
+           then /issue-analysis N --plan
+```
+**Trigger:** the `plan-approved` removal could not be confirmed by a live label read (`references/docs/plan-and-claim.md`, *Posting a plan*). Nothing is posted.
+
+### Plan comment not posted
+```
+⚠ Plan comment not posted on issue #N: {reason}
+
+  The analysis is saved; post it later with /issue-analysis N --plan.
+```
+**Trigger:** `gi-plan.py render-plan` exits non-zero, or `gh issue comment` or the `planned` label write fails.
+
 ## Configuration
 
 ### Invalid config

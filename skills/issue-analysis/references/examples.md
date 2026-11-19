@@ -146,6 +146,25 @@ Full example runs (happy path, view mode, closed issue).
 
 ---
 
+## Example: Plan comment
+
+**User says:** `/issue-analysis 42 --plan`
+
+```
+  ... (the full analysis flow above) ...
+  Saved: .idd/analysis-42.json
+
+  ● Posting plan for issue #42...
+  ✓ plan-approved: not on the issue
+  ✓ Plan comment posted (Option 1 — Minimal fix, 2 tasks)
+  ✓ Label: planned
+    https://github.com/owner/repo/issues/42#issuecomment-123456
+
+  Plan comment:      ✓ posted
+```
+
+---
+
 ## Example: View mode
 
 **User says:** `/issue-analysis 42 view`

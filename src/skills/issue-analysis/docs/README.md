@@ -27,6 +27,7 @@
 |---|---|
 | `/issue-analysis 42` | Run a full root-cause + options analysis of issue #42 |
 | `/issue-analysis 42 view` | Re-render the cached analysis without calling GitHub |
+| `/issue-analysis 42 --plan` | Analyze, then post the recommended option as the issue's plan comment for `/issue-resolver` |
 | "how hard is #42" | Score complexity/risk and outline implementation options |
 | "investigate issue #42" | Trace root cause across affected files and modules |
 | "impact analysis for #42" | Surface blast radius, dependencies, and migration concerns |
@@ -63,6 +64,7 @@ asm install https://github.com/luongnv89/idd --skill issue-analysis
 ```
 /issue-analysis <N>
 /issue-analysis <N> view
+/issue-analysis <N> --plan
 ```
 
 ## Resources

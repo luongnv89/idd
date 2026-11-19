@@ -19,6 +19,7 @@ Deep analysis of a single GitHub issue — root cause, architecture impact, impl
 |------------|--------------|
 | `/issue-analysis <N>` | Full deep analysis of issue #N, persist to `.idd/analysis-<N>.json` |
 | `/issue-analysis <N> view` | Render cached analysis from `.idd/analysis-<N>.json` without re-scanning |
+| `/issue-analysis <N> --plan` | Full analysis, then post its recommended option as the issue's plan comment (*Plan Comment*) — the one form that writes to GitHub |
 
 Require a positive integer issue number; reject invalid input before resolving paths or running commands.
 
@@ -208,6 +209,8 @@ Check these files:
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher (Step 1)
 - `references/scripts/gi-ready.py` — numbers the acceptance criteria for the synthesizer (Steps 6-7)
+- `references/scripts/gi-plan.py` — renders the plan comment (`--plan`)
+- `references/docs/plan-and-claim.md` — plan comment procedure (`--plan`)
 
 ---
 
@@ -280,7 +283,7 @@ Stop.
 ```
 Print the warning and continue: reviewing what was done is a valid use of analysis.
 
-**No guards:** analysis is read-only and non-destructive, so no assignment guard or blocking-label guard is needed — no work can be duplicated and no block violated.
+**No guards:** analysis is read-only and non-destructive — apart from the opt-in `--plan` comment and its labels — so no assignment guard or blocking-label guard is needed: no work can be duplicated and no block violated.
 
 ### Classify type
 
@@ -322,6 +325,15 @@ Summary:
 2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause` (from the `analysis` block's `summary`), `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues may carry an optional sixth `reproduction` field that no skill writes — `/issue-resolver`'s post-fix bug-verification checkpoint produces that evidence in the PR body; see `references/output-and-persist.md`.
 
 Exact schema and rendering, including the report's *Decision Record* section: `references/output-and-persist.md`.
+
+### Plan Comment (`--plan` only)
+
+After the persist succeeds, post the analysis's recommended option as the issue's plan comment, so `/issue-resolver` can build from it (`references/docs/plan-and-claim.md`, *Posting a plan*; format: `references/scripts/gi-plan.py`):
+
+1. **Normalized issues only.** The plan's hash binds it to the body, and the resolver rewrites an un-normalized body before reading the plan. A body without `<!-- idd:normalized v1 -->` (a legacy `gitissue:normalized` one counts) prints *Plan refused — issue not normalized* and posts nothing.
+2. Post with `options[recommended_option - 1]` as the option and the analysis's `criteria` list, in the order *Posting a plan* gives: `plan-approved` removed and confirmed gone first, then the comment, then `planned`. A removal that cannot be confirmed prints *Plan approval label not removed* and posts nothing; a failed post prints *Plan comment not posted*. Either way the saved analysis stands: the run ends `PARTIAL`, never `BLOCKED`.
+
+Report it as a `Plan comment:` row in the *Final Report* block (`✓ posted`, or `✗` with the error's title).
 
 ---
 
