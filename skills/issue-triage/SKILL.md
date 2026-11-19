@@ -20,6 +20,7 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, group pa
 | `/issue-triage` | Show cached triage from `.idd/triage.json` and suggest an update if the repo changed; with no cache, run a full analysis and persist. |
 | `/issue-triage update` | Force a full re-analysis: **Prerequisites** (rate-budget preflight included), then Steps 1-9, overwriting `.idd/triage.json` |
 | `/issue-triage --limit N` | The same, capped at N issues |
+| `/issue-triage --route [N…]` | Route mode: answer fixed closed questions per issue (default: the open backlog) and print a JSON route verdict — *Route Mode* |
 | `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default rather than prompting |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** The report renders with no GitHub API call; an update runs only on request or approval.
@@ -28,7 +29,7 @@ The design principle: **viewing is cheap and instant, updating is deliberate.** 
 
 ## Default Mode (View with Smart Suggestions)
 
-Invoked as `/issue-triage` (no `update`, no `--limit`), first run the *Bundled dependency precheck* below — view mode reads bundled files too — then:
+Invoked as `/issue-triage` (no `update`, `--limit` or `--route`), first run the *Bundled dependency precheck* below — view mode reads bundled files too — then:
 
 ### 1. Check for cached data
 
@@ -191,11 +192,17 @@ Manual fallback: load `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ leg
 
 Triage settings and their defaults — `triage.stale_threshold_days` `14`,
 `triage.auto_priority` `true`, `triage.include_closed` `false`,
-`triage.scan_timeout_per_issue` `30` — with full semantics for each in
+`triage.scan_timeout_per_issue` `30`, `triage.route.comment` `false`,
+`triage.route.label` `false`, `triage.route.label_prefix` `"route:"`,
+`triage.route.questions` all six ids — with full semantics for each in
 `references/docs/config-schema.md` (*triage*), plus `compaction.enabled` `true` and
 `compaction.threshold.issue-triage` `40`. Invalid values in an existing file are the exit-3 case above.
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`): once, right after this config load, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-triage`. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and mode only), then continue — no pause; auto mode prints only the `⚠` line.
+
+## Route Mode
+
+`/issue-triage --route [N…]` runs *Prerequisites*, *Configuration* and the *Bundled dependency precheck*, then follows `references/route-mode.md` instead of the sync and Steps 1-9. `references/scripts/gi-route.py` is the routing table's only home.
 
 ---
 
@@ -247,6 +254,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/error-messages.md` — error catalog
 - `references/self-improve.md`
 - `references/examples.md` — worked example runs
+- `references/route-mode.md` — route mode procedure
 - `references/docs/sync-conventions.md` — stash-first sync
 - `references/docs/idd-methodology.md` — dependency markers, readiness
 - `references/docs/github-projects-sync.md` — Projects status sync
@@ -261,6 +269,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority
 - `references/scripts/gi-ready.py` — issue readiness (Step 1)
+- `references/scripts/gi-route.py` — route-mode questions and routing table
 
 ---
 
@@ -415,7 +424,7 @@ Optional, propose-only. With no user present to approve (a subagent, unattended,
 
 Terminal output follows the `references/docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output, `│ ─ ┼` tables. Errors use the rich format from `references/error-messages.md` — `✗ what failed`, `To fix:  <command>`, then a docs link where one applies.
 
-Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog and rules in references/docs/platform-github.md. This skill is **read-only** against the GitHub Project board and never changes issue status; how other skills update it is in `references/docs/github-projects-sync.md`. Worked runs: `references/examples.md`.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog and rules in references/docs/platform-github.md. This skill is **read-only** against the GitHub Project board and never changes issue status; how other skills update it is in `references/docs/github-projects-sync.md`. Route mode's opt-in label and comment (`triage.route.*`) are its only tracker writes. Worked runs: `references/examples.md`.
 
 ## Expected Output
 

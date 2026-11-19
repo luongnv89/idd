@@ -81,6 +81,24 @@ triage:
   # Maximum: 300
   scan_timeout_per_issue: 30
 
+  # Route mode (/issue-triage --route); both writes are opt-in
+  route:
+    # One comment rendered from the answers. Type: boolean. Default: false
+    comment: false
+    # Add the route label (add-only). Type: boolean. Default: false
+    label: false
+    # Route label prefix. Type: string. Default: "route:"
+    label_prefix: "route:"
+    # Questions; injection, clarity, criteria always asked.
+    # Type: array of strings. Default: all six
+    questions:
+      - scope
+      - clarity
+      - criteria
+      - duplicate
+      - size
+      - injection
+
 # Issue analysis settings
 analysis:
   # Max files to read during deep analysis
@@ -208,6 +226,10 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |
 | `triage.scan_timeout_per_issue` | `30` | Max seconds per issue scan |
+| `triage.route.comment` | `false` | Route mode posts one comment |
+| `triage.route.label` | `false` | Route mode adds its label — the only route signal `/auto-pilot` and `/issue-resolver` read |
+| `triage.route.label_prefix` | `"route:"` | Route label prefix; must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,38}` |
+| `triage.route.questions` | all six | Route questions; a non-empty list of distinct ids, each fullmatching `[a-z]+` |
 | `analysis.max_files` | `30` | Max files to read during analysis |
 | `analysis.trace_depth` | `3` | Import trace depth levels |
 | `analysis.scan_timeout` | `120` | Max seconds for codebase scan |

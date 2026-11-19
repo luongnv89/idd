@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "21",
+        "--json",
+        "number,title,body,labels,state"
+      ],
+      "stdout": "{\"number\":21,\"title\":\"Fix pagination off-by-one on last page\",\"body\":\"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nbug (high confidence)\\n\\n## Description\\n\\nThe final page of the reports table drops its last row.\\n\\n## Acceptance Criteria\\n\\n- [ ] The last page shows every remaining row\\n- [ ] A regression test covers a table whose size is a multiple of the page size\\n\",\"labels\":[{\"name\":\"bug\"}],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

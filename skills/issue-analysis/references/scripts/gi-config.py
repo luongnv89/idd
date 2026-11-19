@@ -44,6 +44,15 @@ view.
 `review.merge_method` (issue #564) is an enum the type check cannot see: an
 accepted value outside squash, merge and rebase is exit 3, in view or not.
 
+`triage.route.label_prefix` (issue #647) becomes part of a label that
+/issue-triage --route puts on a `gh` command line, so an accepted value must be
+1-39 characters, start with a letter or digit, and hold only letters, digits
+and `._:-` (fullmatch), else exit 3, in view or not. 39 keeps the longest
+route label within GitHub's 50-character limit; a leading `-` would read as a
+flag. `triage.route.questions` is passed to `gi-route.py --enabled` as separate
+words, so it must be a non-empty list of distinct strings that each fullmatch `[a-z]+`,
+else exit 3, in view or not; gi-route.py owns which ids exist and are required.
+
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
 directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
 its place (`first_run` false, `config_file` naming it) with
@@ -127,6 +136,18 @@ _COMPACTION_MAX = 99
 # words or the config is invalid.
 _MERGE_METHOD = "review.merge_method"
 _MERGE_METHODS = ("squash", "merge", "rebase")
+
+# The prefix is joined to a route word and substituted into `gh issue edit
+# --add-label` and `gh label create`, so it is shape-checked like an agents
+# value: a letter or digit first (no flag-like `-x`), fullmatch (no trailing
+# newline), and at most 39 characters so `{prefix}needs-human` fits GitHub's
+# 50-character label limit.
+_ROUTE_PREFIX = "triage.route.label_prefix"
+_ROUTE_PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,38}")
+# The question ids become separate words of `gi-route.py --enabled`, so each
+# is a bare lowercase word; gi-route.py decides which ids are known.
+_ROUTE_QUESTIONS = "triage.route.questions"
+_ROUTE_QUESTION_RE = re.compile(r"[a-z]+")
 
 
 class ConfigError(Exception):
@@ -460,6 +481,26 @@ def merge(
 
     if _MERGE_METHOD in accepted and accepted[_MERGE_METHOD] not in _MERGE_METHODS:
         errors.append(f"{_MERGE_METHOD} — must be one of: " + ", ".join(_MERGE_METHODS))
+
+    if _ROUTE_PREFIX in accepted:
+        prefix = accepted[_ROUTE_PREFIX]
+        if not isinstance(prefix, str) or _ROUTE_PREFIX_RE.fullmatch(prefix) is None:
+            errors.append(
+                f"{_ROUTE_PREFIX} — must be 1-39 letters, digits and ._:- that "
+                "starts with a letter or digit"
+            )
+
+    if _ROUTE_QUESTIONS in accepted:
+        ids = accepted[_ROUTE_QUESTIONS]
+        if (
+            not isinstance(ids, list)
+            or not ids
+            or not all(isinstance(i, str) and _ROUTE_QUESTION_RE.fullmatch(i) for i in ids)
+            or len(set(ids)) != len(ids)
+        ):
+            errors.append(
+                f"{_ROUTE_QUESTIONS} — must be a non-empty list of distinct lowercase-letter ids"
+            )
 
     merged = {**defaults, **accepted}
     # Default fill: a null `agents.<knob>.<role>` takes `agents.<knob>.default`,

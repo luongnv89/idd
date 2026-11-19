@@ -59,7 +59,7 @@ These derivations are the resolver's own:
 found the issue already fixed and exited early), or `failed` (a step failed). A
 `failed` run an auto-mode default No stopped also carries — and, under
 `--no-run-log`, returns — `skipped_reason` (`assigned_to_other`, `blocked_label`,
-`needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded`).
+`route_needs_human`, `needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded`).
 
 ## Suppression rule (single writer under `/auto-pilot`)
 

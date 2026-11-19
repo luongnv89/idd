@@ -527,3 +527,6 @@ jobs:
 
       - name: test-runtime-text-history-628
         run: bash tests/test-runtime-text-history-628.sh
+
+      - name: test-route-mode-647
+        run: bash tests/test-route-mode-647.sh

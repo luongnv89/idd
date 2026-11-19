@@ -94,6 +94,22 @@ triage:
   # Max seconds to scan codebase per issue for file dependencies
   scan_timeout_per_issue: 30
 
+  # Route mode (/issue-triage --route): both writes are opt-in
+  route:
+    comment: false
+    # The label is the only route signal /auto-pilot and /issue-resolver read
+    label: false
+    # 1-39 of A-Za-z0-9._:- starting with a letter or digit
+    label_prefix: "route:"
+    # injection, clarity and criteria cannot be left out
+    questions:
+      - scope
+      - clarity
+      - criteria
+      - duplicate
+      - size
+      - injection
+
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
   max_cycles: 3

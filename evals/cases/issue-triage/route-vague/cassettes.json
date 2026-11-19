@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "33",
+        "--json",
+        "number,title,body,labels,state"
+      ],
+      "stdout": "{\"number\":33,\"title\":\"Make the app better\",\"body\":\"The app feels slow sometimes and the UI could be nicer. Please improve it.\",\"labels\":[],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

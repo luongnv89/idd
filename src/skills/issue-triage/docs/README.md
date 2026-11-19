@@ -22,6 +22,7 @@
 - Suggests P1/P2/P3 priorities based on type, age, and blocking relationships
 - Persists results to `.idd/triage.json` for cross-session access
 - View mode renders cached results without GitHub API calls
+- Route mode (`--route`) answers six closed questions per issue — including a prompt-injection check — and maps them through a fixed routing table to `agent-ready`, `needs-human`, `needs-info` or `duplicate`; an opt-in label and comment (`triage.route.*`) never echo issue text
 
 ## When to Use
 
@@ -29,6 +30,7 @@
 |---|---|
 | `/issue-triage` | Show cached triage instantly (or auto-generate on first run), suggest update if changes detected |
 | `/issue-triage update` | Force a fresh analysis, scan for already-fixed issues, and overwrite cached results |
+| `/issue-triage --route [N…]` | Print a JSON route verdict per issue; `/auto-pilot` skips and `/issue-resolver` stops on the restrictive route labels |
 | "what should I work on next" | Show triage report and recommend which issue to pick up first |
 | "which issues are blocked" | Show dependency graph from cached or fresh analysis |
 | "are any issues already fixed" | Scan commit history to find issues resolved by other PRs |
