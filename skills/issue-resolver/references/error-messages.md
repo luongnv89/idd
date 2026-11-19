@@ -106,6 +106,17 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Issue labels include `wontfix`, `blocked`, or `do-not-merge` (case-insensitive).
 **Auto:** takes the default No — stop, `skipped_reason: blocked_label`. <!-- auto:no -->
 
+### Route needs a human
+```
+⚠ Issue #N has route label: {label_name}
+
+  /issue-triage --route judged it needs a human (the label is the
+  verdict; a human removes it to re-route).
+  Continue anyway? [y/N]
+```
+**Trigger:** Issue labels include `triage.route.label_prefix` + `needs-human` (default `route:needs-human`).
+**Auto:** takes the default No — stop, `skipped_reason: route_needs_human`. <!-- auto:no -->
+
 ### Issue needs clarification
 ```
 ⚠ Issue #N needs clarification: {reasons}

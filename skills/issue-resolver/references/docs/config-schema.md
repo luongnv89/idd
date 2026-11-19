@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.idd.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `compaction`, `issue`, `platform`, `projects`, `resolve`, `security`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `compaction`, `issue`, `platform`, `projects`, `resolve`, `security`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 IDD Stack works with zero configuration — every setting has a default. With no `.idd.yml`, the first-run hint is shown:
 
@@ -143,6 +143,49 @@ resolve:
     # Note: when enabled it still skips (fail-soft to code-only) if no app is
     #       running/reachable or capture is unsafe — it never blocks code review.
     browser_review: "ask"
+
+# Triage settings
+triage:
+  # Flag issues with no activity beyond this threshold (days)
+  # Type: integer
+  # Default: 14
+  # Minimum: 1
+  stale_threshold_days: 14
+
+  # Suggest priorities based on type, age, and dependency position
+  # Type: boolean
+  # Default: true
+  auto_priority: true
+
+  # Include recently closed issues in triage analysis
+  # Type: boolean
+  # Default: false
+  include_closed: false
+
+  # Max seconds to scan codebase per issue for file dependencies
+  # Type: integer
+  # Default: 30
+  # Minimum: 5
+  # Maximum: 300
+  scan_timeout_per_issue: 30
+
+  # Route mode (/issue-triage --route); both writes are opt-in
+  route:
+    # One comment rendered from the answers. Type: boolean. Default: false
+    comment: false
+    # Add the route label (add-only). Type: boolean. Default: false
+    label: false
+    # Route label prefix. Type: string. Default: "route:"
+    label_prefix: "route:"
+    # Questions; injection, clarity, criteria always asked.
+    # Type: array of strings. Default: all six
+    questions:
+      - scope
+      - clarity
+      - criteria
+      - duplicate
+      - size
+      - injection
 
 # GitHub Projects board sync
 # See https://github.com/luongnv89/idd/blob/main/docs/github-projects-sync.md
@@ -291,6 +334,14 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off caller-context reuse: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
+| `triage.stale_threshold_days` | `14` | Stale issue threshold |
+| `triage.auto_priority` | `true` | Auto-suggest priorities |
+| `triage.include_closed` | `false` | Exclude closed from triage |
+| `triage.scan_timeout_per_issue` | `30` | Max seconds per issue scan |
+| `triage.route.comment` | `false` | Route mode posts one comment |
+| `triage.route.label` | `false` | Route mode adds its label |
+| `triage.route.label_prefix` | `"route:"` | Route label prefix |
+| `triage.route.questions` | all six | Route questions |
 | `projects.sync_enabled` | `false` | Enable project board sync |
 | `projects.project_number` | `null` | Explicit project number (null = auto-detect) |
 | `projects.status_field` | `"Status"` | Name of the Status field on the board |
