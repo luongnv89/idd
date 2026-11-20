@@ -181,6 +181,67 @@ else
   fail "AC1: auto mode does not bypass a real-secret block (got exit $st)"
 fi
 
+# Issue #539: the `sk-` rule matches only where `sk-` starts a token. Every
+# key-shaped literal and every `…sk-…` identifier is assembled from halves so
+# this file never carries one (this repo's own pre-commit scan reads it).
+# Each case runs the script AND both ERE copies in the canonical document
+# (`realkey_patterns`, Primary Pattern; `realkey`, Quick Reference), which
+# must agree with it — the documented fallback is the scan where python3 is
+# missing.
+SECDOC="$REPO_ROOT/docs/pre-commit-security.md"
+ERE_PRIMARY="$(sed -n "s/^realkey_patterns='\(.*\)'\$/\1/p" "$SECDOC")"
+ERE_QUICK="$(sed -n "s/^realkey='\(.*\)'\$/\1/p" "$SECDOC")"
+if [ -n "$ERE_PRIMARY" ] && [ -n "$ERE_QUICK" ]; then
+  pass "#539: both documented real-key EREs extracted for the parity check"
+else
+  fail "#539: could not extract realkey_patterns / realkey from $SECDOC — parity unchecked"
+fi
+SK="s""k-"
+SK_BODY="Zq7RtY2uWv9XbN4cLp6KdHs3"   # 24 identifier characters after the prefix
+mkdir -p "$WORK/sk"
+# sk_case <expected block|clean> <label> <line content>
+sk_case() {
+  local want="$1" label="$2" f="$WORK/sk/case.txt" got ere name
+  printf '%s\n' "$3" > "$f"
+  run_status out st python3 "$SECSCAN" "$f"
+  got="$(printf '%s' "$out" | jkey verdict 2>/dev/null || true)"
+  if { [ "$want" = block ] && [ "$st" = 1 ] && [ "$got" = block ]; } \
+     || { [ "$want" = clean ] && [ "$st" = 0 ] && [ "$got" = clean ]; }; then
+    pass "#539: script — $label → $want"
+  else
+    fail "#539: script — $label → expected $want, got exit $st verdict '$got'"
+  fi
+  for name in realkey_patterns realkey; do
+    if [ "$name" = realkey ]; then ere="$ERE_QUICK"; else ere="$ERE_PRIMARY"; fi
+    if [ -z "$ere" ]; then fail "#539: $name — $label (pattern not extracted)"; continue; fi
+    if grep -E -q -- "$ere" "$f"; then got=block; else got=clean; fi
+    if [ "$got" = "$want" ]; then
+      pass "#539: doc $name — $label → $want"
+    else
+      fail "#539: doc $name — $label → expected $want, got $got"
+    fi
+  done
+}
+# Must NOT match: `sk-` mid-word in kebab-case identifiers (boundary too loose).
+sk_case clean "risk-… identifier" "\"name\": \"ri${SK}management-specialist-agent\""
+sk_case clean "ask-… identifier" "  - a${SK}questions-if-underspecified"
+sk_case clean "task-… identifier" "ta${SK}runner-configuration-loader"
+sk_case clean "desk-… identifier" "id=de${SK}booking-reservation-system"
+# Must match: `sk-` / `sk-proj-` at every token boundary (boundary too strict).
+for pfx in "$SK" "${SK}proj-"; do
+  k="${pfx}${SK_BODY}"
+  sk_case block "${pfx%-}… at line start" "$k"
+  sk_case block "${pfx%-}… after =" "OPENAI_API_KEY=$k"
+  sk_case block "${pfx%-}… after ': '" "api_key: $k"
+  sk_case block "${pfx%-}… after a double quote" "{\"key\": \"$k\"}"
+  sk_case block "${pfx%-}… after a single quote" "key = '$k'"
+  sk_case block "${pfx%-}… after whitespace" "Authorization: Bearer $k"
+  sk_case block "${pfx%-}… after a tab" "$(printf 'key\t%s' "$k")"
+  sk_case block "${pfx%-}… after %20" "https://x.test/?q=Bearer%20$k"
+  sk_case block "${pfx%-}… after %3D" "https://x.test/?api_key%3D$k"
+  sk_case block "${pfx%-}… after a literal \\n" "{\"log\": \"line one\\n$k\"}"
+done
+
 # Config-extensible patterns, via the config the skill already resolved.
 run_status out st python3 "$SECSCAN" clean.txt \
   --config-json '{"config":{"security.extra_secret_file_pattern":"clean\\.txt$"}}'

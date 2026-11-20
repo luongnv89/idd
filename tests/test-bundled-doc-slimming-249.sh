@@ -287,7 +287,14 @@ FAIL=0
 # tie-break) adds 409 bytes per copy: 625,488 + 818 = 626,306, six to spare.
 # The third (closing a dead run's marker before its label goes, release on
 # an adopted PR) adds 460 per copy: 626,306 + 920 = 627,226, six to spare.
-BUDGET=627232
+#
+# Issue #539 is the seventeenth raise (2026-11-20): the secret-value rule's
+# `sk-` alternative gains a token boundary, so both ERE copies in
+# docs/pre-commit-security.md grow and one Behavior Notes bullet says why:
+# +237 bytes per digest copy, shipped to its 2 skills (issue-pr-review,
+# issue-resolver): +474. HEAD measured 627,222, so 627,222 + 474 = 627,696;
+# the line keeps its six bytes of headroom, so the ratchet is not widened.
+BUDGET=627702
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
