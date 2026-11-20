@@ -1,0 +1,9 @@
+name: Feature request
+description: Ask for a new capability
+body:
+  - type: textarea
+    attributes:
+      label: What should it do?
+  - type: textarea
+    attributes:
+      label: How will we know it works?

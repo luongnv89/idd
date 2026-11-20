@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # test-eval-triage-autopilot-357.sh — behavioral evals for issue-triage
-# ordering and auto-pilot merge gating (issue #357 / F-TEST-005).
+# ordering and auto-pilot merge gating (issue #357 / F-TEST-005), triage route
+# mode (#647), and one case each for issue-analysis, init-idd and idd-doctor
+# (#572), the skills that had no eval case.
 #
 # The authoritative runner for a case is evals/harness/run_eval.sh, which
 # refuses to execute a subject without an OS-level network sandbox. That gate
@@ -12,8 +14,10 @@
 #   T1  case manifests are well formed and only name tools the grader has
 #   T2  cassettes are replayable — every recorded argv matched by the shim
 #   T3  subjects follow the hermetic-subject contract
-#   T4  the expected triage order agrees with gi-triage-graph.py, and the
-#       expected dependency gate agrees with gi-deps.py (repo oracles)
+#   T4  the expected triage order agrees with gi-triage-graph.py, the
+#       expected dependency gate agrees with gi-deps.py, and the init-idd
+#       case's expected .idd.yml is accepted by gi-config.py against the full
+#       config schema (repo oracles)
 #   T5  subject + grade.py run end to end, without the OS network sandbox
 #   T6  run_eval.sh, sandboxed — the authoritative run
 #
@@ -35,7 +39,14 @@ ROUTE_CASES=()
 for route_case in route-clear-bug route-vague route-duplicate route-injection; do
   ROUTE_CASES+=("$REPO_ROOT/evals/cases/issue-triage/$route_case")
 done
-CASES=("$TRIAGE_CASE" "$AUTOPILOT_CASE" "${ROUTE_CASES[@]}")
+# One case per skill that had none (#572): a read-only issue analysis, an
+# init-idd config generation and an idd-doctor health check.
+COVERAGE_CASES=(
+  "$REPO_ROOT/evals/cases/issue-analysis/fresh-read-only"
+  "$REPO_ROOT/evals/cases/init-idd/python-generate"
+  "$REPO_ROOT/evals/cases/idd-doctor/drift-report"
+)
+CASES=("$TRIAGE_CASE" "$AUTOPILOT_CASE" "${ROUTE_CASES[@]}" "${COVERAGE_CASES[@]}")
 
 PASS=0
 FAIL=0
@@ -338,6 +349,59 @@ else
   fail "T4b: the expected dependency gate disagrees with gi-deps.py"
 fi
 
+# The init-idd subject cannot reach docs/config-schema.md from its sandbox, so
+# the config it must write (expected/idd.yml, which the subject compares byte
+# for byte) is checked here by the real gi-config.py against the full schema.
+# A one-key typo in a documented section must be refused, or the oracle proves
+# nothing.
+INIT_CASE="$REPO_ROOT/evals/cases/init-idd/python-generate"
+if "$PYTHON_BIN" - "$INIT_CASE" "$REPO_ROOT" "$TMP" <<'PY'
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+case_dir, repo_root, tmp = (Path(a) for a in sys.argv[1:4])
+config = case_dir / "expected" / "idd.yml"
+gi_config = repo_root / "src" / "shared" / "scripts" / "gi-config.py"
+schema = repo_root / "docs" / "config-schema.md"
+
+
+def resolve(path):
+    return subprocess.run(
+        [sys.executable, str(gi_config), "--config", str(path), "--schema", str(schema)],
+        capture_output=True,
+        text=True,
+    )
+
+
+proc = resolve(config)
+assert proc.returncode == 0, f"gi-config exited {proc.returncode}: {proc.stderr}"
+merged = json.loads(proc.stdout)["config"]
+want = {
+    "platform": "github",
+    "issue.template": "default",
+    "resolve.auto_test": True,
+    "resolve.test_timeout": 60,
+    "triage.stale_threshold_days": 7,
+    "review.merge_method": "squash",
+    "autopilot.mode": "balanced",
+}
+got = {key: merged.get(key) for key in want}
+assert got == want, f"gi-config resolves {got}, the case expects {want}"
+
+typo = tmp / "typo.idd.yml"
+typo.write_text(config.read_text().replace("  auto_test:", "  auto_tset:"))
+assert "auto_tset" in typo.read_text(), "typo mutation did not apply"
+proc = resolve(typo)
+assert proc.returncode == 3, f"a typo key must exit 3, gi-config exited {proc.returncode}"
+PY
+then
+  pass "T4c: gi-config.py accepts init-idd's expected .idd.yml and refuses a typo key"
+else
+  fail "T4c: gi-config.py rejects init-idd's expected .idd.yml (or accepts a typo)"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T5: subject + grade run end to end (no OS network sandbox)
 #
@@ -368,6 +432,12 @@ replay_case() {
   # Cassette input lives under $work, as run_eval.sh arranges it, so a subject
   # can never write back into the checkout.
   cp "$case_dir/cassettes.json" "$work/cassettes.json"
+  # The fixture seeds the workspace, and the shim's call log starts empty, both
+  # as run_eval.sh arranges them.
+  if [ -d "$case_dir/fixture_repo" ]; then
+    cp -R "$case_dir/fixture_repo"/. "$work/repo"/
+  fi
+  : > "$work/gh-calls.jsonl"
   ( cd "$work/repo" && env -i \
       HOME="$work/home" \
       PATH="$bin:/usr/bin:/bin" \
@@ -377,7 +447,11 @@ replay_case() {
       EVAL_CASE_DIR="$work/case" \
       EVAL_WORK="$work" \
       EVAL_SCRIPTS_DIR="$work/scripts" \
+      EVAL_GH_CALL_LOG="$work/gh-calls.jsonl" \
       bash "$work/case/subject.sh" ) >"$work/subject.log" 2>&1 || return 1
+  # Publish the call log into OUT only after the subject, as run_eval.sh does.
+  rm -f "$out/gh-calls.jsonl"
+  cp "$work/gh-calls.jsonl" "$out/gh-calls.jsonl"
   REPO_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$GRADE" \
     --case "$case_dir" --out "$out" >"$work/grade.log" 2>&1
 }
@@ -453,7 +527,7 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 echo "Results: $PASS passed, $FAIL failed, $SKIP skipped"
 
 if [ "$FAIL" -gt 0 ]; then
-  echo "  ✗ triage/auto-pilot eval cases failed"
+  echo "  ✗ triage/auto-pilot/analysis/init/doctor eval cases failed"
   exit 1
 fi
 
@@ -461,5 +535,5 @@ if [ "$SKIP" -gt 0 ]; then
   echo "  ⚠ $SKIP sandboxed run(s) skipped — structural coverage only"
 fi
 
-echo "  ✓ triage ordering and auto-pilot gating cases behave as specified (#357)"
+echo "  ✓ triage, auto-pilot, issue-analysis, init-idd and idd-doctor cases behave as specified"
 exit 0

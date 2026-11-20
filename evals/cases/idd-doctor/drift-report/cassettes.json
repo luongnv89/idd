@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "--json",
+        "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed"
+      ],
+      "stdout": "{\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "api",
+        "repos/eval/idd-fixture",
+        "--jq",
+        "{squash_merge_commit_message, merge_commit_message}"
+      ],
+      "stdout": "{\"merge_commit_message\":\"PR_TITLE\",\"squash_merge_commit_message\":\"PR_BODY\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

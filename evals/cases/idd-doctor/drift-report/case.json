@@ -1,0 +1,80 @@
+{
+  "name": "idd-doctor/drift-report",
+  "skill": "idd-doctor",
+  "prompt": "Run /idd-doctor on a repository whose creator SKILL claims to predict affected files, whose .idd.yml leaves autopilot.mode commented out, and whose configured merge method the repository does not allow",
+  "grade": [
+    {
+      "tool": "gh-calls",
+      "expect_argv": [
+        ["auth", "status"],
+        ["repo", "view", "--json", "mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed"],
+        ["api", "repos/eval/idd-fixture", "--jq", "{squash_merge_commit_message, merge_commit_message}"]
+      ],
+      "expect_exit": 0,
+      "label": "read-only: the auth probe and the two merge-strategy reads, nothing else"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {"issue comment": 1},
+      "expect_exit": 1,
+      "label": "the doctor posts no comment, so claiming one fails (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/result-fail.txt",
+      "expect_exit": 0,
+      "label": "the Result: line carries FAIL as its first word"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/finding-1-src-skills-issue-creator-SKILL.source.md-L8.txt",
+      "expect_exit": 0,
+      "label": "Check 1 reports the positive claim at src/skills/issue-creator/SKILL.source.md:8"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/finding-1-src-skills-issue-creator-docs-README.md-L6.txt",
+      "expect_exit": 1,
+      "label": "Check 1 does not flag the README's negated line (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/check2-pass.txt",
+      "expect_exit": 0,
+      "label": "Check 2 passes two clean templates"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/check3-fail.txt",
+      "expect_exit": 0,
+      "label": "Check 3 fails: the only autopilot mode line is a comment"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/check4-warn.txt",
+      "expect_exit": 0,
+      "label": "Check 4 warns: review.merge_method merge is not allowed by the repository"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/tree-unchanged.txt",
+      "expect_exit": 0,
+      "label": "report-only: the index and working tree are exactly as found"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/result-pass.txt",
+      "expect_exit": 1,
+      "label": "a drifted repository never reports PASS (negative)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The Result: line states FAIL before any finding is read.",
+      "Every failed or warned check names a path:line finding or the quoted configuration value.",
+      "Decision says no approval is needed and names the fix hints to apply."
+    ],
+    "feedback": "Record each reviewer answer with the evaluation, never on a PR or issue; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in applies the doctor's documented checks to a fixture repository; whether a live agent applies them the same way is out of its scope."
+  }
+}

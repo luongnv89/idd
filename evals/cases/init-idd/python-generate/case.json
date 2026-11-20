@@ -1,0 +1,77 @@
+{
+  "name": "init-idd/python-generate",
+  "skill": "init-idd",
+  "prompt": "Run /init-idd in a Python repository with no .idd.yml and generate one",
+  "repo_scripts": [
+    "src/shared/scripts/gi-stack-detect.py"
+  ],
+  "grade": [
+    {
+      "tool": "gh-calls",
+      "expect_argv": [
+        ["auth", "status"],
+        ["repo", "view", "--json", "mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed"],
+        ["api", "repos/eval/notes-api", "--jq", "{squash_merge_commit_message, merge_commit_message}"]
+      ],
+      "expect_exit": 0,
+      "label": "only the auth probe and the two merge-strategy reads — no repository setting changed"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {"repo edit": 1},
+      "expect_exit": 1,
+      "label": "no repo edit was made, so claiming one fails (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/idd.yml",
+      "expect_exit": 0,
+      "label": ".idd.yml was written"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/validated.txt",
+      "expect_exit": 0,
+      "label": "the re-read config parses, keeps no placeholder token and sets platform"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/matches-expected.txt",
+      "expect_exit": 0,
+      "label": "detected Python / FastAPI / pytest values land in .idd.yml exactly as expected/idd.yml"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/merge-method-allowed.txt",
+      "expect_exit": 0,
+      "label": "review.merge_method squash is a method the repository allows"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/only-config-written.txt",
+      "expect_exit": 0,
+      "label": "nothing but .idd.yml was added to the repository"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/broken-config-accepted.txt",
+      "expect_exit": 1,
+      "label": "a config with a surviving placeholder or no platform key fails validation (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/merge-method-not-allowed.txt",
+      "expect_exit": 1,
+      "label": "the merge check does not warn when squash is allowed (negative)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "report.txt states DONE and what happened to .idd.yml on its first row.",
+      "Each detected value names the marker file it came from.",
+      "The report says No approval needed. and names committing .idd.yml as the next action."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-stack-detect.py on a fixture repository and writes a compact config, not the full template; the test suite checks expected/idd.yml with the real gi-config.py. Whether a live agent fills the full template is out of its scope."
+  }
+}

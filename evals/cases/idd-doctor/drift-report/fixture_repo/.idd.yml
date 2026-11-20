@@ -1,0 +1,9 @@
+platform: github
+
+review:
+  auto_merge: false
+  merge_method: merge
+
+autopilot:
+  # mode: balanced  (left for later)
+  max_iterations: 5
