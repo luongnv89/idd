@@ -169,12 +169,12 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Image upload API error
 ```
-⚠ Image upload failed: {filename} — GitHub API error
+⚠ Image upload failed: {filename} — {reason}
   Issue created without embedded image.
-  To fix:  check your permissions: gh api repos/{owner}/{repo}/contents
+  To fix:  check write access, then rerun Step 2 of references/image-upload.md
   Tip: upload the image manually via GitHub's web UI.
 ```
-**Trigger:** The `gh api` call to upload the image returns a non-success status (403, 404, 422, 500).
+**Trigger:** Creating the `issue-assets` branch or uploading to it fails: a `gh api` call exits non-zero (403, 404, 409 empty repository, 422, 500).
 
 ### Partial image upload failure
 ```

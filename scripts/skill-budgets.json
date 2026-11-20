@@ -51,7 +51,7 @@
     },
     "issue-creator": {
       "always_read": {
-        "budget": 43072,
+        "budget": 43976,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 42354
+        "measured": 43976
       },
-      "budget": 184851,
-      "measured": 184816,
+      "budget": 186484,
+      "measured": 186484,
       "skill_md": {
         "budget": 26487,
         "measured": 25541
