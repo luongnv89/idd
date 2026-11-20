@@ -35,7 +35,8 @@ Modes (exactly one)
   --read and --list never create the store.
 
 Patch keys (a closed set — anything else is exit 3, and nothing is written)
-  common    step, effect {kind, state: intent|done, key {sha, branch, pr}},
+  common    step, effect {kind, state: intent|done, key {sha, branch, pr,
+            label, op: add|remove}},
             pr, outcome, caller_run_id, resume (--write only)
   resolver  base, issue_updated_at, profile, analysis_reuse, worktree,
             research (opaque JSON object, <= 64 KiB), plan {selected {number,
@@ -51,7 +52,8 @@ Patch keys (a closed set — anything else is exit 3, and nothing is written)
             relies on it, its diagnostics rerun, and never recorded
   reviewer  linked_issue, profile, prepass_head, cycle, findings {open[] <= 50,
             noted[] <= 50}, history[] <= 2 lists of finding signatures
-  Effect kinds: resolver issue_edit, issue_comment, push, pr_create, run_log;
+  Effect kinds: resolver issue_edit, issue_comment, label_edit, push,
+  pr_create, run_log;
   reviewer push, body_edit, merge. Nested objects are closed key sets too;
   `research` alone is opaque data, kept only to seed a verify-first research
   pass, and never read for a gate. Strings are capped (a summary at 2,000
@@ -158,6 +160,9 @@ RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
 BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\Z")
 LANE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 SHA_RE = re.compile(r"^[0-9a-f]{40}\Z")
+# A label effect's key: the label gi-config shape-checks, and the edit's direction.
+LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}\Z")
+LABEL_OPS = ("add", "remove")
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 WORD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}\Z")
 CRITERION_ID_RE = re.compile(r"^AC[1-9][0-9]{0,3}\Z")
@@ -179,7 +184,8 @@ FORWARD = {
 # Steps that commit: only there may a resume find a moved head or a dirty tree.
 COMMIT_STEPS = {"issue-resolver": {3, 4, 5}, "issue-pr-review": {2, 6}}
 EFFECT_KINDS = {
-    "issue-resolver": {"issue_edit", "issue_comment", "push", "pr_create", "run_log"},
+    "issue-resolver": {"issue_edit", "issue_comment", "label_edit", "push", "pr_create",
+                       "run_log"},
     "issue-pr-review": {"push", "body_edit", "merge"},
 }
 PROFILES = ("light", "full")
@@ -447,13 +453,17 @@ def _effect(value, skill: str) -> None:
     if value.get("state") not in ("intent", "done"):
         raise InvalidInput("effect.state must be 'intent' or 'done'")
     key = value.get("key", {})
-    _closed(key, {"sha", "branch", "pr"}, "effect.key", allow={"branch"})
+    _closed(key, {"sha", "branch", "pr", "label", "op"}, "effect.key", allow={"branch"})
     if "sha" in key:
         _sha(key["sha"], "effect.key.sha")
     if "branch" in key:
         _branch(key["branch"], "effect.key.branch")
     if "pr" in key and not _is_int(key["pr"], 1):
         raise InvalidInput("effect.key.pr must be an integer >= 1")
+    if "label" in key and (not isinstance(key["label"], str) or not LABEL_RE.match(key["label"])):
+        raise InvalidInput("effect.key.label is not a label the claim-label screen allows")
+    if "op" in key and key["op"] not in LABEL_OPS:
+        raise InvalidInput("effect.key.op must be 'add' or 'remove'")
 
 
 def _criterion_id(value, name: str) -> None:

@@ -447,6 +447,7 @@ CODE = {
     "src/shared/scripts/gi-state.py", "src/shared/scripts/gi-triage-graph.py",
     "tests/test-config-search-ceiling-parity-339.sh", "tests/test-qa-handoff-255.sh",
     "tests/test-progress-records-542.sh", "tests/test-qa-receipt-515.sh",
+    "tests/test-plan-claim-648.sh",                   # pins the legacy-marker refusal
     "tests/test-rename-idd-537.sh",
     "tests/test-webpage-ux-clarity-361.sh",
 }
@@ -462,6 +463,7 @@ PROSE = {
     "src/skills/init-idd/references/examples.md",
     "src/skills/init-idd/references/review-contract.md",
     "src/skills/issue-analysis/SKILL.source.md",
+    "src/skills/issue-analysis/references/error-messages.md",
     "src/skills/issue-creator/SKILL.source.md",
     "src/skills/issue-creator/references/error-messages.md",
     "src/skills/issue-creator/references/modes.md",

@@ -287,6 +287,12 @@ grep -q 'effect.key.branch is not a branch name' "$TMP/err"
 check "S4 the metacharacter branch is refused by the branch-name screen" "$?"
 refused "an unknown effect kind" issue-resolver 15 '{"effect": {"kind": "label", "state": "intent", "key": {}}}'
 refused "a malformed SHA" issue-resolver 15 '{"effect": {"kind": "push", "state": "intent", "key": {"sha": "abc"}}}'
+# The claim label effect (#648): its key carries the label and the direction.
+refused "a label_edit label with shell metacharacters" issue-resolver 15 '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working;id", "op": "add"}}}'
+refused "a label_edit op other than add/remove" issue-resolver 15 '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working", "op": "toggle"}}}'
+refused "a label_edit on a reviewer record" issue-pr-review 15 '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working", "op": "add"}}}'
+put "$F" write issue-resolver 15 '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working", "op": "add"}}}'
+[ "$RC" = 0 ]; check "S4 a resolver label_edit intent {label, op: add} is accepted (rc=$RC)" "$?"
 refused "resume that is not a boolean" issue-resolver 15 '{"resume": "yes"}'
 BIG="$(python3 -c 'import json; print(json.dumps({"research": {"blob": "x" * 70000}}))')"
 refused "research over 64 KiB" issue-resolver 15 "$BIG"
@@ -810,7 +816,7 @@ anchor_check_flat "$RS" rs-0j-gates '.tests_state. \*\*is never restored\*\*' "S
 anchor_check_flat "$RS" rs-0j-gates 'only when QA exited clean in this session' "S6e the marker and receipt only after a clean QA in this session"
 grep -qF '**only when QA exited clean** in this session' "$RS/SKILL.md"
 check "S6f resolver Step 5 keeps 'only when QA exited clean' and adds 'in this session'" "$?"
-for effect in 'issue_edit' 'issue_comment' '`push`' '`pr_create`' 'run_log'; do
+for effect in 'issue_edit' 'issue_comment' 'label_edit' '`push`' '`pr_create`' 'run_log'; do
   anchor_check "$RS" rs-0j-reconcile "$effect" "S6g resolver reconciles $effect"
 done
 anchor_check "$RS" rs-0j-reconcile 'gh pr list --head "\$branch_name" --state all --json' "S6h the PR-create reconcile is a live --json read"
@@ -819,8 +825,8 @@ for effect in '`push`' '`body_edit`' '`merge`'; do
   anchor_check "$RV" rvm-progress-reconcile "$effect" "S6j reviewer reconciles $effect"
 done
 anchor_check "$RV" rvm-progress-reconcile 'gh pr view \{N\} --json state,headRefOid' "S6k the merge reconcile is a live --json read"
-anchor_check_flat "$RS" rs-0j-reconcile '[Nn]o label edit exists in this skill today; a future one must add an intent row here' \
-  "S6l resolver: the label rule (AC4 names label)"
+anchor_check_flat "$RS" rs-0j-reconcile 'Every label edit in this skill is the .label_edit. row above; a new one must record an intent the same way' \
+  "S6l resolver: the label rule — the claim's label_edit has its reconcile row (AC4 names label; #648)"
 anchor_check_flat "$RV" rvm-progress-reconcile '[Nn]o label edit exists in this skill today; a future one must add an intent row here' \
   "S6m reviewer: the label rule"
 anchor_check_flat "$RS" rs-0j-validate '[Nn]ever .cd. into it' "S6n a recorded worktree path never reaches cd"

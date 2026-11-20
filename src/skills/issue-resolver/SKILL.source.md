@@ -59,7 +59,7 @@ Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/5]` step start, beside that clock read, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-resolver`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 
-Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false` · `compaction.enabled: true` · `compaction.threshold.issue-resolver: 40`.
+Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false` · `resolver.require_plan` · `resolver.plan_approval` · `resolver.claim_label` · `compaction.enabled: true` · `compaction.threshold.issue-resolver: 40`.
 
 ---
 
@@ -134,6 +134,7 @@ references/docs/platform-github.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
 references/docs/context-threshold.md
+references/docs/plan-and-claim.md
 references/scripts/gi-config.py
 references/scripts/gi-runlog.py
 references/scripts/gi-secscan.py
@@ -148,6 +149,7 @@ references/scripts/gi-sketch.py
 references/scripts/gi-recipe.py
 references/scripts/gi-progress.py
 references/scripts/gi-ready.py
+references/scripts/gi-plan.py
 ```
 
 The practice packs, checked the same way: `references/practice-packs.md`, `references/practice-tests.md`, `references/practice-code.md`, `references/practice-performance.md`, `references/practice-security.md`, `references/practice-frontend.md`, `references/practice-ci-cd.md`, `references/practice-cli.md`, `references/practice-docs.md`.
@@ -190,7 +192,7 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 ### 0c — Guards
 
-Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels, on the `route:needs-human` label (`triage.route.label_prefix` + `needs-human`, default prefix `route:`), or when a non-empty body is not ready — each `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other`, `blocked_label`, `route_needs_human` or `needs_clarification`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
+Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels, on the `route:needs-human` label (`triage.route.label_prefix` + `needs-human`, default prefix `route:`), on a claim that reads `foreign` (bind `$login` and this run's `$claim_run`, then *Reading the issue* in `docs/plan-and-claim.md`), or when a non-empty body is not ready — each `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other`, `blocked_label`, `route_needs_human`, `claimed_elsewhere` or `needs_clarification`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
 
 **Readiness** (`docs/idd-methodology.md`, *Issue Readiness*) is judged on 0a's body, before 0d: pipe 0a's `gi-issue.py` command (a cache hit) into `python3 shared/scripts/gi-ready.py`; a non-zero exit judges by that section. An empty body is Step 1's gate. A body not ready, or any criterion 0d writes, prints `×` on Step 0's `Criteria confirmed`, so the run ends `PARTIAL`.
 
@@ -236,6 +238,8 @@ Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs
 
 The **in-place path**; worktree paths already checked out the branch. Reuse the derived `{branch_name}` (*0e — Workspace*, `docs/naming-conventions.md`). **If it exists:** interactive asks `continue` or `fresh`, auto takes `continue`.
 
+**Claim, every path:** with `{branch_name}` checked out, run the *Claim write* in `docs/plan-and-claim.md` before *0g*, unless its *Claim* section skips it. From here on, every terminal outcome without a PR runs its *Release*.
+
 ### 0g — Complexity gate (select the pipeline profile)
 
 Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules: `docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` pins `full`; else read the **pre-work `Effort` band** in `## Metadata`, never later agent output:
@@ -277,6 +281,8 @@ Understand the issue, the affected code and candidate solutions; the same pass v
 Generate options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive options and recommends one (*Step 2 — Plan*). **Design sketches:** when the change adds or reshapes a domain type, state or transition and the repo has a static checker, options differ in structure instead, each carrying caller code the repo's checker type-checks, never runs; `shared/scripts/gi-sketch.py` rejects designs that accept an invalid transition and may switch the selection (*Step 2 — Plan → Design sketches*).
 
 **Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
+
+**Plan comment.** Every profile first reads the issue for a plan comment, posts one when `resolver.require_plan` is true or `resolver.plan_approval` is `human` and none is current, and holds the run until a `human` plan is approved (*Step 2 — Plan → Plan comment*).
 
 ### Criteria coverage gate (every profile, every mode)
 
@@ -346,6 +352,8 @@ git push -u origin {branch_name}
 gh pr create --title "{pr_title}" --body "{pr_body}"
 ```
 
+Once the PR is created or adopted, run the claim's *Release* (`docs/plan-and-claim.md`).
+
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
 **PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean** in this session, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
@@ -390,7 +398,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 
 ## Closing Summary
 
-Emit **one** closing block at **every** terminal outcome, stops included. Read `references/closing-summary.md` now — its *Review contract* holds for every outcome — then read only the outcome's variant and print it: `references/closing-pr-created.md` (a PR was created), `references/closing-already-resolved.md` or `references/closing-blocked.md`. `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
+Emit **one** closing block at **every** terminal outcome, stops included. Read `references/closing-summary.md` now — its *Review contract* holds for every outcome — then read only the outcome's variant and print it: `references/closing-pr-created.md` (a PR was created), `references/closing-already-resolved.md` or `references/closing-blocked.md`. `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. An outcome without a PR first runs the claim's *Release* (`docs/plan-and-claim.md`). **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
 
 ---
 

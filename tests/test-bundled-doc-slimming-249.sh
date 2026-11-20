@@ -274,7 +274,20 @@ FAIL=0
 # labels, CI run log, update-branch): +284 per digest copy, shipped to all 8
 # skills: +2,272. Main measured 613,056, so 613,056 + 2,272 = 615,328; the
 # line keeps its six bytes of headroom, so the ratchet is not widened.
-BUDGET=615334
+#
+# Issue #648 is the sixteenth raise (2026-11-19): the plan-and-claim protocol
+# adds one runtime doc, docs/plan-and-claim.md (7,037 bytes per copy, shipped to
+# its 2 skills: issue-analysis, issue-resolver), and the new `resolver` config
+# section in each config-schema excerpt that names it. HEAD measured 602,490;
+# the measured total is now 620,864 (+18,374), and the line keeps its six bytes
+# of headroom, so the ratchet is not widened. Its QA fixes (released claims,
+# non-writer markers, an unreadable login) grow that doc by 2,312 bytes per
+# copy: 620,864 + 4,624 = 625,488, again with six bytes of headroom. The
+# second QA cycle (superseded plans, a killed release, the symmetric
+# tie-break) adds 409 bytes per copy: 625,488 + 818 = 626,306, six to spare.
+# The third (closing a dead run's marker before its label goes, release on
+# an adopted PR) adds 460 per copy: 626,306 + 920 = 627,226, six to spare.
+BUDGET=627232
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

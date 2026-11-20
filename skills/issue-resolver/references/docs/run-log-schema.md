@@ -38,7 +38,7 @@ Full field set; *Always present* is the required minimum:
 | `model` | string | no | Model of the session that ran it, only when the host states it. ≤64 chars, no spaces. |
 | `effort` | string | no | That session's reasoning effort; same rule. |
 | `skill_version` | string | no | The writer's own `metadata.version`, `X.Y.Z`. |
-| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `needs_clarification`, `route_needs_human`, `empty_body`, `large_scope`, `max_commits_exceeded` |
+| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `needs_clarification`, `route_needs_human`, `claimed_elsewhere`, `plan_awaiting_approval`, `empty_body`, `large_scope`, `max_commits_exceeded` |
 
 Example lines:
 

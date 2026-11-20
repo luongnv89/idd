@@ -1,0 +1,43 @@
+{
+  "name": "issue-resolver/foreign-claim",
+  "skill": "issue-resolver",
+  "prompt": "Resolve issue #648 while another run holds the agent:working claim (issue #648)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-plan.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/claim-foreign.txt",
+      "expect_exit": 0,
+      "label": "a claim by another run reads foreign"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/claim-own.txt",
+      "expect_exit": 1,
+      "label": "another account's marker never reads own (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/claim-named.txt",
+      "expect_exit": 0,
+      "label": "the stop names the holding run and branch"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run.json",
+      "expect_exit": 0,
+      "label": "the auto-mode stop is a valid failed record with claimed_elsewhere"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The resolver stops before any work on a claimed issue.",
+      "The stop prints the claim's age and the exact command that releases it.",
+      "The foreign claim's label is never removed by this run."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-plan.py on recorded issue reads; whether a live agent follows the plan-and-claim procedure is out of its scope."
+  }
+}

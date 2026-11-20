@@ -316,6 +316,41 @@ for answers in \
   printf '%s' "$answers" | run "$SCRIPTS/gi-route.py" --comment
 done
 
+# gi-plan — render a plan, read it back (current, then stale), the claim rule,
+# conform, and the rejected inputs (issue #648).
+PLAN_IN='{"body":"## Acceptance Criteria\n- [ ] a\n","criteria":[{"id":"AC1","text":"a"}],"option":{"name":"Minimal","summary":"s","files_to_modify":[{"path":"src/a.py","changes":"c"}],"files_to_create":["tests/t.sh"],"criteria_covered":["AC1"],"test_strategy":"t","risk_details":"r"}}'
+printf '%s' "$PLAN_IN" | "$PY" "$SCRIPTS/gi-plan.py" render-plan > "$TMP/plan.md" 2>/dev/null
+printf '%s' "$PLAN_IN" | run "$SCRIPTS/gi-plan.py" render-plan
+"$PY" - "$TMP/plan.md" "$TMP/issue.json" <<'PY'
+import json, sys
+plan = open(sys.argv[1]).read()
+claim = "<!-- idd:claim v1 run=r1 branch=feat/1-x -->\nClaimed."
+other = "<!-- idd:claim v1 run=r0 branch=feat/1-y -->\nClaimed."
+json.dump({"body": "## Acceptance Criteria\n- [ ] a\n",
+           "labels": [{"name": "plan-approved"}, {"name": "agent:working"}],
+           "comments": [{"author": {"login": "me"}, "body": plan, "createdAt": "2026-11-19T10:00:00Z"},
+                        {"author": {"login": "you"}, "body": other, "createdAt": "2026-11-19T10:00:30Z"},
+                        {"author": {"login": "me"}, "body": claim, "createdAt": "2026-11-19T10:01:00Z"}]},
+          open(sys.argv[2], "w"))
+PY
+run "$SCRIPTS/gi-plan.py" check --login me --run r1 < "$TMP/issue.json"
+run "$SCRIPTS/gi-plan.py" check --login me --run r1 --race-window 0 < "$TMP/issue.json"
+run "$SCRIPTS/gi-plan.py" check --login me --branch feat/1-x --claim-label "" < "$TMP/issue.json"
+printf '%s' '{"issue":{"body":"edited","labels":["agent:working"],"comments":[]}}' | run "$SCRIPTS/gi-plan.py" check --login me --run r1
+printf '%s' '{"files_to_modify":["a"],"files_to_create":[],"tasks":[{"task":"t","files":["a"]},{"task":"u","files":["b"]}],"changed":["a","c"]}' | \
+  run "$SCRIPTS/gi-plan.py" conform
+run "$SCRIPTS/gi-plan.py" render-claim --run r1 --branch feat/1-x
+run "$SCRIPTS/gi-plan.py" render-claim --run 'r;1' --branch feat/1-x
+run "$SCRIPTS/gi-plan.py" render-release --run r1 --branch feat/1-x
+printf '%s' '{"body":"x","labels":["agent:working"],"comments":[{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:00:00Z"},{"author":{"login":"me"},"body":"<!-- idd:claim-released v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:01:00Z"},{"author":{"login":"you"},"authorAssociation":"NONE","body":"<!-- idd:claim v1 run=r2 branch=feat/1-y -->","createdAt":"2026-11-19T10:01:30Z"},{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r1 branch=feat/1-x -->","createdAt":"2026-11-19T10:02:00Z"}]}' | \
+  run "$SCRIPTS/gi-plan.py" check --login me --run r1 --branch feat/1-x
+run "$SCRIPTS/gi-plan.py" check --login "" --run r1 < "$TMP/issue.json"
+printf '%s' '{"body":"x","labels":["agent:working"],"comments":[{"author":{"login":"me"},"body":"<!-- idd:claim v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:00:00Z"},{"author":{"login":"me"},"body":"<!-- idd:claim-released v1 run=r0 branch=feat/1-x -->","createdAt":"2026-11-19T10:01:00Z"}]}' | \
+  run "$SCRIPTS/gi-plan.py" check --login me --run r1 --branch feat/1-x
+run "$SCRIPTS/gi-plan.py" check --login you --run r0 < "$TMP/issue.json"
+printf '' | run "$SCRIPTS/gi-plan.py" check --login me
+printf '%s' '{"option":{"name":"","files_to_modify":[]}}' | run "$SCRIPTS/gi-plan.py" render-plan
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

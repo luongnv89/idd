@@ -141,6 +141,22 @@ resolve:
     #       running/reachable or capture is unsafe — it never blocks code review.
     browser_review: "ask"
 
+# Visible issue-side protocol of /issue-resolver: a plan comment before code and
+# a claim label while it works. `resolve.approval_gate` is a local prompt that
+# posts nothing; these keys write to the issue. Protocol:
+# https://github.com/luongnv89/idd/blob/main/docs/plan-and-claim.md
+resolver:
+  # Require a current plan comment before implementing; the resolver posts one
+  # when none is current. Type: boolean. Default: false
+  require_plan: false
+  # Who approves a posted plan. Values: "auto" (no wait) | "human" (the
+  # `plan-approved` label on a current plan). Type: string. Default: "auto"
+  plan_approval: auto
+  # Label that claims an issue while a resolver works on it; "" turns the claim
+  # off. Must be "" or fullmatch [A-Za-z0-9][A-Za-z0-9._:-]{0,49}.
+  # Type: string. Default: "agent:working"
+  claim_label: "agent:working"
+
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
   # Max review-fix cycles before stopping
@@ -552,6 +568,7 @@ graph TD
     R[".idd.yml"] --> P["platform<br/>(driver: github)"]
     R --> I["issue"]
     R --> RS["resolve"]
+    R --> RR["resolver"]
     R --> RV["review"]
     R --> AP["autopilot"]
     R --> T["triage"]
@@ -576,6 +593,10 @@ graph TD
     RS --> R7["qa_max_cycles"]
     RS --> R8["adaptive_effort"]
     RS --> R9["borrow_skills"]
+
+    RR --> RR1["require_plan"]
+    RR --> RR2["plan_approval"]
+    RR --> RR3["claim_label"]
 
     RV --> RV1["max_cycles"]
     RV --> RV14["adaptive_depth"]
@@ -704,6 +725,9 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off caller-context reuse: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
+| `resolver.require_plan` | `false` | Require a current plan comment before implementing; the resolver posts one when none is current |
+| `resolver.plan_approval` | `auto` | `auto` or `human`; `human` waits for the `plan-approved` label on a current plan |
+| `resolver.claim_label` | `"agent:working"` | Claim label while a resolver works; `""` turns the claim off; must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,49}` |
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and auto-pilot's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |

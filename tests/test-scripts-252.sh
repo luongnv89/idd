@@ -1278,7 +1278,10 @@ EXPECTED_SITES = {
     # body into gi-ready.py for the readiness check.
     # 13 since issue #584: that check pipes the retained explicit_issue_records
     # entry instead — one body snapshot, so the re-read site is gone by design.
-    "gi-deps.py": 1, "gi-issue.py": 13,
+    # 16 since issue #648: plan-and-claim.md invalidates the cache after the
+    # claim write and after every label write, and pr-review's plan
+    # conformance reads the Step 1 snapshot back from the cache.
+    "gi-deps.py": 1, "gi-issue.py": 16,
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
@@ -1333,6 +1336,11 @@ EXPECTED_SITES = {
     # 2 since issue #647: /issue-triage route mode validates the question set
     # once (--questions --enabled) and judges each issue (--comment).
     "gi-route.py": 2,
+    # 5 since issue #648: plan-and-claim.md reads the issue (check), posts a
+    # plan (render-plan) and a claim (render-claim); pr-review's plan
+    # conformance reads the plan (check) and compares it with the diff (conform).
+    # 6: plan-and-claim.md also closes a claim marker (render-release).
+    "gi-plan.py": 6,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
@@ -1446,6 +1454,11 @@ ALLOWED_VARS = {
     # Issue #535. The 16-hex `digest` gi-postmerge computed for the file list
     # the user confirmed; the script re-checks it against ^[0-9a-f]{16}$.
     "$digest": "16-hex file-list digest gi-postmerge itself reported, format-checked",
+    # Issue #648. The plan-and-claim reads: each value is bound by the skill
+    # and screened again by gi-plan.py (exit 3 outside its grammar).
+    "$login": "the login `gh api user --jq .login` reported; gi-plan screens it",
+    "$claim_run": "run id the resolver generated (date + 4 hex) or the spawn prompt's run_id; gi-plan screens it",
+    "$claim_label": "resolver.claim_label, shape-checked by gi-config and again by gi-plan",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

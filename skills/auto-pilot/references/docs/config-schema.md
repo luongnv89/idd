@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.idd.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `autopilot`, `compaction`, `platform`, `resolve`, `review`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `autopilot`, `compaction`, `platform`, `resolve`, `resolver`, `review`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 IDD Stack works with zero configuration — every setting has a default. With no `.idd.yml`, the first-run hint is shown:
 
@@ -118,6 +118,22 @@ resolve:
     # Note: when enabled it still skips (fail-soft to code-only) if no app is
     #       running/reachable or capture is unsafe — it never blocks code review.
     browser_review: "ask"
+
+# Visible issue-side protocol of /issue-resolver: a plan comment before code and
+# a claim label while it works. `resolve.approval_gate` is a local prompt that
+# posts nothing; these keys write to the issue. Protocol:
+# https://github.com/luongnv89/idd/blob/main/docs/plan-and-claim.md
+resolver:
+  # Require a current plan comment before implementing; the resolver posts one
+  # when none is current. Type: boolean. Default: false
+  require_plan: false
+  # Who approves a posted plan. Values: "auto" (no wait) | "human" (the
+  # `plan-approved` label on a current plan). Type: string. Default: "auto"
+  plan_approval: auto
+  # Label that claims an issue while a resolver works on it; "" turns the claim
+  # off. Must be "" or fullmatch [A-Za-z0-9][A-Za-z0-9._:-]{0,49}.
+  # Type: string. Default: "agent:working"
+  claim_label: "agent:working"
 
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
@@ -481,6 +497,9 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off caller-context reuse: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
+| `resolver.require_plan` | `false` | Require a current plan comment before implementing; the resolver posts one when none is current |
+| `resolver.plan_approval` | `auto` | `auto` or `human`; `human` waits for the `plan-approved` label on a current plan |
+| `resolver.claim_label` | `"agent:working"` | Claim label while a resolver works; `""` turns the claim off; must fullmatch `[A-Za-z0-9][A-Za-z0-9._:-]{0,49}` |
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and auto-pilot's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |

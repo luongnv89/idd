@@ -358,7 +358,8 @@ distribution that reaches a command line unchecked by `gi-config.py`.
 `review.merge_method` reaches one too, but
 `gi-config.py` accepts only `squash`, `merge` or `rebase` for it, and it
 shape-checks the other free-form values, `triage.route.label_prefix` and each
-`triage.route.questions` id; every other substituted config value is an integer. The
+`triage.route.questions` id; every other substituted config value is an integer.
+`resolver.claim_label` is shape-checked there too. The
 double quotes above stop word-splitting and globbing but do **not** neutralize
 `$(…)` or a backtick, so the check is what makes the substitution safe. Anything
 else is the first degrade path below: skip the write and continue.

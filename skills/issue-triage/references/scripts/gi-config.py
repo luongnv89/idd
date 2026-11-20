@@ -53,6 +53,13 @@ flag. `triage.route.questions` is passed to `gi-route.py --enabled` as separate
 words, so it must be a non-empty list of distinct strings that each fullmatch `[a-z]+`,
 else exit 3, in view or not; gi-route.py owns which ids exist and are required.
 
+`resolver.plan_approval` is an enum the type check cannot see: an accepted
+value outside auto and human is exit 3, in view or not. `resolver.claim_label`
+is put on `gh issue edit --add-label/--remove-label` and passed to
+`gi-plan.py --claim-label`, so an accepted value must be the empty string (the
+claim is off) or 1-50 characters that start with a letter or digit and hold
+only letters, digits and `._:-` (fullmatch), else exit 3, in view or not.
+
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
 directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
 its place (`first_run` false, `config_file` naming it) with
@@ -148,6 +155,13 @@ _ROUTE_PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,38}")
 # is a bare lowercase word; gi-route.py decides which ids are known.
 _ROUTE_QUESTIONS = "triage.route.questions"
 _ROUTE_QUESTION_RE = re.compile(r"[a-z]+")
+# The plan-approval mode is one of two words. The claim label reaches `gh issue
+# edit` and `gi-plan.py --claim-label` as a shell word, so it is shape-checked
+# like the route prefix; "" turns the claim off. 50 is GitHub's label limit.
+_PLAN_APPROVAL = "resolver.plan_approval"
+_PLAN_APPROVALS = ("auto", "human")
+_CLAIM_LABEL = "resolver.claim_label"
+_CLAIM_LABEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,49}")
 
 
 class ConfigError(Exception):
@@ -500,6 +514,17 @@ def merge(
         ):
             errors.append(
                 f"{_ROUTE_QUESTIONS} — must be a non-empty list of distinct lowercase-letter ids"
+            )
+
+    if _PLAN_APPROVAL in accepted and accepted[_PLAN_APPROVAL] not in _PLAN_APPROVALS:
+        errors.append(f"{_PLAN_APPROVAL} — must be one of: " + ", ".join(_PLAN_APPROVALS))
+
+    if _CLAIM_LABEL in accepted:
+        label = accepted[_CLAIM_LABEL]
+        if not isinstance(label, str) or (label and _CLAIM_LABEL_RE.fullmatch(label) is None):
+            errors.append(
+                f"{_CLAIM_LABEL} — must be \"\" or 1-50 letters, digits and ._:- that "
+                "starts with a letter or digit"
             )
 
     merged = {**defaults, **accepted}

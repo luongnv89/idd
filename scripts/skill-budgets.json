@@ -13,11 +13,11 @@
         ],
         "measured": 46750
       },
-      "budget": 448478,
-      "measured": 448478,
+      "budget": 451238,
+      "measured": 451238,
       "skill_md": {
-        "budget": 27312,
-        "measured": 27312
+        "budget": 27636,
+        "measured": 27636
       }
     },
     "init-idd": {
@@ -26,8 +26,8 @@
         "files": [],
         "measured": 0
       },
-      "budget": 125879,
-      "measured": 125879,
+      "budget": 127691,
+      "measured": 127691,
       "skill_md": {
         "budget": 25315,
         "measured": 24300
@@ -42,11 +42,11 @@
         ],
         "measured": 34668
       },
-      "budget": 166474,
-      "measured": 166439,
+      "budget": 179872,
+      "measured": 179870,
       "skill_md": {
-        "budget": 24074,
-        "measured": 23050
+        "budget": 24543,
+        "measured": 24543
       }
     },
     "issue-creator": {
@@ -71,7 +71,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 124320,
+        "budget": 125282,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,13 +79,13 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 123675
+        "measured": 125280
       },
-      "budget": 336686,
-      "measured": 336686,
+      "budget": 338458,
+      "measured": 338456,
       "skill_md": {
-        "budget": 32389,
-        "measured": 32389
+        "budget": 32554,
+        "measured": 32554
       }
     },
     "issue-resolver": {
@@ -96,13 +96,13 @@
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 11103
+        "measured": 11179
       },
-      "budget": 451855,
-      "measured": 451855,
+      "budget": 469237,
+      "measured": 469235,
       "skill_md": {
-        "budget": 35002,
-        "measured": 34194
+        "budget": 35213,
+        "measured": 35209
       }
     },
     "issue-triage": {

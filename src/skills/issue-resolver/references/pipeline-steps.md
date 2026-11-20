@@ -99,13 +99,13 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 
 | Step | Auto behavior |
 |------|---------------|
-| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label, a `route:needs-human` label or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `route_needs_human` / `needs_clarification`. |
+| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label, a `route:needs-human` label, a foreign claim or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `route_needs_human` / `claimed_elsewhere` / `needs_clarification`. The *Claim write* after *0f* takes the same No on a foreign claim. |
 | *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |
 | *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
 | *Step 1* — Research | An already-resolved issue gets one comment recommending the close — **never a close** — and the run exits `already_resolved`. An empty body or 20+ estimated files takes the gate's default No: stop `failed`, `skipped_reason` `empty_body` / `large_scope`. |
-| *Step 2* — Plan | Auto-select the recommended option (when design sketches ran, the sketch's `selected` one under any verdict; `unproven` never stops); the design-confirm checkpoint never fires. The sensitive-change gate still runs when triggered; its `stop` verdict is a safety stop — the run ends `failed`, no PR. |
+| *Step 2* — Plan | A `human` plan without approval takes the default No: stop `failed`, `skipped_reason: plan_awaiting_approval`. Auto-select the recommended option (when design sketches ran, the sketch's `selected` one under any verdict; `unproven` never stops); the design-confirm checkpoint never fires. The sensitive-change gate still runs when triggered; its `stop` verdict is a safety stop — the run ends `failed`, no PR. |
 | *Step 3* — Implement | The max-commits guard takes its default No: no push, no PR, the commits kept on the local branch, `failed` with `skipped_reason: max_commits_exceeded`. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
 | *Step 4* — QA | Run the cycles autonomously; on stagnation, deliver with the known issues recorded rather than stopping. A premise reset that rerunnable diagnostics cannot lift sends no further fix and takes the same deliver-with-known-issues path, with no QA marker. The verification recipe runs only when the base-ref recipe's `auto` list names `resolve`. |
 | *Step 5* — Deliver | Create the PR; never merge. |

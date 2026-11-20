@@ -61,7 +61,8 @@ src/
 │       ├── gi-stats.py            # Read-only run outcomes + post-merge look-back report
 │       ├── gi-ready.py            # Judge whether an issue is ready for an unattended resolve
 │       ├── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
-│       └── gi-route.py            # Route mode: closed-question answers → one route (routing table)
+│       ├── gi-route.py            # Route mode: closed-question answers → one route (routing table)
+│       └── gi-plan.py             # Plan and claim comments: render, freshness, approval, claim owner
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
 │       ├── practice-packs.md      # Practice-pack selection (issue-resolver, issue-pr-review)
 │       ├── practice-*.md          # Eight per-domain practice checklists
@@ -120,7 +121,8 @@ docs/                              # All documentation — single tree (issue #8
 ├── terminal-style.md              #
 ├── auto-mode.md                   #
 ├── post-merge-cleanup.md          #
-├── context-threshold.md           # ↑
+├── context-threshold.md           #
+├── plan-and-claim.md              # ↑
 ├── ARCHITECTURE.md                # ↓ Human-only project docs (not bundled
 ├── DEVELOPMENT.md                 #   into skills; readable on the
 ├── decisions/                     #   repo's main branch only)
@@ -136,7 +138,7 @@ docs/                              # All documentation — single tree (issue #8
 
 All documentation lives in top-level `docs/`. Two kinds coexist there:
 
-1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a **skill** — the build picks it up automatically. Today's runtime docs — all 16 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `agent-overrides.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`, `post-merge-cleanup.md`, `context-threshold.md`.
+1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a **skill** — the build picks it up automatically. Today's runtime docs — all 17 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `agent-overrides.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`, `post-merge-cleanup.md`, `context-threshold.md`, `plan-and-claim.md`.
 
    Three build-time rules shape what actually lands in a skill (issue #249). **(a) Skill-reachable only** — a doc reachable only through a shared agent is validated but not bundled: emitted agent prompts render their references as absolute repo URLs (issue #245), so a bundled copy would be unreferenceable. **(b) Per-skill config excerpt** — `config-schema.md` is emitted carrying only the top-level sections a skill's own text names (plus `platform`); `/init-idd`, which renders `.idd.yml`, keeps it whole. **(c) Runtime digest** — docs in `DOC_SECTION_DIGESTS` (today: `idd-methodology.md`) are emitted as their normative sections only, plus any optional section the skill names. Both (b) and (c) are verified by the build package under `scripts/build/` (`doc_slimming.py`; `DOC_SECTION_DIGESTS` lives in `common.py`) and fail the build on a hole; a doc bundled with no runtime mention outside the index/precheck blocks prints a `⚠` warning.
 2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
