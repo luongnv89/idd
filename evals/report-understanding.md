@@ -88,7 +88,8 @@ Graded on the rendered report, alongside schema correctness.
 | Next decision is clear | Output identifies the next decision or says no approval is needed, and lists remaining work. |
 
 Scenarios: a fresh analysis, a cached view, a scan timeout, and failed
-persistence. No eval case exists yet.
+persistence. Case: [`cases/issue-analysis/fresh-read-only`](cases/issue-analysis/fresh-read-only/)
+(a fresh analysis).
 
 ## issue-triage
 
@@ -146,7 +147,9 @@ Graded on the *Step 4 — Report* block, alongside config correctness.
 | Next decision is clear | The output says `No approval needed.` and names the remaining user actions, including commit and any merge-settings fix. |
 
 Scenarios: a fresh generate, a merge, a cancel (interactive and auto mode), a
-degraded scan, and a failed validation. No eval case exists yet.
+degraded scan, and a failed validation. Case:
+[`cases/init-idd/python-generate`](cases/init-idd/python-generate/) (a fresh
+generate).
 
 ## idd-doctor
 
@@ -160,5 +163,6 @@ the reviewer's answers go with the evaluation, never on a PR or issue.
 | Claims are traceable | Every failed or warned check has a `{path}:{line_number}` finding or a quoted configuration value; `PASS` is never claimed for a skipped check. |
 | Next decision is clear | `Decision` says no approval is needed and names the fix hints to apply, or `Next: none`. |
 
-`tests/test-idd-doctor.sh` checks the spec's correctness only. No eval case
-exists yet.
+`tests/test-idd-doctor.sh` checks the spec's correctness only. Case:
+[`cases/idd-doctor/drift-report`](cases/idd-doctor/drift-report/) (a `FAIL`
+report with one warned check).

@@ -148,8 +148,10 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   reports a soft-pass merge as clean, a disabled check prints `pass`, and the run log has no
   verification field.
 - [ ] **VW18 — Skill behaviour is verified with real agent runs.** Partial: the hermetic
-  evals replay fixed stand-ins, the real-agent promotion lane has no locked tasks, and
-  three skills have no eval cases.
+  evals replay fixed stand-ins, and every skill has at least one case; the real-agent
+  promotion lane has three locked held-out tasks
+  (`tests/test-eval-promotion-517.sh` T13, behavioural), but no promotion run has been
+  recorded yet.
 - [ ] **VW19 — The outcome is checked after merge.** A reopened issue, a revert or a
   follow-up bug is linked back to the run that shipped the change. Partial: `idd-lint stats`
   joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
