@@ -97,9 +97,10 @@ Every byte a skill puts into an agent's context must earn its place.
 - [ ] **TE11 — Runtime token cost per resolved issue is tracked across releases.** Partial:
   the run log takes optional `tokens`, `agents`, `model`, `effort` and `skill_version`
   fields, and `tokens` and `agents` must agree with the run-cost footer (#562;
-  `tests/test-runs-jsonl.sh`, behavioural), and `docs/release-costs.md` records one median
-  per flow per release, a section `tests/test-plugin-manifest-469.sh` (S13) requires for
-  the current version.
+  `tests/test-runs-jsonl.sh` T14a–f, behavioural for the fields; T14h–k, prose pin for
+  the footer agreement), and `docs/release-costs.md` records one median per flow per
+  release, a section `tests/test-plugin-manifest-469.sh` (S13) requires for the current
+  version.
   Missing: the only release entry, v0.27.0, reads `no data`; `tokens` is written only when
   the host reports a count; the `gh`-call counter still runs in the eval lab only; and the
   one measured figure is still the #465 baseline.
