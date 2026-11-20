@@ -533,3 +533,6 @@ jobs:
 
       - name: test-plan-claim-648
         run: bash tests/test-plan-claim-648.sh
+
+      - name: test-image-upload-branch-546
+        run: bash tests/test-image-upload-branch-546.sh
