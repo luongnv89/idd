@@ -340,11 +340,11 @@ for pair in "src:$SRC_PR/SKILL.source.md" "built:$BUILT_PR/SKILL.md"; do
 done
 for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
   rt="$base/issue-pr-review/references/report-templates.md"
-  check_has "$rt" 'is the \*Merge floor\*.s `git rev-parse "origin/\$\{base_ref\}"`' \
+  check_has "$rt" '^`git rev-parse --verify "refs/remotes/origin/\$\{base_ref\}"` after its fetch' \
     "M11.4 (${rt#$REPO_ROOT/}): {floor_base} is the tip the floor fetched and classified"
   check_has "$base/auto-pilot/references/prompts/reviewer.md" '^  `met` returned whole as `met@<sha40>:<sha40>`' \
     "M11.5 (${base#$REPO_ROOT/}): the auto-pilot reviewer returns the floor's binding"
-  anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'pasted only as `met@<40 hex>:<40 hex>`' \
+  anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'pasted only once it matches `\^met@\[0-9a-f\]\{40\}:\[0-9a-f\]\{40\}\$` \(else `stale`\)' \
     "M11.6 (${base#$REPO_ROOT/}): only a well-formed floor binding is pasted into the shell"
   anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'a floor bound to another head or base tip' \
     "M11.7 (${base#$REPO_ROOT/}): a floor bound to another head or base tip is stale"
