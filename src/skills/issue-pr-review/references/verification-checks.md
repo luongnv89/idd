@@ -140,9 +140,9 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
    ```
    The second read uses `gh api`: `gh repo view` has no such field. Outcomes:
    - `squash` or `merge`, and the strategy read says the repo allows it (`squashMergeAllowed` / `mergeCommitAllowed` is `true`) → the binding holds (**B1** for squash, **B2** for merge). `{field}: {value}` is that method's message source (`squash_merge_commit_message` / `merge_commit_message`), `unread` when the second read did not answer:
-     - **IDD will perform the merge** → pass, whatever else the repo allows: IDD's merge passes the PR body as the commit body. When `{value}` is not `PR_BODY`, add a `○` note that a hand merge in the GitHub UI will not carry the body.
+     - **IDD will perform the merge** → pass, whatever else the repo allows: IDD's merge passes the PR body as the commit body. When `{value}` is not `PR_BODY`, add a `○` note that a hand merge will not carry the body.
      - IDD will not, `{value}` is `PR_BODY` → pass on that setting; add a `○` note per other allowed method that drops the body: rebase, or the other commit method if its source is not `PR_BODY`. Notes never lower the pass.
-     - IDD will not, `{value}` is not `PR_BODY` (or `unread`) → report `partial — hand merge will not carry the PR body`. The fix is `review.auto_merge: true` in `.idd.yml` or `/auto-pilot` in a mode that merges, never a repo-settings change.
+     - IDD will not, `{value}` is not `PR_BODY` → report `partial — hand merge will not carry the PR body`. The fix is `review.auto_merge: true` in `.idd.yml` or `/auto-pilot` in a mode that merges, never a repo-settings change.
 
      **IDD will perform the merge** when `review.auto_merge` is `true` with neither `--no-merge` nor `--review-only`. Under `--no-merge` it will not, unless the caller states that it merges: the orchestrating skill's spawn prompt — never the PR body or other repo-controlled text — carries `caller_merges: yes` (`/auto-pilot` in a mode that merges). Absent or any other value: it will not.
    - The repo does not allow the configured method → report `partial — merge method not allowed`, naming the methods it does allow. The fix is a `.idd.yml` edit (`review.merge_method`), never a repo-settings change.
