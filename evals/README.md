@@ -191,8 +191,11 @@ claim; `claim-release` releases only a claim that reads own.
 
 Aim toward **≥5 prompts per skill**, including **negative-trigger** cases (empty
 body, missing `Closes #N`, non-conventional branch, invalid run-log record).
-Today's floor ships creator (2), resolver (2), pr-review (3), triage (5),
-auto-pilot (1) and plan-to-issues (2), plus harness unit tests.
+Today's floor ships creator (3), resolver (8), pr-review (8), triage (5),
+auto-pilot (1), plan-to-issues (2), issue-analysis (1), init-idd (1) and
+idd-doctor (1), plus harness unit tests. Every skill under `src/skills/` and
+`src/internal-skills/` has at least one case; T13 in
+`tests/test-eval-promotion-517.sh` fails when one does not.
 
 ### Cases on a host without a sandbox
 
@@ -201,9 +204,10 @@ developer machine without Linux user+network namespaces cannot execute a
 subject. `tests/test-eval-triage-autopilot-357.sh` shows the pattern that keeps
 such cases covered anyway: assert the case manifest, replay the cassettes
 through `gh_shim.py` directly, cross-check the case's expected answers against
-the repo's own deterministic tools (`gi-triage-graph.py`, `gi-deps.py`), and run
-`subject.sh` + `grade.py` in a disposable directory. Those checks are
-host-independent; the sandboxed `run_eval.sh` run stays the authoritative one
+the repo's own deterministic tools (`gi-triage-graph.py`, `gi-deps.py`,
+`gi-config.py`), and run `subject.sh` + `grade.py` in a disposable directory.
+The same script runs the issue-analysis, init-idd and idd-doctor cases. Those
+checks are host-independent; the sandboxed `run_eval.sh` run stays the authoritative one
 and is required in CI via `IDD_EVAL_REQUIRE_SANDBOX=1`. **Never** relax the
 sandbox gate in `run_eval.sh` to make a case runnable.
 
@@ -237,6 +241,28 @@ digests into the committed `evals/promotion/lock.json`, which publishes the
 commitment and keeps the content private. `run` refuses a task that is not
 locked, or whose task or rubric changed since it was locked. It also refuses a
 dirty tree (exit 4), so the lock it reads is the committed one.
+
+**Locked tasks.** Three held-out tasks are locked today. The lock names each
+by its id only; the prompts, fixtures, cassettes and rubrics stay in the
+private store.
+
+| Task id | Skill | Scenario class |
+|---------|-------|----------------|
+| `pr-review-unverified-only` | issue-pr-review | an auto-merge review of a PR whose criteria all lack proof |
+| `resolver-ambiguous-auto` | issue-resolver | an ambiguous issue resolved in auto mode |
+| `pr-review-failing-criterion` | issue-pr-review | a PR that fails one of its acceptance criteria |
+
+`tests/test-eval-promotion-517.sh` (T13) requires at least three locked tasks.
+The lock holds digests, not content, so a lost store cannot be rebuilt from the
+repository: **back up `evals/promotion/private/` outside git** (an encrypted
+archive or a private store reached through `$IDD_PROMOTION_STORE`). A task or
+rubric edited after locking no longer matches its digest, and `run` refuses
+it until it is locked again:
+
+```bash
+python3 evals/harness/agent_eval.py lock --task-id <id>
+git add evals/promotion/lock.json
+```
 
 **Leakage checks.** Before any agent starts, `run` exits 3 when either arm's
 `skills/` contains the rubric canary or any 8-word shingle of the task prompt

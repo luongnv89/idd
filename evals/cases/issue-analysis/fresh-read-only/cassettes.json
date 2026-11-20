@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "argv": [
+        "issue",
+        "view",
+        "42",
+        "--json",
+        "number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author"
+      ],
+      "stdout": "{\"number\":42,\"title\":\"Fix rate limiter letting one extra request through\",\"body\":\"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nBug\\n\\n## Description\\n\\n`Window(2).allow()` returns true for the third call in a window.\\n\\n## Acceptance Criteria\\n\\n- [ ] `Window(n).allow()` returns false for call n+1 in one window\\n- [ ] A regression test covers the boundary call\\n\",\"labels\":[{\"name\":\"bug\"}],\"assignees\":[],\"state\":\"OPEN\",\"comments\":[],\"createdAt\":\"2026-09-01T08:00:00Z\",\"updatedAt\":\"2026-09-03T10:15:00Z\",\"author\":{\"login\":\"reporter\",\"name\":\"Rae Porter\"}}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

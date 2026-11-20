@@ -1,0 +1,78 @@
+{
+  "name": "issue-analysis/fresh-read-only",
+  "skill": "issue-analysis",
+  "prompt": "Analyze issue #42 with /issue-analysis 42 and persist .idd/analysis-42.json",
+  "repo_scripts": [
+    "src/shared/scripts/gi-issue.py",
+    "src/shared/scripts/gi-gh.py",
+    "src/shared/scripts/gi-ready.py"
+  ],
+  "grade": [
+    {
+      "tool": "gh-calls",
+      "expect_count": 1,
+      "expect_argv": [
+        ["issue", "view", "42", "--json", "assignees,author,body,comments,createdAt,labels,number,state,title,updatedAt"]
+      ],
+      "expect_exit": 0,
+      "label": "exactly one gh call: the full-field issue read, and no tracker write"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {"issue view": 0},
+      "expect_exit": 1,
+      "label": "the call counter is live — claiming zero issue reads fails (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/analysis-42.json",
+      "expect_exit": 0,
+      "label": "the analysis artifact was produced"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/schema-valid.txt",
+      "expect_exit": 0,
+      "label": "the analysis passes the Validate-analysis-data rules (git_state, updatedAt verbatim, option numbering, decision record)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/coverage-covered.txt",
+      "expect_exit": 0,
+      "label": "gi-ready.py --coverage finds every criterion covered by the recommended option"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/persist-verified.txt",
+      "expect_exit": 0,
+      "label": ".idd/analysis-42.json was replaced atomically and re-read equal"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/source-untouched.txt",
+      "expect_exit": 0,
+      "label": "read-only: no tracked file changed and nothing was written outside .idd/"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/tampered-accepted.txt",
+      "expect_exit": 1,
+      "label": "a renamed commit_sha, a re-derived updatedAt, a missing recommended option or an unknown criterion id is refused (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/coverage-gap.txt",
+      "expect_exit": 1,
+      "label": "the recommended option leaves no criterion uncovered (negative)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "report.txt leads with DONE and the root cause, with its path:line, before any detail.",
+      "The root cause is labeled as observed in code, not as a reproduced failure.",
+      "The recommended option names the criteria it covers, and the report says no approval is needed."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the real gi-issue.py and gi-ready.py on a recorded issue; whether a live agent finds the root cause or ranks options well is out of its scope."
+  }
+}

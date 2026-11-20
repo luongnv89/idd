@@ -8,7 +8,8 @@
 # the clean-tree gate, pre-run held-out and staging leak checks, recorded
 # provenance, blind packets, the verdict rule, artifact verification,
 # post-run leak detection, per-run isolation, normalized mtimes and the sealed
-# seed.
+# seed. T13 checks the real repo: at least three held-out tasks are locked, and
+# every skill under src/ has at least one hermetic eval case (#572).
 #
 # Offline and hermetic: no network, no gh auth, no sandbox required.
 #
@@ -618,6 +619,51 @@ if [ "$T12_OK" -eq 1 ]; then
   pass "T12: runs below min_runs → insufficient; a timed-out agent records exit \"timeout\"; a FIFO left behind is skipped and recorded, not fatal"
 else
   fail "T12: insufficient / timeout / unusual files (exit $EC12)"
+fi
+
+# ─── T13: locked held-out tasks and a case per skill ───────
+# The lane is only useful with tasks to run (#572): the committed lock names at
+# least three, each by a lowercase-hyphen id with two sha256 digests. The
+# hermetic lane covers every public and internal skill, enumerated from src/
+# rather than listed here, so a new skill without a case fails this test.
+T13_OK=1
+python3 - "$REPO_ROOT" <<'PY' || T13_OK=0
+import json, re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+tasks = json.loads((root / "evals/promotion/lock.json").read_text())["tasks"]
+problems = []
+if len(tasks) < 3:
+    problems.append(f"lock.json locks {len(tasks)} task(s), want >= 3")
+for tid, entry in sorted(tasks.items()):
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", tid):
+        problems.append(f"task id {tid!r} is not lowercase-hyphen")
+    for key in ("task_sha256", "rubric_sha256"):
+        if not re.fullmatch(r"[0-9a-f]{64}", str((entry or {}).get(key, ""))):
+            problems.append(f"{tid}: {key} is not 64 lowercase hex")
+skills = sorted(
+    p.name
+    for parent in ("src/skills", "src/internal-skills")
+    for p in (root / parent).iterdir()
+    if p.is_dir()
+)
+if not skills:
+    problems.append("no skill directories found under src/")
+for name in skills:
+    cases = [
+        c for c in sorted((root / "evals/cases" / name).glob("*/case.json"))
+        if json.loads(c.read_text()).get("skill") == name
+    ]
+    if not cases:
+        problems.append(f"skill {name} has no eval case under evals/cases/{name}/")
+for line in problems:
+    print(f"    {line}")
+sys.exit(1 if problems else 0)
+PY
+if [ "$T13_OK" -eq 1 ]; then
+  pass "T13: lock.json locks >= 3 held-out tasks (lowercase-hyphen ids, sha256 digests); every skill under src/ has an eval case"
+else
+  fail "T13: locked tasks / per-skill eval cases"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
