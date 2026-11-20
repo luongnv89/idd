@@ -44,7 +44,7 @@ Every read is live, never the issue cache. Only comments by `$login` can make a 
 
 1. Read the issue. `foreign` → *Claimed elsewhere*. `own` → already held: skip to 6.
 2. Record the progress intent `{"kind": "label_edit", "state": "intent", "key": {"label": "<claim_label>", "op": "add"}}`.
-3. Post the claim comment first — a marker without the label claims nothing, so a crash here leaves nothing a later run reads as foreign:
+3. Post the claim comment first — a crash here adds no label, yet its live marker races claims posted within ten minutes (*No expiry*):
 
    ```bash
    mkdir -p .idd/cache && python3 references/scripts/gi-plan.py render-claim --run "$claim_run" --branch "$branch_name" > .idd/cache/claim-{N}.md && gh issue comment {N} --body-file .idd/cache/claim-{N}.md; ec=$?; rm -f .idd/cache/claim-{N}.md; exit "$ec"

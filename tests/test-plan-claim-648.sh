@@ -519,7 +519,7 @@ issue "$TMP/i-n2.json" - "agent:working" "alice|2026-11-19T10:00:00Z|$TMP/c-r1.m
 
 # ── T4: wiring pins ────────────────────────────────────────────────────────
 echo "  ┄ wiring"
-has "$DOC" 'Post the claim comment first — a marker without the label claims nothing' "T4.1 the claim comment is posted before the label"
+has "$DOC" 'Post the claim comment first — a crash here adds no label, yet its live marker races claims posted within ten minutes' "T4.1 the claim comment is posted before the label"
 has "$DOC" 'it must read `own`' "T4.2 the claim write re-reads live and must read own"
 has "$DOC" 'leave the label — it belongs to the winner' "T4.3 a lost race never removes the winner's label"
 has "$DOC" 'Never remove a claim that does not read `own`' "T4.4 release touches only an own claim"
