@@ -1,4 +1,17 @@
 {
-  "tasks": {},
+  "tasks": {
+    "pr-review-failing-criterion": {
+      "rubric_sha256": "4516fe8dfcebb0073caec669dd981810d17349e82f5c0fa283f1582d97ad9538",
+      "task_sha256": "2e7fe8814ed57a1a3b939b75098cca5fe99156baee99df3dcc22d93a714d8f2b"
+    },
+    "pr-review-unverified-only": {
+      "rubric_sha256": "f7385f0a6ce6d9460cdd1ff74e33fb268778b8c6185a4be38a3e8accd6a0e55c",
+      "task_sha256": "cc0d36e45690eb9654a5111b0d935e76ff692331e1d8b0b3d3de9af56daf5b28"
+    },
+    "resolver-ambiguous-auto": {
+      "rubric_sha256": "e6d7dc427ba6f450172690dbfebde96d524742edc7a055184c0196ecab1ce48f",
+      "task_sha256": "b1fcba0c7e4760fd1b5c4d6f8203ab6ccdabcda97ba3a0a1adb718bbd146cbc8"
+    }
+  },
   "version": 1
 }
