@@ -93,14 +93,14 @@ forbid_grep "T1: src pass no longer needs squash-only" \
 
 echo "T2: a message source other than PR_BODY is a note only when IDD performs the merge"
 expect_grep "T2: src adds a ○ note for a hand merge when IDD will perform the merge" \
-  'When `\{value\}` is not `PR_BODY`, add a `○` note that a hand merge in the GitHub UI will not carry the body' "$SRC_VERIFICATION"
+  'When `\{value\}` is not `PR_BODY`, add a `○` note that a hand merge will not carry the body' "$SRC_VERIFICATION"
 expect_grep "T2: src notes never lower the pass" \
   'Notes never lower the pass' "$SRC_VERIFICATION"
 # SPEC §4.3: for a merge the tool does not perform, the message source decides.
 for f in "$SRC_VERIFICATION" "$BUILT_VERIFICATION"; do
   tag="${f#"$REPO_ROOT"/}"; tag="${tag%%/*}"
   expect_grep "T2 ($tag): a hand merge without PR_BODY is a partial, never a pass" \
-    '^     - IDD will not → report `partial — hand merge will not carry the PR body`' "$f"
+    '^     - IDD will not, `\{value\}` is not `PR_BODY` → report `partial — hand merge will not carry the PR body`' "$f"
   expect_grep "T2 ($tag): its fix is a .idd.yml edit, never a repo-settings change" \
     'The fix is `review\.auto_merge: true` in `\.idd\.yml` or `/auto-pilot` in a mode that merges, never a repo-settings change' "$f"
   expect_grep "T2 ($tag): 'IDD will perform the merge' follows the merge rule" \

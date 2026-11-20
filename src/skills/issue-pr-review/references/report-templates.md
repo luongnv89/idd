@@ -205,7 +205,7 @@ Traceability check 4 judges the repository against `review.merge_method` (`refer
 
 `{other}` is `rebase`, or the other commit method and its `({field}: {value})`; one note each.
 
-When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges`.
+When check 4 reports the hand-merge `partial`, print it instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges`.
 
 When the repo does not allow the configured method, the dimension reports `partial`. The fix is a config edit; IDD never changes a repo setting:
 
@@ -297,9 +297,9 @@ the PR body under any repo setting (`docs/platform-github.md`, *Merge + clean
 up*); a failed body read empties `verified_head`, so the guard refuses the
 merge. For `rebase`, drop the `body_file` and `trap` lines and the `--body-file` flag.
 
-`{floor_base}` is the *Merge floor*'s `git rev-parse "origin/${base_ref}"`
-after its fresh fetch, the base tip it classified: a retargeted PR or a moved
-base has another live tip, so the merge is blocked.
+`{floor_base}` is the base tip the *Merge floor* classified,
+`git rev-parse --verify "refs/remotes/origin/${base_ref}"` after its fetch: a
+retarget or a moved base has another live tip and blocks the merge.
 
 The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*
 that a standalone review needs. `behind_by` `0` means the live base tip is an

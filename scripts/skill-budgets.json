@@ -14,7 +14,7 @@
         "measured": 46750
       },
       "budget": 451238,
-      "measured": 451238,
+      "measured": 451234,
       "skill_md": {
         "budget": 27636,
         "measured": 27636
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 125280
+        "measured": 125277
       },
       "budget": 338693,
-      "measured": 338693,
+      "measured": 338690,
       "skill_md": {
         "budget": 32554,
         "measured": 32554
