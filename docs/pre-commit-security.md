@@ -84,7 +84,7 @@ done <<< "$files"
 # 2. Block: real API-key values inside text files.
 #    Distinguish placeholders ('your-...', 'xxx', 'placeholder', '<...>', '${...}')
 #    from real keys via known prefixes.
-realkey_patterns='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
+realkey_patterns='((^|[^A-Za-z0-9_-]|%[0-9A-Fa-f]{2}|\\[nrt])sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   [ -f "$f" ] || continue
@@ -159,7 +159,7 @@ fi
 
 ### Behavior Notes
 
-- **Real keys vs. placeholders.** Real-key detection is gated on prefix patterns (`sk-proj-`, `sk_live_`, `AKIA`, `ghp_`, `gho_`, `ghs_`, `xox[abp]-`, `glpat-`, `AIza...`) plus length, so common placeholders (`your-api-key`, `xxx`, `placeholder`, `<your-key>`, `${VAR}`) do not match. When extending the pattern, prefer **prefix + length** over **identifier + value** — the latter false-positives on docstrings and tests.
+- **Real keys vs. placeholders.** Real-key detection is gated on prefix patterns (`sk-proj-`, `sk_live_`, `AKIA`, `ghp_`, `gho_`, `ghs_`, `xox[abp]-`, `glpat-`, `AIza...`) plus length, so common placeholders (`your-api-key`, `xxx`, `placeholder`, `<your-key>`, `${VAR}`) do not match. `sk-` must start a token (line start, a non-identifier character, `%XX`, or a literal `\n`/`\r`/`\t`), so kebab-case names like `risk-…` do not match. When extending the pattern, prefer **prefix + length** over **identifier + value** — the latter false-positives on docstrings and tests.
 - **Binary skip.** `binary`-charset files skip real-key scanning (avoids slow, FP-prone scans). **Residual risk:** NUL-sniff proxy misses evasions; filename/size rules still fire. Gitleaks closed this ask as not planned.
 - **Working set.** What to scan, and when: *Skill-Side Responsibilities* item 1. `--staged` reads index blobs; `--range BASE`, every commit in `BASE..HEAD`. The Primary Pattern reads only the on-disk files its `$files` names, so it misses a secret added and removed inside a range.
 - **Exit code.** Real secrets exit `1` and stop the skill. Warnings print and either prompt the user (interactive mode) or log-and-continue (auto mode); see *Mode Contract* below.
@@ -257,7 +257,7 @@ if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentia
   echo "✗ Secret-bearing file staged."
   exit 1
 fi
-realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
+realkey='((^|[^A-Za-z0-9_-]|%[0-9A-Fa-f]{2}|\\[nrt])sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   [ -f "$f" ] || continue

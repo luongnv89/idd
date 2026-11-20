@@ -167,8 +167,12 @@ SECRET_FILE_PATTERN = (
 
 # Prefix + length, never identifier + value: the latter false-positives on
 # docstrings and tests, which is how a scan gets disabled in practice.
+# `sk-` must start a token: kebab-case names (risk-…, ask-…) contain it
+# mid-word. An encoded (%XX) or escaped (\n, \r, \t) delimiter still counts
+# as a boundary, so a key inside a URL or a JSON-escaped blob is caught.
 SECRET_VALUE_PATTERN = (
-    r"(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}"
+    r"((?:(?<![A-Za-z0-9_-])|(?<=%[0-9A-Fa-f]{2})|(?<=\\[nrt]))"
+    r"sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}"
     r"|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}"
     r"|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}"
     r"|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}"
