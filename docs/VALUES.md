@@ -150,7 +150,7 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
 - [ ] **VW18 — Skill behaviour is verified with real agent runs.** Partial: the hermetic
   evals replay fixed stand-ins, and every skill has at least one case; the real-agent
   promotion lane has three locked held-out tasks
-  (`tests/test-eval-promotion-517.sh` T13, behavioural), but no promotion run has been
+  (`tests/test-eval-promotion-517.sh` T13), but no promotion run has been
   recorded yet.
 - [ ] **VW19 — The outcome is checked after merge.** A reopened issue, a revert or a
   follow-up bug is linked back to the run that shipped the change. Partial: `idd-lint stats`
