@@ -234,7 +234,7 @@ _CONFIG_EXCERPT_NOTICE = (
 DOC_DIGEST_EXPECTED_BYTES: dict[str, tuple[int, int]] = {
     # document: (authored document, emitted runtime digest)
     "platform-github.md": (6376, 5980),
-    "pre-commit-security.md": (28382, 19824),
+    "pre-commit-security.md": (28619, 20061),
 }
 
 DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
