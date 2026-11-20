@@ -396,7 +396,7 @@ grep -qE '^- merge_floor: "met" or "unmet: \{reason\}"' "$AP_PROMPTS" \
   && pass "T11.5: the auto-pilot reviewer returns merge_floor" \
   || fail "T11.5: the auto-pilot reviewer prompt lacks the merge_floor report-back field"
 
-if grep -qF '**Merge floor met** — Step 3.2'"'"'s `merge_floor` is `met`' "$AP_MERGE" \
+if grep -qF '**Merge floor met** — Step 3.2'"'"'s `merge_floor` is `met@<head40>:<base40>` (*Step 5.1c* checks it)' "$AP_MERGE" \
    && grep -qF 'never re-derive it' "$AP_MERGE" \
    && grep -qF 'A missing `merge_floor` (no review ran this session) is `left_open` too' "$AP_MERGE" \
    && grep -qF '⚠ PR #{pr_number} left open — merge floor not derived (resumed run)' "$AP_MERGE"; then
