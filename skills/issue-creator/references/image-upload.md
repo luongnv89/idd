@@ -29,22 +29,28 @@ For each image path provided:
          409) reason=$empty; return 1 ;;
          *) reason="API error reading branch issue-assets"; return 1 ;;
        esac
-       default=$(gh repo view "$owner/$repo" --json defaultBranchRef --jq .defaultBranchRef.name) \
-         || { reason="API error reading the default branch"; return 1; }
-       [ -n "$default" ] || { reason=$empty; return 1; }
-       tip=$(gh api "$api/git/ref/heads/$default" --jq .object.sha) && [ -n "$tip" ] \
-         || { reason="API error reading the default branch"; return 1; }
-       # 422 "Reference already exists": a concurrent run created it, so go ahead.
-       out=$(gh api "$api/git/refs" --method POST -f ref=refs/heads/issue-assets -f sha="$tip") \
-         || { [ "$(http "$out")" = 422 ] && grep -q '"message": *"Reference already exists"' <<<"$out"; } \
-         || { reason="could not create branch issue-assets"; return 1; }
+       if ! default=$(gh repo view "$owner/$repo" --json defaultBranchRef --jq .defaultBranchRef.name); then
+         reason="API error reading the default branch"; return 1
+       fi
+       if [ -z "$default" ]; then reason=$empty; return 1; fi
+       if ! tip=$(gh api "$api/git/ref/heads/$default" --jq .object.sha) || [ -z "$tip" ]; then
+         reason="API error reading the default branch"; return 1
+       fi
+       if ! out=$(gh api "$api/git/refs" --method POST -f ref=refs/heads/issue-assets -f sha="$tip"); then
+         # 422 "Reference already exists": a concurrent run created it, so go ahead.
+         if [ "$(http "$out")" != 422 ] || ! grep -q '"message": *"Reference already exists"' <<<"$out"; then
+           reason="could not create branch issue-assets"; return 1
+         fi
+       fi
      fi
-     download_url=$({ base64 -w0 < "$image_path" 2>/dev/null || base64 < "$image_path"; } | tr -d '\n' \
+     if ! download_url=$({ base64 -w0 < "$image_path" 2>/dev/null || base64 < "$image_path"; } | tr -d '\n' \
        | gh api "$api/contents/.github/issue-assets/$filename" --method PUT -f branch=issue-assets \
            -f message="Upload image for issue: $filename" -F content=@- --jq .content.download_url) \
-       && [ -n "$download_url" ] || { download_url=""; reason="API error on upload"; return 1; }
+       || [ -z "$download_url" ]; then
+       download_url=""; reason="API error on upload"; return 1
+     fi
    }
-   upload && echo "download_url=$download_url" || { echo "reason=$reason" >&2; false; }
+   if upload; then echo "download_url=$download_url"; else echo "reason=$reason" >&2; false; fi
    ```
 
 3. **Check the result** — success is a zero exit **and** a non-empty `download_url`: `https://raw.githubusercontent.com/{owner}/{repo}/issue-assets/.github/issue-assets/{filename}`. Anything else is a failure: put the printed `reason` in the *Failure handling* warning, and never embed a failed call's output as a URL.
