@@ -96,9 +96,10 @@ Every byte a skill puts into an agent's context must earn its place.
   GitHub remote* in five.
 - [ ] **TE11 — Runtime token cost per resolved issue is tracked across releases.** Partial:
   the run log takes optional `tokens`, `agents`, `model`, `effort` and `skill_version`
-  fields that must agree with the run-cost footer (#562; `tests/test-runs-jsonl.sh`,
-  behavioural), and `docs/release-costs.md` records one median per flow per release, a
-  section `tests/test-plugin-manifest-469.sh` (S13) requires for the current version.
+  fields, and `tokens` and `agents` must agree with the run-cost footer (#562;
+  `tests/test-runs-jsonl.sh`, behavioural), and `docs/release-costs.md` records one median
+  per flow per release, a section `tests/test-plugin-manifest-469.sh` (S13) requires for
+  the current version.
   Missing: the only release entry, v0.27.0, reads `no data`; `tokens` is written only when
   the host reports a count; the `gh`-call counter still runs in the eval lab only; and the
   one measured figure is still the #465 baseline.
@@ -119,8 +120,8 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   or a `(needs review)` type or criterion, is marked unclear by triage and skipped by the
   auto-pilot pick; the resolver's readiness gate takes its default No in auto mode, a
   resolve of one ends `PARTIAL`, and the merge floor stays unmet while a criterion carries
-  the marker. Guard: `tests/test-issue-readiness-553.sh` T1–T3 (behavioural,
-  `gi-ready.py`), T4 (prose pin).
+  the marker. Guard: `tests/test-issue-readiness-553.sh` T1–T3 (behavioural: `gi-ready.py`,
+  `gi-triage-graph.py`, `gi-runlog.py`), T4 (prose pin).
 - [ ] **VW4 — Criteria are testable, not just present.** Partial: `SPEC.md` §1 requires it;
   nothing checks it.
 - [x] **VW5 — The plan is mapped to each criterion before implementation.** Every plan
@@ -148,8 +149,9 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
 - [x] **VW10 — Unverified work never merges as clean.** An unattended merge needs the
   *Merge floor*: the criteria check enabled, at least one `pass`, and no `unverified` or
   `(needs review)` criterion; an interactive run below it asks, default No. Holds on
-  default config. Guard: `tests/test-merge-identity-516.sh` M12 (behavioural: the merge
-  block refuses unless `merge_floor` is `met` for that head and base);
+  default config. Guard: `tests/test-merge-identity-516.sh` M12 (behavioural: auto-pilot's
+  merge blocks refuse unless `merge_floor` is `met` for that head and base;
+  `/issue-pr-review`'s block binds the floor's base tip, and its unmet stop is prose);
   `tests/test-consolidated-blocks-248.sh` T11, `tests/test-review-followups-584.sh` T2
   (prose pin); eval `issue-pr-review/unverified-only-auto` (stand-in). The floor itself is
   computed in prose, not in a script.
@@ -266,12 +268,14 @@ A maintainer can hand work to the skills and believe what they report.
 - [x] **TR7 — Skills do not rewrite themselves.** They propose; a human approves. Guard:
   `tests/test-correction-guards-524.sh` for the corrections loop; judgement for the
   Self-Improve section.
-- [x] **TR8 — Reports are honest.** A failure reads as a failure, a skipped or disabled
-  check as skipped, and unverified work as unverified. A soft-pass merge shows its
-  unverified count, a disabled dimension reads `disabled`, and a resolver `PARTIAL` keeps
-  `outcome: success` (a PR was delivered) but carries `verification: partial`. Guard:
-  `tests/test-runs-jsonl.sh` T13a–e (behavioural), T13f–l (prose pin; T13k also greps
-  `src/` and `docs/` for a disabled check reported as `pass`).
+- [ ] **TR8 — Reports are honest.** A failure reads as a failure, a skipped or disabled
+  check as skipped, and unverified work as unverified. Partial: a soft-pass merge shows its
+  unverified count, a disabled dimension reads `disabled`, and a resolver run on an unready
+  issue or with an AC row not `pass` logs `verification: partial`
+  (`tests/test-runs-jsonl.sh` T13a–e, behavioural for the field; T13f–l, prose pin; T13k
+  also greps `src/` and `docs/` for a disabled check reported as `pass`). Missing: a
+  resolver `PARTIAL` from residual QA findings or a check that could not be evaluated still
+  logs `outcome: success` with `verification: full`.
 - [ ] **TR9 — Auto mode never does more than the interactive default would.** Partial:
   every `[y/N]` gate takes its printed No in auto mode or is a row of the exception table in
   `docs/auto-mode.md`, a lint fails an unmarked gate, and an already-resolved issue gets a
@@ -280,11 +284,12 @@ A maintainer can hand work to the skills and believe what they report.
 - [ ] **TR10 — Existing work and data are never lost.** Partial: sync stashes first; a sync
   conflict resets the default branch only when `origin/<base>..HEAD` is empty and the
   tracked tree is clean, else auto-pilot stops and discards nothing
-  (`tests/test-sync-safety.sh` T5–T8, behavioural); post-merge cleanup keeps a dirty
-  worktree and a branch with unmerged commits (`tests/test-postmerge-cleanup.sh`,
-  behavioural); `/issue-creator` previews and backs up before a rewrite. Missing: the
-  resolver's normalize step rewrites an issue body without a preview; it posts a backup
-  comment first and skips the rewrite when that fails, but no test pins that order.
+  (`tests/test-sync-safety.sh` T6–T8, behavioural; T5, static lint); post-merge cleanup
+  keeps a dirty worktree and a branch with unmerged commits
+  (`tests/test-postmerge-cleanup.sh`, behavioural); `/issue-creator` previews and backs up
+  before a rewrite. Missing: the resolver's normalize step rewrites an issue body without a
+  preview; it posts a backup comment first and skips the rewrite when that fails, but no
+  test pins that order.
 - [ ] **TR11 — Untrusted text is data, not instructions.** Partial: the shared agents treat
   issue titles, bodies and comments as data. The remaining gaps are tracked privately per
   `SECURITY.md`.
@@ -383,4 +388,4 @@ Record every approved change to a value here: date, item, what changed, who aske
 | 2026-11-19 | issue-analysis | Growth-cap exemption against v0.27.0: the bundle is 14,374 bytes (+8.68%) above its size at that tag (165,496 → 179,870). Covers the `--plan` form that posts the recommended option as a plan comment, and the bundled `gi-plan.py` (#648); approved on 2026-11-19 | maintainer |
 | 2026-11-19 | issue-resolver | Growth-cap exemption against v0.27.0 raised: the bundle is 47,254 bytes (+11.19%) above its size at that tag (421,981 → 469,235). Covers the plan-comment gate and the `agent:working` claim and release, with the bundled `gi-plan.py` and `docs/plan-and-claim.md` (#648); approved on 2026-11-19 | maintainer |
 | 2026-11-19 | issue-pr-review | Growth-cap exemption against v0.27.0 raised: the bundle is 31,449 bytes (+10.24%) above its size at that tag (307,009 → 338,458). Covers the plan-conformance check and the bundled `gi-plan.py` (#648); approved on 2026-11-19 | maintainer |
-| 2026-11-20 | VW3, VW5, VW6, VW10, VW11, VW13, VW17, TR8 | Ticked after a re-grade against `main` at 57722ec, each naming its guard. The `Partial:` notes of TE8–TE11, VW12, VW15, VW19, SI8, TR9, TR10, TR12–TR14 and SP3 were rewritten to the current state and name what is still missing; SI9, TR11, TR15, TR16 and VW18 were already current (#547) | maintainer |
+| 2026-11-20 | VW3, VW5, VW6, VW10, VW11, VW13, VW17 | Ticked after a re-grade against `main` at 57722ec, each naming its guard. The `Partial:` notes of TE8–TE11, VW12, VW15, VW19, SI8, TR8–TR10, TR12–TR14 and SP3 were rewritten to the current state and name what is still missing; SI9, TR11, TR15, TR16 and VW18 were already current (#547) | maintainer |
