@@ -12,25 +12,48 @@ For each image path provided:
 
 1. **Validate the file** — confirm it exists, is a supported format, and is under 10 MB:
    ```bash
-   test -f "{image_path}" && stat -f%z "{image_path}" 2>/dev/null || stat -c%s "{image_path}" 2>/dev/null
+   test -f "$image_path" && stat -f%z "$image_path" 2>/dev/null || stat -c%s "$image_path" 2>/dev/null
    ```
 
-2. **Upload via GitHub API** — use the repository contents API to commit the image to `.github/issue-assets/`. The contents API requires `content` to be base64-encoded, so encode the image and **stream the result to `gh` via stdin** — never pass the base64 string as a command-line argument, or large images overflow `ARG_MAX` (~1 MB on macOS) and the upload fails with "argument list too long" before any network call:
+2. **Upload via GitHub API** — commit the image to `.github/issue-assets/` on the `issue-assets` branch, created from the default branch tip on first use. It is a storage branch, never a work branch, so the branch naming convention does not apply. The default branch never receives image commits, because protected branches refuse direct writes. **Stream the base64 `content` to `gh` via stdin** (`-F content=@-`, capital `-F`), never as an argument: a large image overflows `ARG_MAX` (~1 MB on macOS) and fails with "argument list too long" before any network call. Set `owner`, `repo`, `image_path` and `original_filename`, then run:
    ```bash
-   filename="$(date +%Y%m%d%H%M%S)-{original_filename}"
-
-   # Pipe base64 (newlines stripped) to gh via stdin. `-F content=@-` (capital -F, NOT
-   # -f) reads the field from stdin, keeping the payload off argv to avoid ARG_MAX.
-   download_url=$(
-     { base64 -w0 < "{image_path}" 2>/dev/null || base64 < "{image_path}"; } | tr -d '\n' \
-     | gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
-         --method PUT \
-         -f message="Upload image for issue: {filename}" \
-         -F content=@- \
-         --jq '.content.download_url')
+   filename="$(date +%Y%m%d%H%M%S)-$original_filename" api="repos/$owner/$repo" download_url=""
+   # Route on gh's exit status, then the HTTP code: on an HTTP error gh exits 1 and prints
+   # the error JSON (not the --jq result), so its output never signals success.
+   http() { sed -n 's/.*"status": *"\([0-9]*\)".*/\1/p' <<<"$1"; }
+   empty="empty repository — push a first commit, then retry"
+   upload() {
+     if ! out=$(gh api "$api/git/ref/heads/issue-assets" --jq .object.sha); then
+       case "$(http "$out")" in
+         404) ;;  # first use: create the branch
+         409) reason=$empty; return 1 ;;
+         *) reason="API error reading branch issue-assets"; return 1 ;;
+       esac
+       if ! default=$(gh repo view "$owner/$repo" --json defaultBranchRef --jq .defaultBranchRef.name); then
+         reason="API error reading the default branch"; return 1
+       fi
+       if [ -z "$default" ]; then reason=$empty; return 1; fi
+       if ! tip=$(gh api "$api/git/ref/heads/$default" --jq .object.sha) || [ -z "$tip" ]; then
+         reason="API error reading the default branch"; return 1
+       fi
+       if ! out=$(gh api "$api/git/refs" --method POST -f ref=refs/heads/issue-assets -f sha="$tip"); then
+         # 422 "Reference already exists": a concurrent run created it, so go ahead.
+         if [ "$(http "$out")" != 422 ] || ! grep -q '"message": *"Reference already exists"' <<<"$out"; then
+           reason="could not create branch issue-assets"; return 1
+         fi
+       fi
+     fi
+     if ! download_url=$({ base64 -w0 < "$image_path" 2>/dev/null || base64 < "$image_path"; } | tr -d '\n' \
+       | gh api "$api/contents/.github/issue-assets/$filename" --method PUT -f branch=issue-assets \
+           -f message="Upload image for issue: $filename" -F content=@- --jq .content.download_url) \
+       || [ -z "$download_url" ]; then
+       download_url=""; reason="API error on upload"; return 1
+     fi
+   }
+   if upload; then echo "download_url=$download_url"; else echo "reason=$reason" >&2; false; fi
    ```
 
-3. **Extract the URL** — the upload command in Step 2 already captures `download_url` via `--jq`. Verify it is non-empty before proceeding. If empty, treat as an upload failure.
+3. **Check the result** — success is a zero exit **and** a non-empty `download_url`: `https://raw.githubusercontent.com/{owner}/{repo}/issue-assets/.github/issue-assets/{filename}`. Anything else is a failure: put the printed `reason` in the *Failure handling* warning, and never embed a failed call's output as a URL.
 
 4. **Build the markdown** — create an image embed for each uploaded file:
    ```markdown
@@ -44,9 +67,7 @@ Embed uploaded images in a **Screenshots** section placed between the Descriptio
 ```markdown
 ## Screenshots
 
-![screenshot-1.png](https://raw.githubusercontent.com/owner/repo/main/.github/issue-assets/20260320120000-screenshot-1.png)
-
-![error-log.png](https://raw.githubusercontent.com/owner/repo/main/.github/issue-assets/20260320120001-error-log.png)
+![screenshot-1.png](https://raw.githubusercontent.com/owner/repo/issue-assets/.github/issue-assets/20260320120000-screenshot-1.png)
 ```
 
 If no images are provided, omit the Screenshots section entirely.
@@ -55,15 +76,7 @@ If no images are provided, omit the Screenshots section entirely.
 
 ## Multiple images
 
-When multiple images are provided, upload each sequentially and embed all of them in the Screenshots section. Number them if the user did not provide descriptive filenames:
-
-```markdown
-## Screenshots
-
-![Screenshot 1](url1)
-
-![Screenshot 2](url2)
-```
+When multiple images are provided, upload each sequentially and embed all of them in the Screenshots section, numbered (`![Screenshot 1](url1)`, `![Screenshot 2](url2)`) if the user did not provide descriptive filenames.
 
 ## Failure handling
 
@@ -75,7 +88,7 @@ If an image upload fails, do **not** block issue creation. Create the issue with
   Tip: upload the image manually via GitHub's web UI.
 ```
 
-Reasons include: file not found, unsupported format, file too large (>10 MB), API error, permission denied.
+Reasons include: file not found, unsupported format, file too large (>10 MB), empty repository, API error, permission denied.
 
 If some images in a batch succeed and others fail, embed the successful ones and warn about the failures.
 
