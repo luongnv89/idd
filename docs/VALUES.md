@@ -30,7 +30,9 @@ Legend:
     an agent follows it;
   - **judgement** means no test covers it and a reviewer has to look.
 
-Markings were last reviewed on 2026-11-11 against v0.27.0.
+Markings were last reviewed on 2026-11-11 against v0.27.0. The items named in the
+values improvement plan's milestones (#547) were re-graded on 2026-11-20 against `main`
+at 57722ec.
 
 ## When values conflict
 
@@ -67,20 +69,41 @@ Every byte a skill puts into an agent's context must earn its place.
 - [x] **TE7 — Long runs survive a full context.** Context-threshold check and durable
   progress records. Guard: `tests/test-context-threshold-540.sh`,
   `tests/test-progress-records-542.sh` (behavioural).
-- [ ] **TE8 — Bundles do not grow release over release without approval.** Partial: growth
-  is explicit (TE2), but the budget is raised by hand in the same PR and has risen in most
-  changes to it. The line cap (TE1) is met with denser lines; SKILL.md has no byte ceiling.
+- [ ] **TE8 — Bundles do not grow release over release without approval.** Partial: a
+  bundle more than 2% above its size at the last release tag fails CI unless the *Change
+  log* has a row naming the skill and the tag, each SKILL.md has a byte ceiling, and the
+  always-read bytes are budgeted (#558; `tests/test-skill-bundle-budget-466.sh`,
+  behavioural). Missing: a row exempts its skill for the whole release and the check reads
+  no byte figure from it, so growth after the first row passes unseen (#653 grew two
+  bundles past their last approved sizes with no new row); five of eight bundles sit above
+  the cap on exemptions, up to +11.25%; and the SKILL.md ceiling has no release cap.
 - [ ] **TE9 — Progressive disclosure: a step reads only what that step needs.** Partial:
-  steps and phases are split into their own files and two skills have tested disclosure
-  gates (`tests/test-disclosure-gates-250.sh`); the common resolver and auto-pilot paths
-  still load more than half the bundle, including whole files for one section.
+  steps and phases are split into their own files, two skills have tested disclosure gates
+  (`tests/test-disclosure-gates-250.sh`), and the bytes behind "read now" pointers are
+  budgeted per skill (`tests/test-skill-bundle-budget-466.sh`, behavioural). The
+  resolver's always-read set fell from 50.5 KB to 11.2 KB (#559). Missing: auto-pilot
+  still reads 46.8 KB up front, `summary-format.md` whole for its final summary;
+  issue-pr-review reads 125 KB across five whole files; and the budget counts only the
+  pointers, so nothing measures what a common path loads.
 - [ ] **TE10 — One home per instruction: written once and pointed to, never copied.**
-  Partial: eight blocks are pinned by `tests/test-consolidated-blocks-248.sh`; `run-stats.md`
-  is authored once per skill, and the Self-Improve section and common error messages repeat
-  across skills.
+  Partial: `run-stats.md` and `self-improve.md` have one authored source in
+  `src/shared/references/`, each SKILL.md keeps only a short Self-Improve pointer, and
+  `tests/test-consolidated-blocks-248.sh` pins eight blocks and fails when an authored file
+  is byte-identical in two skills (T12, behavioural) (#560). `gi-stats.py` mirroring
+  `idd-lint.py` is an accepted exception (*Change log*). Missing: the common error
+  messages still repeat across skills: *Not a git repository* in eight `error-messages.md`
+  files, *Not authenticated* and *Invalid config* in six, *GitHub CLI not found* and *No
+  GitHub remote* in five.
 - [ ] **TE11 — Runtime token cost per resolved issue is tracked across releases.** Partial:
-  one measurement exists in `docs/experiments/cost-counters-465.md`; the run log has no
-  token field and the `gh`-call counter runs in the eval lab only.
+  the run log takes optional `tokens`, `agents`, `model`, `effort` and `skill_version`
+  fields, and `tokens` and `agents` must agree with the run-cost footer (#562;
+  `tests/test-runs-jsonl.sh` T14a–f, behavioural for the fields; T14h–k, prose pin for
+  the footer agreement), and `docs/release-costs.md` records one median per flow per
+  release, a section `tests/test-plugin-manifest-469.sh` (S13) requires for the current
+  version.
+  Missing: the only release entry, v0.27.0, reads `no data`; `tokens` is written only when
+  the host reports a count; the `gh`-call counter still runs in the eval lab only; and the
+  one measured figure is still the #465 baseline.
 
 ## Pillar 2 — Verification of work
 
@@ -94,18 +117,25 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   (prose pin).
 - [x] **VW2 — Every issue IDD writes carries acceptance criteria.** Guard: issue templates,
   `scripts/idd-lint.py` (checks that at least one criterion exists).
-- [ ] **VW3 — An unclear issue is never implemented unattended.** Partial: interactive
-  create asks up to two questions at low confidence; batch and auto mode guess and mark
-  `(needs review)`, and nothing downstream reads the marker. An issue with no criteria, or
-  with criteria the resolver wrote itself, still resolves and merges.
+- [x] **VW3 — An unclear issue is never implemented unattended.** An issue with no criteria,
+  or a `(needs review)` type or criterion, is marked unclear by triage and skipped by the
+  auto-pilot pick; the resolver's readiness gate takes its default No in auto mode, a
+  resolve of one ends `PARTIAL`, and the merge floor stays unmet while a criterion carries
+  the marker. Guard: `tests/test-issue-readiness-553.sh` T1–T3 (behavioural: `gi-ready.py`,
+  `gi-triage-graph.py`, `gi-runlog.py`), T4 (prose pin).
 - [ ] **VW4 — Criteria are testable, not just present.** Partial: `SPEC.md` §1 requires it;
   nothing checks it.
-- [ ] **VW5 — The plan is mapped to each criterion before implementation.** Partial: design
-  sketches reject invalid state transitions (`tests/test-design-sketch-520.sh`) and the
-  design-confirm checkpoint is interactive only; plan options carry no criteria mapping.
-- [ ] **VW6 — The contract states its boundaries**: non-goals, invariants that must not
-  change, and non-functional constraints. Partial: the implementer notes out-of-scope items;
-  the issue template has no place for them.
+- [x] **VW5 — The plan is mapped to each criterion before implementation.** Every plan
+  option lists `criteria_covered`, and a selected option that leaves a criterion uncovered
+  stops planning with the gap named, in every profile and in auto mode. Guard:
+  `tests/test-plan-criteria-coverage-554.sh` T1–T3 (behavioural, `gi-ready.py --coverage`),
+  T4 (prose pin).
+- [x] **VW6 — The contract states its boundaries**: non-goals, invariants that must not
+  change, and non-functional constraints. The optional `## Constraints` section (`SPEC.md`
+  §1.1) holds them, `/issue-creator` fills it only from the reporter's words, and the code
+  reviewer reports any diff that touches one at any confidence. Guard:
+  `tests/test-issue-constraints-557.sh` T1–T2 (behavioural, `idd-lint`, `gi-ready.py`),
+  T3 (prose pin).
 - [ ] **VW7 — A change to the issue mid-run is noticed.** Partial: checked when an analysis
   is reused and by the review's fresh read; not between preflight and deliver, or between
   review and merge.
@@ -117,25 +147,39 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
 - [x] **VW9 — The suite and the build run in every QA cycle, and a merge is bound to the
   head commit that was verified.** Holds on default config. Guard:
   `tests/test-merge-identity-516.sh` (head binding); judgement for the per-cycle run.
-- [ ] **VW10 — Unverified work never merges as clean.** Partial: `unverified` is a distinct
-  status, but under the default `review.soft_pass: true` it is report-only, so a PR with no
-  proven criterion can pass and merge.
-- [ ] **VW11 — Criterion evidence is independent and reproducible.** Partial: a `pass` needs
-  evidence, but a one-line description counts, and the PR reviewer is handed the PR body
-  with the resolver's own verdicts. Resolver QA does spawn a fresh reviewer per cycle.
+- [x] **VW10 — Unverified work never merges as clean.** An unattended merge needs the
+  *Merge floor*: the criteria check enabled, at least one `pass`, and no `unverified` or
+  `(needs review)` criterion; an interactive run below it asks, default No. Holds on
+  default config. Guard: `tests/test-merge-identity-516.sh` M12 (behavioural: auto-pilot's
+  merge blocks refuse unless `merge_floor` is `met` for that head and base;
+  `/issue-pr-review`'s block binds the floor's base tip, and its unmet stop is prose);
+  `tests/test-consolidated-blocks-248.sh` T11, `tests/test-review-followups-584.sh` T2
+  (prose pin); eval `issue-pr-review/unverified-only-auto` (stand-in). The floor itself is
+  computed in prose, not in a script.
+- [x] **VW11 — Criterion evidence is independent and reproducible.** An isolated criteria
+  judge sees the issue and the diff only, never the PR body, and `gi-criteria.py`
+  downgrades to `unverified` a `pass` without a test green at head or a command with its
+  observed output. Guard: `tests/test-criteria-evidence-555.sh` T1–T3 (behavioural), T4
+  (prose pin).
 - [ ] **VW12 — Tests prove what they claim.** Partial: the implementer must report mutation
   sensitivity, pinned outputs and any weakened test
-  (`tests/test-behavior-test-contracts-521.sh`, prose pin); the report is its own,
-  `not_verified` never blocks, and the PR review does not read it.
-- [ ] **VW13 — A bug fix is red before and green after.** Partial: the reproduction is
-  required and recorded; a missing one never stops the run, and the review cites it without
-  re-running it.
+  (`tests/test-behavior-test-contracts-521.sh`, prose pin), and the review re-runs a bug
+  fix's regression test red at base and green at head (`tests/test-bug-proof-556.sh`).
+  Missing: for any other test the sensitivity record is the implementer's own, and the
+  review lists a `sensitivity not verified` row under Uncertainty without blocking on it.
+- [x] **VW13 — A bug fix is red before and green after.** The review re-runs the cited
+  regression test at the merge-base (red) and at head (green), and an unattended merge of a
+  bug PR needs that `red→green` proof; `not reproduced`, `manual` or `unproven` leaves it
+  open. Guard: `tests/test-bug-proof-556.sh` T1–T3 (prose pin); eval
+  `issue-pr-review/regression-green-at-base` (stand-in on a real git fixture).
 - [ ] **VW14 — Behaviour is exercised, not only read.** Partial: verification recipes are
   real and tested (`tests/test-verification-recipes-523.sh`, behavioural) but opt-in, and
   the browser UI review is skipped in auto mode.
 - [ ] **VW15 — Non-functional criteria are verified** when the issue states them. Partial:
-  the code reviewer has a security category and UI changes get an accessibility review;
-  nothing covers performance.
+  the code reviewer has a security category, UI changes get an accessibility review, a
+  stated `**Limit:**` in `## Constraints` is checked against the diff, and the performance
+  practice pack reviews data access, loops and I/O; a performance limit is read, never
+  measured.
 
 ### Outcome
 
@@ -143,10 +187,12 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   with negative mutation tests of the build and a coverage floor on the shared scripts.
   Guard: `.github/workflows/dist-check.yml`, `tests/test-build-negative-mutations.sh`,
   `tests/test-coverage-floor-333.sh`.
-- [ ] **VW17 — Every run reports what it verified and what it did not.** Partial: the PR
-  body carries the criteria table and the summaries have Uncertainty rows; auto-pilot
-  reports a soft-pass merge as clean, a disabled check prints `pass`, and the run log has no
-  verification field.
+- [x] **VW17 — Every run reports what it verified and what it did not.** Each summary keeps
+  Result, Evidence and Uncertainty apart; auto-pilot prints every merged PR's AC
+  pass/fail/unverified counts and calls a run `complete` only when each merge is
+  `verification: full`; a disabled check prints `disabled`; the run log carries
+  `verification`. Guard: `tests/test-runs-jsonl.sh` T13a–e (behavioural, `gi-runlog.py`),
+  T13f–l (prose pin).
 - [ ] **VW18 — Skill behaviour is verified with real agent runs.** Partial: the hermetic
   evals replay fixed stand-ins, and every skill has at least one case; the real-agent
   promotion lane has three locked held-out tasks
@@ -154,11 +200,12 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   recorded yet.
 - [ ] **VW19 — The outcome is checked after merge.** A reopened issue, a revert or a
   follow-up bug is linked back to the run that shipped the change. Partial: `idd-lint stats`
-  joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
-  per release (`tests/test-idd-lint-stats-project.sh`, behavioural). The trace is reported,
-  not linked into the run record, except that a `/issue-pr-review --revert` row names the
-  reverted PR and its revert PR (#571). `/auto-pilot --stats` (`gi-stats.py`) now reports
-  outcomes and the look-back from an installed skill, pinned by `tests/test-stats-573.sh`.
+  and `/auto-pilot --stats` (`gi-stats.py`) join each merged run's PR to reverts, reopened
+  issues and follow-up bugs, name the flagged PRs and report the counts per release (#568,
+  #573; `tests/test-idd-lint-stats-project.sh`, `tests/test-stats-573.sh`, behavioural),
+  and a `/issue-pr-review --revert` row names the reverted PR and its revert PR (#571).
+  Missing: the check runs only when someone asks for the report, the link is computed, not
+  written into the run record, and offline it sees reverts only.
 
 ## Pillar 3 — Simplicity
 
@@ -183,9 +230,13 @@ Easy to install, easy to fit into any workflow, low ceremony to keep using.
   or Codex plugin. Guard: `tests/test-plugin-manifest-469.sh`,
   `tests/test-codex-plugin-489.sh`, `tests/test-autopilot-portability.sh`.
 - [ ] **SI8 — The surface stays small, and its size is counted.** A new skill, config key,
-  flag, gate or script must replace prose or remove a step. Partial: bundle bytes are
-  budgeted; skills, scripts, config keys, flags and gates are not counted, and all have
-  grown.
+  flag, gate or script must replace prose or remove a step. Partial: skills, shared
+  scripts, script lines, config keys, flags, gate headings and files with `gh` calls are
+  counted in `scripts/surface-counts.json`, and CI fails when one rises without that file
+  changing in the same PR (#563; `tests/test-surface-counts-563.sh`, behavioural).
+  Missing: raising a count is a hand edit nothing checks against the rule, and since the
+  counter landed scripts rose 25 → 28, config keys 109 → 118, flags 26 → 30 and script
+  lines 14,493 → 16,470, with one recorded exception (#573).
 - [ ] **SI9 — It fits an existing workflow without imposing its own.** Partial: branch
   prefix, labels, merge mode, merge method (`review.merge_method`) and CI handling are
   configurable, and a repo PR template is kept with the IDD sections added; Conventional
@@ -219,32 +270,56 @@ A maintainer can hand work to the skills and believe what they report.
   `tests/test-correction-guards-524.sh` for the corrections loop; judgement for the
   Self-Improve section.
 - [ ] **TR8 — Reports are honest.** A failure reads as a failure, a skipped or disabled
-  check as skipped, and unverified work as unverified. Partial: the statuses exist and an
-  unread setting is never reported as `pass`; auto-pilot collapses a soft-pass into
-  `merged`, a disabled check prints `pass`, and a resolver `PARTIAL` is logged as `success`.
+  check as skipped, and unverified work as unverified. Partial: a soft-pass merge shows its
+  unverified count, a disabled dimension reads `disabled`, and a resolver run on an unready
+  issue or with an AC row not `pass` logs `verification: partial`
+  (`tests/test-runs-jsonl.sh` T13a–e, behavioural for the field; T13f–l, prose pin; T13k
+  also greps `src/` and `docs/` for a disabled check reported as `pass`). Missing: a
+  resolver `PARTIAL` from residual QA findings or a check that could not be evaluated still
+  logs `outcome: success` with `verification: full`.
 - [ ] **TR9 — Auto mode never does more than the interactive default would.** Partial:
-  `docs/auto-mode.md` states it; auto mode proceeds past several default-No prompts, and
-  closes an issue it judges already resolved. One further gap is tracked privately per
-  `SECURITY.md`.
-- [ ] **TR10 — Existing work and data are never lost.** Partial: sync stashes first
-  (`tests/test-sync-safety.sh`) and `/issue-creator` previews and backs up before a rewrite;
-  auto-pilot hard-resets the local default branch on a sync conflict, and the resolver's
-  normalize step rewrites an issue body without a preview.
+  every `[y/N]` gate takes its printed No in auto mode or is a row of the exception table in
+  `docs/auto-mode.md`, a lint fails an unmarked gate, and an already-resolved issue gets a
+  comment, never a close (`tests/test-auto-mode-gates-549.sh` T1–T4). One further gap is
+  tracked privately per `SECURITY.md`.
+- [ ] **TR10 — Existing work and data are never lost.** Partial: sync stashes first; a sync
+  conflict resets the default branch only when `origin/<base>..HEAD` is empty and the
+  tracked tree is clean, else auto-pilot stops and discards nothing
+  (`tests/test-sync-safety.sh` T6–T8, behavioural; T5, static lint); post-merge cleanup
+  keeps a dirty worktree and a branch with unmerged commits
+  (`tests/test-postmerge-cleanup.sh`, behavioural); `/issue-creator` previews and backs up
+  before a rewrite. Missing: the resolver's normalize step rewrites an issue body without a
+  preview; it posts a backup comment first and skips the rewrite when that fails, but no
+  test pins that order.
 - [ ] **TR11 — Untrusted text is data, not instructions.** Partial: the shared agents treat
   issue titles, bodies and comments as data. The remaining gaps are tracked privately per
   `SECURITY.md`.
 - [ ] **TR12 — Doubt fails safe.** A missing record, unreadable state or ambiguous result
-  runs the check, blocks or stops. Partial: run state is a hint, never an authority, and
-  the premise reset blocks (`tests/test-premise-reset-519.sh`); the cases under TR9 and TR10
-  fail open, and a missing `python3` runs without the run lock.
+  runs the check, blocks or stops. Partial: run state is a hint, never an authority; the
+  premise reset blocks (`tests/test-premise-reset-519.sh`); a sync conflict with local work
+  stops (`tests/test-sync-safety.sh` T6, T8); an unreadable dependency body or a missing
+  `merge_floor` leaves the PR open (`tests/test-merge-gate-copies-619.sh` T1,
+  `tests/test-review-followups-584.sh` T2); unreadable judge output is `unverified`
+  (`tests/test-criteria-evidence-555.sh` T3). Missing: without `python3`, auto-pilot stops
+  on a live `.idd/run.lock` but runs without taking one.
 - [ ] **TR13 — Provenance is durable.** The PR records which model, effort and skill version
-  produced the change. Partial: none; the run log records the pipeline profile and whether
-  agent overrides applied, and it is local and gitignored.
+  produced the change. Partial: the resolver's PR body carries a *Produced by* line in the
+  Decision Record (model, effort, skill version, locally modified), never in a commit
+  trailer or the QA marker, and the run log takes `model`, `effort` and `skill_version`
+  (#567; `tests/test-idd-lint.sh` T31, prose pin for the template, behavioural for the lint
+  and trailer checks). Missing: model and effort read `unknown` when the host does not
+  state them, the locally-modified flag is only `yes` or `unknown`, `idd-lint` P07 only
+  warns when the line is absent, and commits a `/issue-pr-review` fix cycle adds carry no
+  provenance.
 - [ ] **TR14 — Autonomy is earned.** One risk tier, computed from the actual diff, drives
   review depth, verification and merge mode, and tightens or relaxes with the measured track
-  record. Partial: profile, sensitive-change gate, review depth and merge mode are separate
-  mechanisms with separate inputs, and the profile is chosen from the issue's own Effort
-  text.
+  record. Partial: `gi-sensitive.py --classify` returns one tier (`sensitive` or
+  `standard`) from labels and the delivered diff; the resolver classifies again at
+  Deliver, the review's Depth gate forces `full` on a sensitive or unknown tier whatever
+  the Effort, and the merge floor leaves a sensitive PR open (#569;
+  `tests/test-sensitive-gate-518.sh` G7, behavioural). Missing: the tier has two levels and
+  no input from the track record, it does not drive verification, and a standard-tier
+  resolver run still takes its profile from the issue's own Effort text.
 - [ ] **TR15 — Every change is cheap to undo.** A documented revert path that keeps the
   trace intact. Partial: `/issue-pr-review <M> --revert` reverts a squash or merge commit
   through a new PR, reopens the issue with a link to the revert and logs a `revert_opened`
@@ -270,10 +345,13 @@ These keep the pillars standing. The same rules apply.
   `tests/test-autopilot-state-257.sh`, `tests/test-autopilot-hardening-259.sh`,
   `tests/test-progress-records-542.sh`.
 - [ ] **SP3 — Observability.** A maintainer can tell whether the automation is getting
-  better or worse. Partial: the resolver and auto-pilot write a local run log;
-  `/auto-pilot --stats` (`gi-stats.py`) now reports outcomes and the look-back from an
-  installed skill, pinned by `tests/test-stats-573.sh`; `/idd-doctor` is not shipped and
-  there is no trend view.
+  better or worse. Partial: the resolver and auto-pilot write a local run log, and
+  `/auto-pilot --stats` (`gi-stats.py`) reports run outcomes and the post-merge look-back
+  from an installed skill, the look-back per release (#573; `tests/test-stats-573.sh`,
+  behavioural). Missing: outcomes and token cost are totals, not per release; the log is
+  local to one checkout and rotates; `docs/release-costs.md` has no measured entry;
+  `/idd-doctor` is not shipped; and nothing beyond the look-back table shows a trend
+  across releases.
 - [ ] **SP4 — Enforcement over prose.** A rule that matters is a behavioural test, a lint
   check or a build abort. Partial: the build validators and shared scripts are tested this
   way; many skill rules are guarded by prose pins only.
@@ -311,3 +389,4 @@ Record every approved change to a value here: date, item, what changed, who aske
 | 2026-11-19 | issue-analysis | Growth-cap exemption against v0.27.0: the bundle is 14,374 bytes (+8.68%) above its size at that tag (165,496 → 179,870). Covers the `--plan` form that posts the recommended option as a plan comment, and the bundled `gi-plan.py` (#648); approved on 2026-11-19 | maintainer |
 | 2026-11-19 | issue-resolver | Growth-cap exemption against v0.27.0 raised: the bundle is 47,254 bytes (+11.19%) above its size at that tag (421,981 → 469,235). Covers the plan-comment gate and the `agent:working` claim and release, with the bundled `gi-plan.py` and `docs/plan-and-claim.md` (#648); approved on 2026-11-19 | maintainer |
 | 2026-11-19 | issue-pr-review | Growth-cap exemption against v0.27.0 raised: the bundle is 31,449 bytes (+10.24%) above its size at that tag (307,009 → 338,458). Covers the plan-conformance check and the bundled `gi-plan.py` (#648); approved on 2026-11-19 | maintainer |
+| 2026-11-20 | VW3, VW5, VW6, VW10, VW11, VW13, VW17 | Ticked after a re-grade against `main` at 57722ec, each naming its guard. The `Partial:` notes of TE8–TE11, VW12, VW15, VW19, SI8, TR8–TR10, TR12–TR14 and SP3 were rewritten to the current state and name what is still missing; SI9, TR11, TR15, TR16 and VW18 were already current (#547) | maintainer |
