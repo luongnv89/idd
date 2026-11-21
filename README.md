@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.27.0-blue.svg" alt="Version 0.27.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.28.0-blue.svg" alt="Version 0.28.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -257,9 +257,10 @@ Everything the skills write, where it lands, and how to turn it off. Nothing in 
 | Area | What IDD does | Which skill | Control |
 |------|---------------|-------------|---------|
 | Files in the worktree | Writes `.idd.yml` and adds one line, `.idd/cache/`, to `.gitignore` | `/init-idd` | Runs only when you call it; it asks before it overwrites a config |
-| Files in the worktree | Writes local state under `.idd/`: `triage.json`, `analysis-<N>.json`, `runs.jsonl`, `run-state.json`, `run.lock`, `last-run-report.md`, `cache/` | `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/auto-pilot` | Local state, safe to delete |
+| Files in the worktree | Writes local state under `.idd/`: `triage.json`, `analysis-<N>.json`, `runs.jsonl`, `run-state.json`, `run.lock`, `last-run-report.md`, `cache/` | `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/issue-pr-review` (`--revert`), `/auto-pilot` | Local state, safe to delete |
 | Files outside the worktree | Stores review receipts and progress records under `<git common dir>/idd/`, and a model-data cache under `~/.cache/idd` | `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, `/issue-creator` | Safe to delete; `IDD_CACHE_DIR` moves the cache |
 | Git | Creates one branch per issue, commits on it and pushes it. Never commits to the default branch and never force-pushes | `/issue-resolver`, `/issue-pr-review` (fix commits) | `resolve.branch_prefix`, `resolve.max_commits` |
+| Git | Commits each screenshot you attach to `.github/issue-assets/` on an `issue-assets` storage branch, through the GitHub API; the branch is created from the default branch tip on first use. Anyone who can read the repository can open the images | `/issue-creator` | Only when you attach an image |
 | Git | Stashes uncommitted work, runs `git pull --rebase`, then restores the stash, before it reads or changes code | every skill that syncs | Commit or stash first to skip the stash step |
 | Git | Creates a worktree for an issue when you accept the offer, or for each parallel lane | `/issue-resolver`, `/auto-pilot` | Answer `n` to the offer; `autopilot.max_parallel: 1` |
 | Git | After a merge: deletes the merged local branch and its clean worktrees, and fast-forwards the base branch. Untracked files are deleted only when you say yes to the exact list | `/issue-pr-review`, `/auto-pilot` | No merge, no cleanup |
@@ -267,9 +268,13 @@ Everything the skills write, where it lands, and how to turn it off. Nothing in 
 | Issues | Creates issues, with labels | `/issue-creator`, `/plan-to-issues`, `/auto-pilot` (follow-ups) | Interactive runs show a preview first |
 | Issues | Rewrites an issue body into the standard template, after it saves the original text in a comment | `/issue-creator`, `/issue-resolver` | `issue.auto_normalize: false`, `issue.normalize_comment` |
 | Issues | Adds comments and labels, including the quarantine label for an issue that keeps failing | `/issue-resolver`, `/auto-pilot`, `/plan-to-issues` (creates missing labels) | `autopilot.quarantine_after: 0` |
+| Issues | Claims an issue while it works on it: adds the `agent:working` label and a claim comment, then posts a release comment and removes the label once the PR exists or the run ends | `/issue-resolver` | `resolver.claim_label: ""` turns the claim off |
+| Issues | Posts a plan comment and the `planned` label, removing `plan-approved` first so an approval never carries over to a new plan | `/issue-analysis --plan`; `/issue-resolver` when `resolver.require_plan` is `true` or `resolver.plan_approval` is `human` | Off by default |
+| Issues | Adds a `route:<route>` label and one route comment built only from its answers, never from issue text | `/issue-triage --route` | Off by default: `triage.route.label`, `triage.route.comment` |
 | Issues | Closes an issue through the `Closes #N` line of a merged PR. `/issue-triage` only prints a close command | `/issue-pr-review`, `/auto-pilot` | Merging is opt-in (next rows) |
 | Pull requests | Opens a PR. A review edits its body only to add a missing `Closes #N` line, and pushes fix commits to its branch. A PR branch behind its base is never updated: the command is printed | `/issue-resolver`, `/issue-pr-review` | `--review-only` changes nothing |
 | Pull requests | Merges a clean PR and deletes its branch, with the merge method you choose. The squash or merge commit carries the PR body (rebase: none does) | `/issue-pr-review`, `/auto-pilot` | `review.auto_merge` (default `false`), `review.merge_method` (`squash`, `merge`, `rebase`), `--no-merge`, `autopilot.mode` |
+| Pull requests | Undoes a merged PR: pushes a `fix/<N>-revert-pr-<M>` branch made from the base, opens a revert PR it never merges, and reopens the issue the merged PR closed, with a comment linking the revert | `/issue-pr-review --revert` | Runs only when you pass `--revert` |
 | PR template | Keeps your repository's pull-request template and adds the IDD sections to it | `/issue-resolver` | Automatic when a template exists |
 | Projects board | Adds issues to a GitHub Projects board and moves their status | `/issue-creator`, `/issue-resolver` | Off by default: `projects.sync_enabled` |
 | Repo settings | Never changed. When a setting does not fit, IDD prints the fix and you decide | all | Nothing to turn off |
@@ -308,7 +313,7 @@ Don't have `asm`? `npm install -g agent-skill-manager`.
 
 #### Alternative — Claude Code plugin
 
-Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 3.2 MB at v0.27.0), not the rest of the repository:
+Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 3.6 MB at v0.28.0), not the rest of the repository:
 
 ```bash
 claude plugin marketplace add luongnv89/idd   # register the marketplace (once)
@@ -499,7 +504,7 @@ MIT Licensed · [View on GitHub](https://github.com/luongnv89/idd)
 | `/issue-creator <N> --force` | Force | Normalize even if issue has a security label |
 | `/issue-creator <multi-item text>` | Batch | Extract and create multiple issues from one input |
 
-**Create mode** classifies the issue type (bug/feature/improvement), generates acceptance criteria, uploads screenshots to GitHub, and creates a structured issue.
+**Create mode** classifies the issue type (bug/feature/improvement), generates acceptance criteria, uploads screenshots to an `issue-assets` branch in the repository, and creates a structured issue.
 
 **Normalize mode** restructures an existing issue: preserves original text in a Reporter Context blockquote, generates acceptance criteria, and posts a backup before editing.
 
@@ -519,6 +524,8 @@ MIT Licensed · [View on GitHub](https://github.com/luongnv89/idd)
 
 The bulk counterpart of `/issue-creator`, and the entry point upstream of the loop: plan → `/plan-to-issues` → `/issue-triage` → `/issue-resolver` (or `/auto-pilot`) → `/issue-pr-review`. It creates one **epic** issue (whole-effort acceptance criteria plus a static plan map grouped by phase; live status comes from GitHub native sub-issues) and one issue per task. Every body is written by `/issue-creator` in batch mode with `--parent <epic>` (`Part of #<epic>`), labelled `phase:pN`, type, `dim:`, and `priority:`, with `Depends on #N` markers that `/auto-pilot`'s merge gate reads. Re-runs are idempotent, and no source file is modified. Requires git, authenticated `gh`, and the sibling `issue-creator` skill.
 
+With no plan file and nothing to draft from the conversation, it looks for a requirements document (`prd.md`, `requirements.md`, `spec.md` and similar names, in the repo root, then `docs/`) and asks once: draft issues from it (you confirm the draft before anything is filed), run `/tasks-generator` on it first, or stop. It never runs `/tasks-generator` itself.
+
 ### /issue-analysis N -- Deep Issue Analysis
 
 Analyzes issue #N in depth without making code changes:
@@ -534,6 +541,8 @@ Analyzes issue #N in depth without making code changes:
 [8/8] Report         — Terminal report + .idd/analysis-N.json
 ```
 
+`/issue-analysis N --plan` runs the same analysis, then posts its recommended option on the issue as a plan comment (files, tasks, the acceptance criterion each task covers, tests, risks) and adds the `planned` label, so `/issue-resolver` can build from an agreed plan. It is the one form that writes to GitHub, and it posts only on a normalized issue.
+
 ### /issue-resolver N -- Resolve Issues
 
 Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a crash, a closed terminal, a host restart), `/issue-resolver N --resume` picks up at the recorded step instead of starting over; an interactive run offers this on its own. The progress record is first checked against live git and GitHub, and every safety gate runs again:
@@ -547,9 +556,13 @@ Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a cras
 [5/5] Deliver      — Push branch, create PR with "Closes #N"
 ```
 
+Before it builds, the resolver reads the issue's plan comment: a current plan posted by the same login becomes the selected option, and an edit to the issue body makes it stale, so the run plans again. With `resolver.require_plan: true` it posts its plan before implementing, and with `resolver.plan_approval: human` it also waits until a person adds the `plan-approved` label. While it works it holds an `agent:working` claim label (`resolver.claim_label`), so two runs don't pick up the same issue; on a claim held by another run it asks first, and auto mode skips the issue.
+
 ### /issue-triage -- Triage the Backlog
 
 Dependency detection via codebase scanning, topological sort for execution order, parallelizable issue identification, stale issue detection (>14 days), already-fixed detection (scans commit history and merged PRs with confidence levels), priority suggestions.
+
+`/issue-triage --route [N…]` answers six fixed closed questions per issue (scope, clarity, criteria, duplicate, size, injection) and routes each one to `agent-ready`, `needs-human`, `needs-info` or `duplicate`, printing one JSON verdict line per issue. Issue text is treated as untrusted data, so text that tries to instruct an AI agent routes to `needs-human`. It writes nothing to GitHub by default; `triage.route.label` and `triage.route.comment` opt into a `route:` label and a comment, and `/auto-pilot` skips issues labelled `route:needs-human`, `route:needs-info` or `route:duplicate`.
 
 ### /auto-pilot -- Automated Backlog Processing
 
@@ -561,6 +574,7 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot --limit 5                # cap to 5 iterations
 /auto-pilot --dry-run                # show plan without resolving
 /auto-pilot --resume                 # resume an interrupted run where it stopped
+/auto-pilot --stats                  # read-only: run outcomes and post-merge look-back
 ```
 
 Merge modes (configured under `autopilot.mode` in `.idd.yml`):
@@ -569,6 +583,8 @@ Merge modes (configured under `autopilot.mode` in `.idd.yml`):
 |------|----------|-----------------------------------|
 | `conservative` | leave open | leave open + create follow-up issue |
 | `balanced` (default) | merge | leave open + create follow-up issue |
+
+`autopilot.max_open_prs` (default `0`, no cap) stops the loop cleanly, with result `LIMIT REACHED`, once that many pull requests on IDD branches are open, so the review queue never outgrows the people reviewing it.
 | `aggressive` | merge | merge + create follow-up issue (requires `merge_partial: true`) |
 
 ### /idd-doctor -- Read-Only Health Check
@@ -594,6 +610,7 @@ Reviews a PR end-to-end: script pre-pass (lint/format/test auto-fix, zero LLM co
 /issue-pr-review 87              # review PR #87
 /issue-pr-review                 # auto-detect PR for current branch
 /issue-pr-review 87 --resume     # resume a killed review of PR #87
+/issue-pr-review 87 --revert     # undo merged PR #87 through a revert PR and reopen its issue
 ```
 
 Pipeline:
@@ -665,6 +682,7 @@ Each normalized issue includes:
 - `<!-- idd:normalized v1 -->` marker (invisible in GitHub UI)
 - Reporter's original text in a `> Reporter Context` blockquote
 - Acceptance criteria derived from the reporter's intent
+- An optional `## Constraints` section (non-goals, invariants, limits), only when the reporter stated them
 
 `/issue-creator` is **intent-only** — it never scans the codebase, never lists "affected files", and never proposes implementation notes. Codebase analysis is performed at execution time by `/issue-resolver`, `/issue-triage`, and `/issue-analysis`, always against current code.
 

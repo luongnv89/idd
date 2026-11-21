@@ -109,7 +109,8 @@ src/                        # SOURCE OF TRUTH — hand-edit here
 ├── internal-skills/        # /idd-doctor and other internal-only skills
 └── shared/
     ├── agents/             # Shared agent definitions used by multiple skills
-    └── scripts/            # stdlib-only Python helpers (16 × gi-*.py)
+    ├── scripts/            # stdlib-only Python helpers (28 × gi-*.py)
+    └── references/         # Shared reference files copied into each citing skill
 
 scripts/                    # Repo tooling (not the shared-script closure)
 ├── build.sh                # Thin entrypoint → calls build.py

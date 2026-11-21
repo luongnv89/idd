@@ -9,8 +9,8 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 | `/init-idd` | Generate `.idd.yml` for a repo | No arguments |
 | `/issue-creator` | Create, normalize, or batch-create structured GitHub issues | Text, issue number, multi-item text, screenshots |
 | `/plan-to-issues` | Turn a phased plan or a conversation into an epic plus one labelled issue per task | Plan file path, `--from-conversation`, `--dry-run`, `--phase`, `sync <epic#>` |
-| `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` |
-| `/issue-triage` | Prioritize and order the issue backlog | No args, `update`, `--limit N` |
+| `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` or `--plan` |
+| `/issue-triage` | Prioritize and order the issue backlog | No args, `update`, `--limit N`, `--route [N…]` |
 | `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` or `--resume` |
 | `/issue-pr-review` | Review a PR, run tests/CI, fix issues in cycles | PR number or current branch PR, optional modes |
 | `/auto-pilot` | Fully autonomous backlog loop | Optional issue list, limit, dry-run, skip, resume |
@@ -68,7 +68,7 @@ Creates structured, intent-focused GitHub issues. It preserves reporter context 
 | `/issue-creator <N> --force` | Force normalize | Normalizes even when the issue has security-sensitive labels. |
 | `/issue-creator … --refresh-model-data` | Refresh cache | Force-refreshes the user-level model-data cache before proceeding (combines with any mode when model suggestion is enabled). |
 | `/issue-creator <multi-item text>` | Batch | Extracts multiple issues from one input and creates them sequentially. |
-| `/issue-creator <image path> [text]` | Screenshot/image issue | Reads visual context, uploads the image to GitHub, embeds it in the issue body, and creates a structured issue. |
+| `/issue-creator <image path> [text]` | Screenshot/image issue | Reads visual context, uploads the image to the repository's `issue-assets` branch, embeds it in the issue body, and creates a structured issue. |
 | `/issue-creator … --auto` | Autonomous | Runs non-interactively (combines with any mode): every gate logs a `⚠` and takes its safe default instead of prompting — see `docs/auto-mode.md`. |
 
 ### Mode detection
@@ -96,7 +96,7 @@ Converts a phased plan file — any path, any producer — or a conversation abo
 
 | Input | Mode | Behavior |
 |---|---|---|
-| `/plan-to-issues` | Create | Resolves the input — plan discovery first, then the conversation — and creates the epic plus one issue per task. |
+| `/plan-to-issues` | Create | Resolves the input — plan discovery first, then the conversation, then a requirements document such as `prd.md`, for which it asks once whether to draft issues from it, hand off to `/tasks-generator`, or stop — and creates the epic plus one issue per task. |
 | `/plan-to-issues <path.md>` | Create | Uses that plan file. |
 | `/plan-to-issues --from-conversation` | Create | Drafts the task list from the conversation, shows it, and files it only after you confirm. |
 | `/plan-to-issues --from-conversation --epic <n>` | Resume | Restores the confirmed task list from epic #n and files only the remaining tasks. |
@@ -128,6 +128,7 @@ Performs deep analysis for one GitHub issue and persists the result to `.idd/ana
 |---|---|---|
 | `/issue-analysis <N>` | Full analysis | Fetches issue #N, scans the codebase, identifies root cause, affected areas, options, risk, and complexity, then writes `.idd/analysis-<N>.json`. |
 | `/issue-analysis <N> view` | Cached view | Reads `.idd/analysis-<N>.json` and renders the cached report without rescanning or calling GitHub. |
+| `/issue-analysis <N> --plan` | Analysis + plan | Runs the full analysis, then posts its recommended option on the issue as a plan comment and adds the `planned` label (removing `plan-approved` first), so `/issue-resolver` can build from it. Normalized issues only; the one form that writes to GitHub. |
 
 ### Requirements
 
@@ -147,6 +148,7 @@ Analyzes the open issue backlog for priority, dependencies, parallelizable work,
 | `/issue-triage` | Cached view | Shows cached triage immediately. If no cache exists, runs the first full analysis automatically. |
 | `/issue-triage update` | Full update | Re-analyzes open issues and overwrites `.idd/triage.json`. |
 | `/issue-triage --limit N` | Limited update | Re-analyzes up to N issues and overwrites the cache. |
+| `/issue-triage --route [N…]` | Route | Answers six fixed closed questions per issue (default: the open backlog) and prints one JSON verdict line routing it to `agent-ready`, `needs-human`, `needs-info` or `duplicate`. Issue text is untrusted data: text that tries to instruct an AI agent routes to `needs-human`. Never writes `.idd/triage.json`; writes to GitHub only when `triage.route.label` or `triage.route.comment` is `true`. |
 | `/issue-triage … --auto` | Autonomous | Runs non-interactively (combines with any invocation): the repo-sync gate logs a `⚠` and syncs instead of prompting — see `docs/auto-mode.md`. |
 
 ### Default behavior
@@ -181,6 +183,12 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 4. Implement selected option with tests.
 5. Run QA review/test/build/fix loop.
 6. Push branch and create PR.
+
+### Plan and claim
+
+- Step 2 reads the issue's plan comment on every run. A current plan posted by the same login becomes the selected option; an edit to the issue body makes it stale, and the run plans again.
+- `resolver.require_plan: true` posts the selected plan on the issue before implementing when none is current. `resolver.plan_approval: human` also stops with *Plan awaiting approval* until a person adds `plan-approved` to the current plan; auto mode skips the issue instead of waiting.
+- Once its branch is derived, the resolver claims the issue with the `resolver.claim_label` label (default `agent:working`) and a claim comment, and releases it once the PR exists or the run ends without one. On a claim held by another run it asks `[y/N]`, and auto mode takes the No. `resolver.claim_label: ""` turns the claim off.
 
 ### Requirements
 
@@ -267,6 +275,8 @@ Controlled by `.idd.yml`:
 
 The loop pauses only for critical unresolved review failures, because that decision is not safely reversible. A dependency-blocked PR (`Depends on #N` / `Blocked by #N`) is never merged out of order, but it does not halt the run either: the PR is left open with outcome `blocked_by_dependency` and the loop continues to the next eligible issue. After every merge (clean, partial, or critical-issue, sequential or parallel, and for a merged PR found at resume) the loop cleans up the local checkout the same way `/issue-pr-review` does; anything it keeps is listed in the run summary's *Uncertainty* section.
 
+`autopilot.max_open_prs` (integer `0..50`, default `0` = no cap) is checked at the top of every iteration: at or above the cap the loop prints *Open PR cap reached* and stops cleanly with result `LIMIT REACHED`. Issues that `/issue-triage --route` labelled `route:needs-human`, `route:needs-info` or `route:duplicate` (the default `route:` prefix) are skipped like `autopilot.skip_labels`.
+
 ### Requirements
 
 - Requires `git`, authenticated `gh`, GitHub remote, push access, and merge permission.
@@ -313,9 +323,12 @@ After the four gating checks, the doctor prints one **informational, non-gating*
 | Normalize an existing issue | `/issue-creator <N>` |
 | File a phased plan or a conversation as an epic plus issues | `/plan-to-issues` or `/plan-to-issues <path.md>` |
 | Understand one issue before implementing | `/issue-analysis <N>` |
+| Agree a plan on the issue before any code is written | `/issue-analysis <N> --plan` |
 | Decide what to work on next | `/issue-triage` or `/issue-triage update` |
+| Sort issues into ready for an agent, needs a person, needs info, or duplicate | `/issue-triage --route` |
 | Implement one issue | `/issue-resolver <N>` |
 | Review and clean up an existing PR | `/issue-pr-review <PR_NUMBER>` |
 | Audit a PR without edits | `/issue-pr-review <PR_NUMBER> --review-only` |
+| Undo a merged PR | `/issue-pr-review <PR_NUMBER> --revert` |
 | Process the backlog autonomously | `/auto-pilot` |
 | Check IDD repo health | `/idd-doctor` |

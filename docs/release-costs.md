@@ -42,6 +42,13 @@ flow, or a row's median is neither an integer nor `no data`.
 
 Newest first.
 
+## v0.28.0
+
+| Flow | Median tokens | Samples | Source |
+|------|--------------:|--------:|--------|
+| `issue-resolver` | no data | 0 | `idd-lint stats --no-github` on 2026-11-21: 0 of 9 run-log rows carry `tokens` |
+| `auto-pilot` | no data | 0 | `idd-lint stats --no-github` on 2026-11-21: 0 of 17 run-log rows carry `tokens` |
+
 ## v0.27.0
 
 | Flow | Median tokens | Samples | Source |
