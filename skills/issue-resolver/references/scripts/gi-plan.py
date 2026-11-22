@@ -37,8 +37,8 @@ Plan comment (render-plan writes it; check reads it back)
   carrying the option's `criteria_covered`.
 
   Test types: one line per `criterion_tests` entry, typed unit, integration,
-  e2e, recipe, property or differential; absent without entries. A criterion
-  has at most one entry, and given `criteria`, exactly one. A user-visible
+  e2e, recipe, property or differential; absent without entries. Each
+  `criteria_covered` id has one entry, in `criteria` if given. A user-visible
   criterion tested as neither e2e nor recipe needs a note saying why not; a
   differential test needs a note listing the approved differences (or `none`).
 
@@ -218,7 +218,7 @@ def _files(option: dict, key: str, note_key: str) -> list[tuple[str, str]]:
     return out
 
 
-def _criterion_tests(option: dict, criteria: list[tuple[str, str]]) -> list[dict]:
+def _criterion_tests(option: dict, covered: list[str], criteria: list[tuple[str, str]]) -> list[dict]:
     raw = option.get("criterion_tests")
     if raw is None:
         return []
@@ -239,8 +239,8 @@ def _criterion_tests(option: dict, criteria: list[tuple[str, str]]) -> list[dict
             raise InvalidInput(f"{cid}: a user-visible criterion tested as {kind} needs a note saying why not e2e or recipe")
         out.append({"id": cid, "type": kind, "user_visible": visible, "note": note})
     listed, known = [t["id"] for t in out], {cid for cid, _ in criteria}
-    if len(set(listed)) < len(listed) or (known and set(listed) != known):
-        raise InvalidInput("criterion_tests needs one entry per criterion (each one in `criteria`)")
+    if len(set(listed)) < len(listed) or set(listed) != set(covered) or (known and not set(listed) <= known):
+        raise InvalidInput("criterion_tests needs one entry per criteria_covered id (each one in `criteria`)")
     return out
 
 
@@ -282,7 +282,7 @@ def render_plan(payload: object, issue_file: str | None = None) -> str:
             criteria.append((cid, clean(item.get("text"), "criteria[].text")))
         else:
             criteria.append((f"AC{n}", clean(item, "criteria[]")))
-    tests = _criterion_tests(option, criteria)
+    tests = _criterion_tests(option, covered, criteria)
     tasks = payload.get("tasks")
     if tasks is None:
         tasks = [{"task": f"{'Modify' if i < len(modify) else 'Create'} `{path}`"

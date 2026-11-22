@@ -522,15 +522,15 @@ issue "$TMP/i-n2.json" - "agent:working" "alice|2026-11-19T10:00:00Z|$TMP/c-r1.m
 
 # ── T9: a recorded test type per acceptance criterion ─────────────────────
 echo "  ┄ criterion test types"
-# tplan <name> <criterion_tests-json|-> [criteria-json] — render a plan with
-# that criterion_tests list (- leaves the key out); rc in $RC.
+# tplan <name> <criterion_tests-json|-> [criteria-json] [covered-json] — render
+# a plan with that criterion_tests list (- leaves the key out); rc in $RC.
 TWO_CRITERIA='[{"id":"AC1","text":"a"},{"id":"AC2","text":"b"}]'
 tplan() {
   RC=0
-  python3 - "$BODY" "$2" "${3:-$TWO_CRITERIA}" > "$TMP/t-in.json" <<'PY'
+  python3 - "$BODY" "$2" "${3:-$TWO_CRITERIA}" "${4:-[\"AC1\",\"AC2\"]}" > "$TMP/t-in.json" <<'PY'
 import json, sys
-body, tests, criteria = sys.argv[1:]
-option = {"name": "n", "files_to_modify": ["src/a.py"], "criteria_covered": ["AC1", "AC2"]}
+body, tests, criteria, covered = sys.argv[1:]
+option = {"name": "n", "files_to_modify": ["src/a.py"], "criteria_covered": json.loads(covered)}
 if tests != "-":
     option["criterion_tests"] = json.loads(tests)
 print(json.dumps({"body": body, "criteria": json.loads(criteria), "option": option}))
@@ -554,7 +554,7 @@ for spec in \
   'a type outside the six|[{"id":"AC1","type":"smoke"},{"id":"AC2","type":"unit"}]' \
   'two entries for one criterion|[{"id":"AC1","type":"unit"},{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"}]' \
   'an id not in criteria|[{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"},{"id":"AC3","type":"unit"}]' \
-  'a criterion with no entry|[{"id":"AC1","type":"unit"}]' \
+  'a covered criterion with no entry|[{"id":"AC1","type":"unit"}]' \
   'an empty list beside criteria|[]' \
   'a user-visible unit test with no note|[{"id":"AC1","type":"unit","user_visible":true},{"id":"AC2","type":"unit"}]' \
   'a differential test with no note|[{"id":"AC1","type":"differential","note":" "},{"id":"AC2","type":"unit"}]' \
@@ -564,9 +564,18 @@ for spec in \
   tplan t-bad "${spec#*|}"
   [ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] && pass "T9.5 render-plan refuses ${spec%%|*} (exit 3, nothing rendered)" || fail "T9.5 ${spec%%|*} gave $RC"
 done
-tplan t-nocrit '[{"id":"AC4","type":"unit"}]' '[]'
+tplan t-nocrit '[{"id":"AC4","type":"unit"}]' '[]' '["AC4"]'
 [ "$RC" = 0 ] && grep -qx -- '- AC4: unit' "$TMP/t-nocrit.md" \
-  && pass "T9.6 without criteria only the ids and types are checked" || fail "T9.6 rc=$RC $(cat "$TMP/err")"
+  && pass "T9.6 without criteria the entries are checked against criteria_covered only" || fail "T9.6 rc=$RC $(cat "$TMP/err")"
+tplan t-part '[{"id":"AC1","type":"unit"}]' "$TWO_CRITERIA" '["AC1"]'
+[ "$RC" = 0 ] && [ "$(sed -n '/^\*\*Test types\*\*$/,/^\*\*Covers/p' "$TMP/t-part.md" | grep -c -- '^- ')" = 1 ] \
+  && pass "T9.20 an option covering AC1 of two criteria renders its one entry" || fail "T9.20 rc=$RC $(cat "$TMP/err")"
+tplan t-bad '[{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"}]' "$TWO_CRITERIA" '["AC1"]'
+[ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] \
+  && pass "T9.21 render-plan refuses an entry for a criterion the option does not cover" || fail "T9.21 gave $RC"
+tplan t-bad '[{"id":"AC1","type":"unit"},{"id":"AC3","type":"unit"}]' "$TWO_CRITERIA" '["AC1","AC3"]'
+[ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] \
+  && pass "T9.22 render-plan refuses a covered entry naming an id outside criteria" || fail "T9.22 gave $RC"
 tplan t-old -
 [ "$RC" = 0 ] && ! grep -q 'Test types' "$TMP/t-old.md" \
   && pass "T9.7 an option without criterion_tests renders no Test types section" || fail "T9.7 rc=$RC"
