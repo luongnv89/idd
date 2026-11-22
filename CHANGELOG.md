@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Refactoring
+- **issue-pr-review, shared agents:** review without the author's own verdicts (#662). The code-reviewer's `pr_context` (*Cycle 1 — Initial review* in `review-loop-mechanics.md`, also bound by the confirmation pass) is now an allowlist: the PR title, the body's `## Approach` section and **Residual risk** line, and the linked issue's `## Constraints` and `## Acceptance Criteria`. The rest of the body, including Test Results, the Acceptance Criteria Verification table, the Sensitivity evidence rows and the `idd:qa` marker, no longer reaches the reviewer, because a grader that sees the author's verdicts on its own work anchors on them. A PR body with neither section gives the reviewer nothing from the body. The shared code-reviewer's `{pr_context}` contract now reads "the caller's task context, never a PR body's verdicts". `docs/VALUES.md` VW11 records this isolation next to the criteria judge's, guarded by the new T7 in `tests/test-criteria-evidence-555.sh`. `tests/test-issue-constraints-557.sh` T3.16 now pins the new binding wording. Budgets in `scripts/skill-budgets.json` grow: issue-pr-review by 322 bytes (always-read by 279) and issue-resolver by 41, both within the 2% release cap.
+
 ## v0.28.0 — 2026-11-21
 
 ### Features
