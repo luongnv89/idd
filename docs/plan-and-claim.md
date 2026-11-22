@@ -31,7 +31,7 @@ Every read is live, never the issue cache. Only comments by `$login` can make a 
    mkdir -p .idd/cache && gh issue view {N} --json body > .idd/cache/plan-body-{N}.json && python3 shared/scripts/gi-plan.py render-plan --issue .idd/cache/plan-body-{N}.json < .idd/cache/plan-input-{N}.json > .idd/cache/plan-{N}.md && gh issue comment {N} --body-file .idd/cache/plan-{N}.md; ec=$?; rm -f .idd/cache/plan-body-{N}.json .idd/cache/plan-input-{N}.json .idd/cache/plan-{N}.md; exit "$ec"
    ```
 
-   Exit 3 from `render-plan` (no name, no files, a bad criterion id) posts nothing.
+   The option's `criterion_tests` render as the *Test types* section. Exit 3 from `render-plan` (no name, no files, a bad criterion id, a criterion test that breaks the *Test types* rules) posts nothing.
 3. Add `planned` with the *Label write*.
 4. Re-read the labels live: if `plan-approved` is back, repeat step 1's removal and confirm; if it cannot be confirmed gone, the plan is not approved.
 
