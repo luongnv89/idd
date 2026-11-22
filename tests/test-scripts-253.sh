@@ -14,6 +14,10 @@
 #        refresh/debug-only reading.
 #   AC5  Every replaced prose procedure survives as a documented fallback, and
 #        no untrusted value reaches a shared-script command line.
+#   #668 gi-stack-detect drafts a starter verification recipe — one smoke
+#        capability per root entry point, only when the default branch has
+#        none — and init-idd prints it but still writes only .idd.yml and
+#        .gitignore (T3b).
 #
 # The behavioral halves run each script directly out of src/shared/scripts/ —
 # the build already asserts the shipped copies are byte-identical, so testing
@@ -408,6 +412,188 @@ printf '{"dependencies": {"react": "1.0"}, "x": "\\"; touch PWNED; echo \\""}\n'
 ( cd "$INJ3" && python3 "$STACK" --root . >/dev/null 2>&1 ) || true
 [ ! -e "$INJ3/PWNED" ] && pass "AC3: a crafted dependency file cannot execute" \
                        || fail "AC3: a crafted dependency file executed a command — injection"
+
+# ───────────────────────────────────────────────────────────
+# T3b (#668): gi-stack-detect drafts a starter verification recipe — one smoke
+# capability per root entry point, only when the default branch has none, and
+# the detector writes nothing.
+# ───────────────────────────────────────────────────────────
+# rkey <json> <python expression over r, the recipe block> — print one value.
+rkey() { python3 -c 'import json,sys; r=json.loads(sys.argv[1])["recipe"]; print(eval(sys.argv[2]))' "$1" "$2"; }
+# git_base <dir> [remote-branch] — commit the tree and fake a fetched remote
+# default branch: origin/HEAD → origin/<branch>, no network.
+git_base() {
+  (
+    cd "$1" && git init -q -b main && git config user.email t@example.invalid \
+      && git config user.name t && git config commit.gpgsign false \
+      && git add -A && git commit -qm init \
+      && git update-ref "refs/remotes/origin/${2:-main}" HEAD \
+      && if [ "${2:-main}" = main ]; then git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main; fi
+  )
+}
+# A non-git fixture must not inherit a git repo that happens to enclose $TMP.
+stack_nogit() { GIT_CEILING_DIRECTORIES="$TMP" python3 "$STACK" --root "$1"; }
+
+EP="$TMP/ep-repo"
+mkdir -p "$EP/cmd/worker" "$EP/src" "$EP/bin"
+cat > "$EP/package.json" <<'EOF'
+{"name": "@me/webapp", "scripts": {"start": "node server.js"},
+ "bin": {"mycli": "bin/cli.js", "-evil": "bin/x.js", "bad name": "bin/y.js",
+         "escape": "../outside.js", "naïve": "bin/z.js",
+         "trail\n": "bin/cli.js", "nlpath": "bin/w.js\n"}}
+EOF
+printf '[project]\nname = "pt"\n[project.scripts]\npytool = "pt:main"\n"-rf" = "pt:bad"\n' > "$EP/pyproject.toml"
+printf 'module example.com/me/goapp\n' > "$EP/go.mod"
+printf 'package main\n' > "$EP/main.go"
+printf 'package main\n' > "$EP/cmd/worker/main.go"
+printf 'fn main() {}\n' > "$EP/src/main.rs"
+printf '[package]\nname = "rusty"\n[[bin]]\nname = "rusty"\n[[bin]]\nname = "helper"\n' > "$EP/Cargo.toml"
+printf '#!/usr/bin/env python3\n' > "$EP/manage.py"
+snap() { (cd "$1" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | xargs sha1sum; GIT_CEILING_DIRECTORIES="$TMP" git status --porcelain 2>/dev/null || true); }
+ep_before="$(snap "$EP")"
+out="$(stack_nogit "$EP")"
+if [ "$ep_before" = "$(snap "$EP")" ]; then
+  pass "#668 AC2: the detector writes nothing into a repo it drafts a starter for"
+else
+  fail "#668 AC2: running the detector added or changed a file in the fixture"
+fi
+want="[('server', 'manage.py', 'manage.py'), ('cli', 'mycli', 'package.json'), ('cli', 'pytool', 'pyproject.toml'), ('cli', 'goapp', 'main.go'), ('cli', 'worker', 'cmd/worker/main.go'), ('cli', 'rusty', 'Cargo.toml'), ('cli', 'helper', 'Cargo.toml')]"
+got="$(rkey "$out" '[(e["kind"], e["name"], e["source"]) for e in r["entry_points"]]')"
+if [ "$got" = "$want" ]; then
+  pass "#668: every root entry-point kind is found, manage.py wins the one server slot"
+else
+  fail "#668: root entry points wrong (got: $got)"
+fi
+# Manifest names are untrusted: a leading dash, whitespace (a trailing newline
+# included), non-ASCII or a path escaping the repo never reaches the starter.
+if ! printf '%s' "$got" | grep -qE -- "-evil|bad name|escape|naïve|-rf|npm-start|trail|nlpath"; then
+  pass "#668: unsafe manifest names and paths are dropped, and only one server is listed"
+else
+  fail "#668: an unsafe manifest name or a second server reached entry_points (got: $got)"
+fi
+if [ "$(rkey "$out" 'r["skip"], r["starter"], r["default_branch"]')" = "('no_default_branch', None, None)" ]; then
+  pass "#668: outside a git repo there is no default branch, so no starter"
+else
+  fail "#668: non-git fixture should skip no_default_branch (got: $(rkey "$out" 'r'))"
+fi
+
+# A git-backed copy whose default branch carries no recipe gets a starter with
+# exactly one capability per entry point. The detector must write nothing (AC2).
+GB="$TMP/gb-repo"
+cp -R "$EP" "$GB" && git_base "$GB"
+before="$(snap "$GB")"
+out="$(python3 "$STACK" --root "$GB")"
+after="$(snap "$GB")"
+if [ "$(rkey "$out" 'r["default_branch"], r["on_base"], r["skip"]')" = "('origin/main', None, None)" ] \
+   && [ "$(rkey "$out" 'len(r["starter"]["capabilities"]) == len(r["entry_points"]) == 7')" = "True" ]; then
+  pass "#668: no recipe on origin/main → a starter with one capability per entry point"
+else
+  fail "#668: git-backed starter wrong (got: $(rkey "$out" 'r'))"
+fi
+if [ "$(rkey "$out" '[c["name"] for c in r["starter"]["capabilities"]]')" = "['server-manage-py', 'cli-mycli', 'cli-pytool', 'cli-goapp', 'cli-worker', 'cli-rusty', 'cli-helper']" ] \
+   && [ "$(rkey "$out" 'r["starter"]["launch"]["command"]')" = "['python3', 'manage.py', 'runserver', '127.0.0.1:{port}']" ] \
+   && [ "$(rkey "$out" 'r["starter"]["capabilities"][1]["drive"]')" = "['node', 'bin/cli.js', '--help']" ] \
+   && [ "$(rkey "$out" 'r["starter"]["capabilities"][4]["drive"]')" = "['go', 'run', './cmd/worker', '--help']" ] \
+   && [ "$(rkey "$out" 'r["starter"]["auto"], "paths" in str(r["starter"])')" = "([], False)" ]; then
+  pass "#668: the server is launched on loopback, each CLI is driven with --help, auto stays empty"
+else
+  fail "#668: starter launch/drives wrong (got: $(rkey "$out" 'r["starter"]'))"
+fi
+if [ "$before" = "$after" ]; then
+  pass "#668 AC2: the detector leaves the repo's files and git status unchanged"
+else
+  fail "#668 AC2: running the detector changed the fixture"
+fi
+
+# A recipe in the working tree but not on the default branch does not count:
+# skills read a recipe from the base ref only.
+printf '{}\n' > "$GB/.idd-recipe.json"
+out="$(python3 "$STACK" --root "$GB")"
+[ "$(rkey "$out" 'r["skip"]')" = "None" ] \
+  && pass "#668: an uncommitted working-tree recipe does not suppress the starter" \
+  || fail "#668: a working-tree recipe suppressed the starter (got: $(rkey "$out" 'r'))"
+(cd "$GB" && git add .idd-recipe.json && git commit -qm recipe && git update-ref refs/remotes/origin/main HEAD)
+out="$(python3 "$STACK" --root "$GB")"
+if [ "$(rkey "$out" 'r["on_base"], r["skip"], r["starter"]')" = "('.idd-recipe.json', 'recipe_on_base', None)" ]; then
+  pass "#668: a recipe on the default branch → no starter (recipe_on_base)"
+else
+  fail "#668: a committed recipe should skip recipe_on_base (got: $(rkey "$out" 'r'))"
+fi
+
+# A partial clone (--filter=blob:none) lacks the recipe blob. The probe reads
+# the tree, so the committed recipe still counts and nothing is fetched: the
+# source repo is gone, and the blob stays missing after the scan.
+PS="$TMP/partial-src"
+mkdir -p "$PS"
+printf 'package main\n' > "$PS/main.go"
+printf '{}\n' > "$PS/.idd-recipe.json"
+git_base "$PS" && git -C "$PS" config uploadpack.allowFilter true
+git clone -q --no-checkout --filter=blob:none "file://$PS" "$TMP/partial-clone" 2>/dev/null
+blob="$(git -C "$TMP/partial-clone" rev-parse origin/main:.idd-recipe.json)"
+rm -rf "$PS"
+out="$(python3 "$STACK" --root "$TMP/partial-clone")"
+if [ "$(rkey "$out" 'r["on_base"], r["skip"]')" = "('.idd-recipe.json', 'recipe_on_base')" ] \
+   && git -C "$TMP/partial-clone" rev-list --objects --missing=print --all | grep -qx "?$blob"; then
+  pass "#668: a blob:none partial clone still sees the committed recipe, offline"
+else
+  fail "#668: partial-clone recipe probe wrong or fetched (got: $(rkey "$out" 'r'))"
+fi
+
+# The legacy name counts as present; origin/master is the fallback default
+# branch when origin/HEAD is unset.
+LG="$TMP/legacy-repo"
+mkdir -p "$LG"
+printf 'package main\n' > "$LG/main.go"
+printf '{}\n' > "$LG/.gitissue-recipe.json"
+git_base "$LG" master
+out="$(python3 "$STACK" --root "$LG")"
+if [ "$(rkey "$out" 'r["default_branch"], r["on_base"], r["skip"]')" = "('origin/master', '.gitissue-recipe.json', 'recipe_on_base')" ]; then
+  pass "#668: a legacy .gitissue-recipe.json on origin/master also suppresses the starter"
+else
+  fail "#668: legacy recipe / master fallback wrong (got: $(rkey "$out" 'r'))"
+fi
+
+# Only the root counts: an app nested under a fixture directory is not this
+# repo's entry point.
+NE="$TMP/nested-repo"
+mkdir -p "$NE/sub/fixture/cmd/x"
+printf '{"name": "f", "bin": "cli.js", "scripts": {"start": "x"}}\n' > "$NE/sub/fixture/package.json"
+printf 'x\n' > "$NE/sub/fixture/manage.py"
+printf 'package main\n' > "$NE/sub/fixture/cmd/x/main.go"
+git_base "$NE"
+out="$(python3 "$STACK" --root "$NE")"
+if [ "$(rkey "$out" 'r["entry_points"], r["skip"], r["starter"]')" = "([], 'no_entry_point', None)" ]; then
+  pass "#668: nested-only entry points are ignored (no_entry_point)"
+else
+  fail "#668: a nested entry point was taken as the repo's (got: $(rkey "$out" 'r'))"
+fi
+
+# Without a server the launch is a stand-in loopback server, and the comment
+# says so; with only `npm start` that script is the launch.
+CL="$TMP/cli-repo"
+mkdir -p "$CL"
+printf '[project]\nname = "pt"\n[project.scripts]\npytool = "pt:main"\n' > "$CL/pyproject.toml"
+git_base "$CL"
+out="$(python3 "$STACK" --root "$CL")"
+if [ "$(rkey "$out" 'r["starter"]["launch"]["command"][:4]')" = "['python3', '-I', '-m', 'http.server']" ] \
+   && [ "$(rkey "$out" '"stand-in" in r["starter"]["_comment"]')" = "True" ] \
+   && [ "$(rkey "$out" '[c["drive"] for c in r["starter"]["capabilities"]]')" = "[['pytool', '--help']]" ]; then
+  pass "#668: a CLI-only repo gets a stand-in launch and one --help capability"
+else
+  fail "#668: CLI-only starter wrong (got: $(rkey "$out" 'r["starter"]'))"
+fi
+NP="$TMP/npm-repo"
+mkdir -p "$NP"
+printf '{"name": "w", "scripts": {"start": "node s.js"}}\n' > "$NP/package.json"
+git_base "$NP"
+out="$(python3 "$STACK" --root "$NP")"
+if [ "$(rkey "$out" 'r["starter"]["launch"]["command"]')" = "['env', 'PORT={port}', 'HOST=127.0.0.1', 'npm', 'start']" ] \
+   && [ "$(rkey "$out" '[c["name"] for c in r["starter"]["capabilities"]]')" = "['server-npm-start']" ] \
+   && [ "$(rkey "$out" '"stand-in" in r["starter"]["_comment"]')" = "False" ]; then
+  pass "#668: an npm start script is the launch, smoke-tested by one curl capability"
+else
+  fail "#668: npm start starter wrong (got: $(rkey "$out" 'r["starter"]'))"
+fi
 
 # ───────────────────────────────────────────────────────────
 # T4 (AC4): gi-model-cache — the lifecycle, and the no-substitution rule
@@ -1086,6 +1272,12 @@ expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementati
   "references/scripts/gi-triage-graph.py" "$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
 expect_grep "AC3: init-idd Step 1 calls gi-stack-detect" \
   "references/scripts/gi-stack-detect.py" "$SKILLS/init-idd/SKILL.md"
+expect_grep "#668 AC2: init-idd still writes only .idd.yml and .gitignore" \
+  "write only \`.idd.yml\` and the repo's own \`.gitignore\`" "$SKILLS/init-idd/SKILL.md"
+expect_grep "#668 AC2: init-idd prints the starter recipe and never writes it" \
+  "Print it, never write it" "$SKILLS/init-idd/SKILL.md"
+expect_grep "#668: the init-idd report carries a Recipe row" \
+  "Recipe:            ✓ starter printed" "$SKILLS/init-idd/SKILL.md"
 expect_grep "AC4: issue-creator's config step calls gi-model-cache" \
   "references/scripts/gi-model-cache.py" "$SKILLS/issue-creator/SKILL.md"
 

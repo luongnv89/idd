@@ -629,7 +629,7 @@ Max 3 review-fix cycles with stagnation detection.
 
 ### /init-idd -- Generate Config
 
-Scans your repository and generates `.idd.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size. On every run it also makes your `.gitignore` ignore IDD's local cache (`.idd/cache/`), creating the file if it is missing and never adding the same line twice.
+Scans your repository and generates `.idd.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size. On every run it also makes your `.gitignore` ignore IDD's local cache (`.idd/cache/`), creating the file if it is missing and never adding the same line twice. When the repo has a runnable app or CLI at its root and the default branch has no verification recipe, it also prints a starter `.idd-recipe.json` for you to review and commit; it never writes one.
 
 </details>
 

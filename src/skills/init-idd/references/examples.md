@@ -18,7 +18,24 @@ Full example outputs for five scenarios. Every report follows `references/review
 5. Write `.idd.yml` with Next.js-specific comments
 6. Validate the written file — parses as YAML, no placeholder tokens left, `platform` present
 7. Merge-settings reads: squash allowed, but `squash_merge_commit_message` is `COMMIT_MESSAGES` and `review.auto_merge` is off
-8. Report:
+8. Starter recipe: no `.idd-recipe.json` (or legacy `.gitissue-recipe.json`) on `origin/main`; the `start` script in `package.json` is the one entry point → starter printed:
+
+```json
+{
+  "_comment": "Starter printed by /init-idd. Review and edit it, then commit it to the default branch as .idd-recipe.json: the skills read it from there only. auto is empty, so only interactive runs offer it.",
+  "version": 1,
+  "auto": [],
+  "launch": {"command": ["env", "PORT={port}", "HOST=127.0.0.1", "npm", "start"], "ready": {"url": "/", "timeout_s": 60}},
+  "capabilities": [{"name": "server-npm-start", "drive": ["curl", "-sf", "-o", "{evidence_dir}/index.html", "{app_url}/"]}]
+}
+```
+
+```
+○ Review this starter, then commit it to origin/main as .idd-recipe.json.
+  Skills read a recipe from the base ref only.
+```
+
+9. Report:
 
 ```
 ◆ Init IDD — setup complete
@@ -34,6 +51,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ⚠ warn (hand merge drops the PR body)
+  Recipe:            ✓ starter printed (capabilities: 1)
   .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
@@ -41,7 +59,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Decision:          No approval needed.
 
   Config: .idd.yml
-  Next action: set review.auto_merge: true or use /auto-pilot in a mode that merges; commit .idd.yml
+  Next action: set review.auto_merge: true or use /auto-pilot in a mode that merges; commit .idd.yml and the starter recipe
 ```
 
 ## Example: Minimal Python project
@@ -80,6 +98,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ○ skip (gh not installed)
+  Recipe:            ○ skip (no entry point)
   .gitignore:        ✓ created, added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
@@ -116,6 +135,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ merged into existing .idd.yml (3 new, 8 preserved)
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash allowed
+  Recipe:            ○ skip (recipe on origin/main)
   .gitignore:        ○ already ignored
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
