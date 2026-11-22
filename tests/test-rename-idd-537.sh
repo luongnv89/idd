@@ -450,6 +450,7 @@ CODE = {
     "tests/test-progress-records-542.sh", "tests/test-qa-receipt-515.sh",
     "tests/test-plan-claim-648.sh",                   # pins the legacy-marker refusal
     "tests/test-scripts-253.sh",                      # pins the legacy-recipe starter skip
+    "tests/test-review-config-base-ref-659.sh",       # pins the legacy name at a ref
     "tests/test-rename-idd-537.sh",
     "tests/test-webpage-ux-clarity-361.sh",
 }
