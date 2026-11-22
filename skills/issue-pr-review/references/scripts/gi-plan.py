@@ -23,6 +23,8 @@ Plan comment (render-plan writes it; check reads it back)
   - [ ] <task> (criteria: AC1, AC3; files: `<path>`, `<path>`)
   **Acceptance criteria**
   - AC1: <criterion text>
+  **Test types**
+  - AC1: <type>[ (user-visible)][ — <note>]
   **Covers:** AC1, AC3
   **Tests:** <test strategy>
   **Risks:** <risk details>
@@ -33,6 +35,12 @@ Plan comment (render-plan writes it; check reads it back)
   can forge a marker or start a section. Criterion ids are `AC<n>`, the ids
   the readiness script numbers. Without `tasks`, each file becomes one task
   carrying the option's `criteria_covered`.
+
+  Test types: one line per `criterion_tests` entry, typed unit, integration,
+  e2e, recipe, property or differential; absent without entries. Each
+  `criteria_covered` id has one entry, in `criteria` if given. A user-visible
+  criterion tested as neither e2e nor recipe needs a note saying why not; a
+  differential test needs a note listing the approved differences (or `none`).
 
 Claim comment (render-claim writes it) and release comment (render-release)
 
@@ -49,7 +57,8 @@ Subcommands
   render-plan   [--issue FILE] stdin {"body", "criteria": [{"id", "text"}], "option": {"name",
                 "summary", "files_to_modify": [{"path", "changes"} | path],
                 "files_to_create": [{"path", "purpose"} | path],
-                "criteria_covered": [id], "test_strategy", "risk_details"},
+                "criteria_covered": [id], "test_strategy", "risk_details",
+                "criterion_tests"?: [{"id", "type", "user_visible"?, "note"?}]},
                 "tasks"?: [{"task", "criteria": [id], "files": [path]}]}
                 → the plan comment on stdout. With --issue, the body is read from
                 FILE (`gh issue view --json body` output or a gi-issue.py
@@ -65,7 +74,7 @@ Subcommands
                    "plan_hash", "body_hash", "name", "summary",
                    "files_to_modify", "files_to_create", "tasks", "criteria",
                    "criteria_covered", "test_strategy", "risk_details",
-                   "claim": "none|own|foreign", "claim_run", "claim_branch",
+                   "criterion_tests", "claim": "none|own|foreign", "claim_run", "claim_branch",
                    "claim_login", "claim_age_s"}
   conform       stdin {"files_to_modify", "files_to_create", "tasks",
                 "changed": [path]} (check's output plus `changed`) → one JSON
@@ -113,7 +122,8 @@ Exit codes
   2  usage error.
   3  invalid input — a malformed argument (run, branch, login or label
      outside its grammar), stdin JSON of the wrong shape, or a plan with no
-     name, no files or a criterion id outside `AC<n>`.
+     name, no files, a criterion id outside `AC<n>` or a criterion test
+     breaking the Test types rules.
   4  cannot complete — stdin empty or unreadable. Callers follow the manual
      procedure in the plan-and-claim doc.
 
@@ -142,7 +152,10 @@ WRITERS = {"OWNER", "MEMBER", "COLLABORATOR"}
 FILE_LINE_RE = re.compile(r"- (modify|create) `([^`]+)`(?: — (.*))?")
 TASK_LINE_RE = re.compile(r"- \[[ xX]\] (.+) \(criteria: ([A-Za-z0-9, ]*); files: (.*)\)")
 CRITERION_LINE_RE = re.compile(r"- (AC[1-9][0-9]{0,3}): (.*)")
-SECTIONS = {"**Files**": "files", "**Tasks**": "tasks", "**Acceptance criteria**": "criteria"}
+TEST_TYPES = ("unit", "integration", "e2e", "recipe", "property", "differential")
+TEST_LINE_RE = re.compile(r"- (AC[1-9][0-9]{0,3}): (%s)( \(user-visible\))?(?: — (.*))?" % "|".join(TEST_TYPES))
+SECTIONS = {"**Files**": "files", "**Tasks**": "tasks", "**Acceptance criteria**": "criteria",
+            "**Test types**": "tests"}
 FIELDS = {"Summary: ": "summary", "**Covers:** ": "covers", "**Tests:** ": "test_strategy",
           "**Risks:** ": "risk_details"}
 TEXT_MAX = 2000
@@ -205,6 +218,32 @@ def _files(option: dict, key: str, note_key: str) -> list[tuple[str, str]]:
     return out
 
 
+def _criterion_tests(option: dict, covered: list[str], criteria: list[tuple[str, str]]) -> list[dict]:
+    raw = option.get("criterion_tests")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+        raise InvalidInput("option.criterion_tests must be a list of objects")
+    out = []
+    for item in raw:
+        cid = ids([item.get("id") if isinstance(item.get("id"), str) else ""], "criterion_tests[].id")[0]
+        kind, visible = item.get("type"), item.get("user_visible", False)
+        if kind not in TEST_TYPES:
+            raise InvalidInput(f"{cid}: test type must be one of {', '.join(TEST_TYPES)}")
+        if not isinstance(visible, bool):
+            raise InvalidInput(f"{cid}: user_visible must be true or false")
+        note = clean(item.get("note"), "criterion_tests[].note", 500)
+        if not note and kind == "differential":
+            raise InvalidInput(f"{cid}: a differential test needs a note listing the approved differences")
+        if not note and visible and kind not in ("e2e", "recipe"):
+            raise InvalidInput(f"{cid}: a user-visible criterion tested as {kind} needs a note saying why not e2e or recipe")
+        out.append({"id": cid, "type": kind, "user_visible": visible, "note": note})
+    listed, known = [t["id"] for t in out], {cid for cid, _ in criteria}
+    if len(set(listed)) < len(listed) or set(listed) != set(covered) or (known and not set(listed) <= known):
+        raise InvalidInput("criterion_tests needs one entry per criteria_covered id (each one in `criteria`)")
+    return out
+
+
 def render_plan(payload: object, issue_file: str | None = None) -> str:
     if not isinstance(payload, dict):
         raise InvalidInput("stdin must be a JSON object")
@@ -243,6 +282,7 @@ def render_plan(payload: object, issue_file: str | None = None) -> str:
             criteria.append((cid, clean(item.get("text"), "criteria[].text")))
         else:
             criteria.append((f"AC{n}", clean(item, "criteria[]")))
+    tests = _criterion_tests(option, covered, criteria)
     tasks = payload.get("tasks")
     if tasks is None:
         tasks = [{"task": f"{'Modify' if i < len(modify) else 'Create'} `{path}`"
@@ -274,6 +314,10 @@ def render_plan(payload: object, issue_file: str | None = None) -> str:
     if criteria:
         lines += ["", "**Acceptance criteria**", ""]
         lines += [f"- {cid}: {text}" for cid, text in criteria]
+    if tests:
+        lines += ["", "**Test types**", ""]
+        lines += [f"- {t['id']}: {t['type']}" + (" (user-visible)" if t["user_visible"] else "")
+                  + (f" — {t['note']}" if t["note"] else "") for t in tests]
     lines += ["", f"**Covers:** {', '.join(covered) or 'none'}"]
     lines.append(f"**Tests:** {clean(option.get('test_strategy'), 'option.test_strategy') or 'none'}")
     lines.append(f"**Risks:** {clean(option.get('risk_details'), 'option.risk_details') or 'none'}")
@@ -295,7 +339,7 @@ def render_release(run: str, branch: str) -> str:
 def parse_plan(text: str) -> dict:
     plan: dict = {"name": None, "summary": None, "files_to_modify": [], "files_to_create": [],
                   "tasks": [], "criteria": [], "criteria_covered": [], "test_strategy": None,
-                  "risk_details": None}
+                  "risk_details": None, "criterion_tests": []}
     section = None
     for line in text.replace("\r\n", "\n").split("\n")[1:]:
         line = line.rstrip()
@@ -324,6 +368,9 @@ def parse_plan(text: str) -> dict:
             })
         elif section == "criteria" and (m := CRITERION_LINE_RE.fullmatch(line)):
             plan["criteria"].append({"id": m.group(1), "text": m.group(2)})
+        elif section == "tests" and (m := TEST_LINE_RE.fullmatch(line)):
+            plan["criterion_tests"].append({"id": m.group(1), "type": m.group(2),
+                                            "user_visible": bool(m.group(3)), "note": m.group(4) or ""})
     return plan
 
 

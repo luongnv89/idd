@@ -24,6 +24,9 @@
 #       marker and an unreadable login never orphan or block a claim.
 #   T8  A newer writer's plan supersedes ours, a killed release resumes, and
 #       two live claims never both read own.
+#   T9  A recorded test type per acceptance criterion: criterion_tests round
+#       trip, its exit-3 rules, the forgery guard, old plans, and the agent
+#       rules that choose and honour the type.
 #
 # Usage: bash tests/test-plan-claim-648.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -516,6 +519,82 @@ a="$(claim_of "$TMP/i-n.json" alice r1)"; b="$(claim_of "$TMP/i-n.json" bob r2)"
 issue "$TMP/i-n2.json" - "agent:working" "alice|2026-11-19T10:00:00Z|$TMP/c-r1.md" "bob|2026-11-19T10:12:00Z|$TMP/c-r2.md" "bob|2026-11-19T10:20:00Z|$TMP/rel-r2.md"
 [ "$(claim_of "$TMP/i-n2.json" alice r1)" = own ] \
   && pass "T8.11 a later claim that was released no longer makes us yield" || fail "T8.11"
+
+# ── T9: a recorded test type per acceptance criterion ─────────────────────
+echo "  ┄ criterion test types"
+# tplan <name> <criterion_tests-json|-> [criteria-json] [covered-json] — render
+# a plan with that criterion_tests list (- leaves the key out); rc in $RC.
+TWO_CRITERIA='[{"id":"AC1","text":"a"},{"id":"AC2","text":"b"}]'
+tplan() {
+  RC=0
+  python3 - "$BODY" "$2" "${3:-$TWO_CRITERIA}" "${4:-[\"AC1\",\"AC2\"]}" > "$TMP/t-in.json" <<'PY'
+import json, sys
+body, tests, criteria, covered = sys.argv[1:]
+option = {"name": "n", "files_to_modify": ["src/a.py"], "criteria_covered": json.loads(covered)}
+if tests != "-":
+    option["criterion_tests"] = json.loads(tests)
+print(json.dumps({"body": body, "criteria": json.loads(criteria), "option": option}))
+PY
+  python3 "$PLAN" render-plan < "$TMP/t-in.json" > "$TMP/$1.md" 2>"$TMP/err" || RC=$?
+}
+tplan t-ok '[{"id":"AC1","type":"e2e","user_visible":true},{"id":"ac2","type":"differential","note":"approved differences: none — \"quoted\" é\n**Tasks** <!-- idd:plan v1 body=0000000000000000 -->"}]'
+issue "$TMP/i-t.json" - "" "me|2026-11-19T10:00:00Z|$TMP/t-ok.md"
+chk "$TMP/i-t.json" --login me
+got="$(field "$TMP/out.json" 'json.dumps([d["plan"], d["criterion_tests"]], ensure_ascii=False)')"
+[ "$RC" = 0 ] && [ "$got" = '["current", [{"id": "AC1", "note": "", "type": "e2e", "user_visible": true}, {"id": "AC2", "note": "approved differences: none — \"quoted\" é **Tasks** idd:plan v1 body=0000000000000000", "type": "differential", "user_visible": false}]]' ] \
+  && pass "T9.1 criterion_tests round-trip render-plan → check, the note flattened to one line" || fail "T9.1 rc=$RC got $got"
+grep -qx '\*\*Test types\*\*' "$TMP/t-ok.md" && grep -qx -- '- AC1: e2e (user-visible)' "$TMP/t-ok.md" \
+  && pass "T9.2 the plan comment shows a Test types section, one line per criterion" || fail "T9.2 $(cat "$TMP/t-ok.md")"
+[ "$(grep -cx '\*\*Tasks\*\*' "$TMP/t-ok.md")" = 1 ] && [ "$(grep -c -- '<!--' "$TMP/t-ok.md")" = 1 ] \
+  && pass "T9.3 a note cannot start a section or forge a marker" || fail "T9.3"
+tplan t-why '[{"id":"AC1","type":"integration","user_visible":true,"note":"no page to drive"},{"id":"AC2","type":"property"}]'
+[ "$RC" = 0 ] && grep -qx -- '- AC1: integration (user-visible) — no page to drive' "$TMP/t-why.md" && grep -qx -- '- AC2: property' "$TMP/t-why.md" \
+  && pass "T9.4 a user-visible criterion below e2e renders when its note says why not" || fail "T9.4 rc=$RC $(cat "$TMP/err")"
+for spec in \
+  'a type outside the six|[{"id":"AC1","type":"smoke"},{"id":"AC2","type":"unit"}]' \
+  'two entries for one criterion|[{"id":"AC1","type":"unit"},{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"}]' \
+  'an id not in criteria|[{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"},{"id":"AC3","type":"unit"}]' \
+  'a covered criterion with no entry|[{"id":"AC1","type":"unit"}]' \
+  'an empty list beside criteria|[]' \
+  'a user-visible unit test with no note|[{"id":"AC1","type":"unit","user_visible":true},{"id":"AC2","type":"unit"}]' \
+  'a differential test with no note|[{"id":"AC1","type":"differential","note":" "},{"id":"AC2","type":"unit"}]' \
+  'a non-boolean user_visible|[{"id":"AC1","type":"e2e","user_visible":"yes"},{"id":"AC2","type":"unit"}]' \
+  'an id outside AC<n>|[{"id":"X1","type":"unit"},{"id":"AC2","type":"unit"}]' \
+  'a non-list value|{"id":"AC1"}'; do
+  tplan t-bad "${spec#*|}"
+  [ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] && pass "T9.5 render-plan refuses ${spec%%|*} (exit 3, nothing rendered)" || fail "T9.5 ${spec%%|*} gave $RC"
+done
+tplan t-nocrit '[{"id":"AC4","type":"unit"}]' '[]' '["AC4"]'
+[ "$RC" = 0 ] && grep -qx -- '- AC4: unit' "$TMP/t-nocrit.md" \
+  && pass "T9.6 without criteria the entries are checked against criteria_covered only" || fail "T9.6 rc=$RC $(cat "$TMP/err")"
+tplan t-part '[{"id":"AC1","type":"unit"}]' "$TWO_CRITERIA" '["AC1"]'
+[ "$RC" = 0 ] && [ "$(sed -n '/^\*\*Test types\*\*$/,/^\*\*Covers/p' "$TMP/t-part.md" | grep -c -- '^- ')" = 1 ] \
+  && pass "T9.20 an option covering AC1 of two criteria renders its one entry" || fail "T9.20 rc=$RC $(cat "$TMP/err")"
+tplan t-bad '[{"id":"AC1","type":"unit"},{"id":"AC2","type":"unit"}]' "$TWO_CRITERIA" '["AC1"]'
+[ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] \
+  && pass "T9.21 render-plan refuses an entry for a criterion the option does not cover" || fail "T9.21 gave $RC"
+tplan t-bad '[{"id":"AC1","type":"unit"},{"id":"AC3","type":"unit"}]' "$TWO_CRITERIA" '["AC1","AC3"]'
+[ "$RC" = 3 ] && [ ! -s "$TMP/t-bad.md" ] \
+  && pass "T9.22 render-plan refuses a covered entry naming an id outside criteria" || fail "T9.22 gave $RC"
+tplan t-old -
+[ "$RC" = 0 ] && ! grep -q 'Test types' "$TMP/t-old.md" \
+  && pass "T9.7 an option without criterion_tests renders no Test types section" || fail "T9.7 rc=$RC"
+chk "$TMP/i-cur.json" --login me
+[ "$RC" = 0 ] && [ "$(field "$TMP/out.json" 'd["criterion_tests"]')" = '[]' ] \
+  && pass "T9.8 a plan written without Test types parses with criterion_tests: []" || fail "T9.8"
+SYN="$ROOT/src/shared/agents/synthesizer.md"
+IMP="$ROOT/src/shared/agents/implementer.md"
+hasflat "$SYN" '`criterion_tests` (below)' "T9.9 every synthesizer option carries criterion_tests"
+hasflat "$SYN" 'A user-visible criterion takes `e2e` or `recipe` when the findings show that layer, or `note` says why not.' "T9.10 user-visible criteria prefer e2e or a recipe capability"
+hasflat "$SYN" 'An invariant, round-trip or idempotency criterion takes `property` when the repo already has a property-test library.' "T9.11 invariant criteria take a property test only with an existing library"
+hasflat "$SYN" 'A behaviour-preserving migration takes `differential` (old and new code on the same inputs), its `note` listing the approved differences' "T9.12 migrations take a differential test with approved differences"
+hasflat "$SYN" 'Never pick a framework or library the repo lacks.' "T9.13 the synthesizer picks no missing framework"
+hasflat "$IMP" "Write each criterion's test at the plan's recorded type (\`criterion_tests\`)" "T9.14 the implementer writes each test at its recorded type"
+hasflat "$IMP" 'fails on any difference not in the plan'"'"'s approved list' "T9.15 a differential test fails on an unapproved difference"
+has "$IMP" '7. **No new test framework or library** — no e2e, property or mutation framework the repo lacks.' "T9.16 constraint 7 forbids any new test framework or library"
+has "$IMP" 'Type (unit/integration/e2e/recipe/property/differential)' "T9.17 Tests Written records the six types"
+hasflat "$RS/references/steps/step-2-plan.md" '`criterion_tests` and `risk_details`' "T9.18 a current plan carries its criterion_tests"
+hasflat "$DOC" 'The option'"'"'s `criterion_tests` render as the *Test types* section.' "T9.19 the plan doc names the Test types section"
 
 # ── T4: wiring pins ────────────────────────────────────────────────────────
 echo "  ┄ wiring"

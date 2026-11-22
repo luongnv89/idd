@@ -80,7 +80,9 @@ Use only the researcher's findings as evidence.
 
 Propose **3 options** (2 is fine if trivial) differing in scope — **Minimal fix**, **Balanced approach**, **Comprehensive refactor** — or, given `sketch_contract` (`{language, checker}`), in **structure**: distinct domain designs. Each option includes every field:
 
-`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `criteria_covered` (IDs of the criteria this option fully satisfies) · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
+`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `criteria_covered` (IDs of the criteria this option fully satisfies) · `criterion_tests` (below) · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
+
+**`criterion_tests`**: one `{id, type, user_visible, note}` per `criteria_covered` ID; `type` is `unit`, `integration`, `e2e`, `recipe` (a capability of the base branch's `.idd-recipe.json`), `property` or `differential`. A user-visible criterion takes `e2e` or `recipe` when the findings show that layer, or `note` says why not. An invariant, round-trip or idempotency criterion takes `property` when the repo already has a property-test library. A behaviour-preserving migration takes `differential` (old and new code on the same inputs), its `note` listing the approved differences, or `none`. Never pick a framework or library the repo lacks.
 
 **`design_sketch`** (only with `sketch_contract`): `{shape, types, callers: [{id, kind: "valid" | "invalid", transition, code}]}` in `language` — one-line `shape`, self-contained `types`, at least one `valid` caller and one `invalid` caller attempting a forbidden transition. Write it from the findings, never copying issue text; the orchestrator type-checks it.
 
@@ -106,7 +108,8 @@ Return a single JSON object (nothing outside the block):
       "summary": "Add login route to redirect exclusion list",
       "files_to_modify": [ { "path": "src/auth/middleware.py", "changes": "Add route to exclusion list" } ],
       "files_to_create": [],
-      "test_strategy": "Add unit test for redirect exclusion",
+      "test_strategy": "Add an e2e test for the login redirect",
+      "criterion_tests": [ { "id": "AC1", "type": "e2e", "user_visible": true, "note": "" } ],
       "pros": ["Smallest change, lowest risk"], "cons": ["Hardcoded exclusion list grows over time"],
       "complexity": "S", "risk": "Low", "risk_details": "Single file, clear behavior change",
       "criteria_covered": ["AC1"], "recommended": false,
@@ -120,7 +123,9 @@ Return a single JSON object (nothing outside the block):
         { "path": "src/config/routes.py", "changes": "Add auth requirement field" }
       ],
       "files_to_create": [],
-      "test_strategy": "Unit tests for per-route auth + integration test for redirect flow",
+      "test_strategy": "Unit tests for per-route auth + e2e test for the redirect flow",
+      "criterion_tests": [ { "id": "AC1", "type": "e2e", "user_visible": true, "note": "" },
+                           { "id": "AC2", "type": "integration", "user_visible": true, "note": "a request per public route proves it; no page to drive" } ],
       "pros": ["Declarative auth per route", "Solves class of problems"],
       "cons": ["Moderate refactor", "Config migration needed"],
       "complexity": "M", "risk": "Medium", "risk_details": "Two files, config migration needed",
