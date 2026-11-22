@@ -18,7 +18,8 @@ Full example outputs for five scenarios. Every report follows `references/review
 5. Write `.idd.yml` with Next.js-specific comments
 6. Validate the written file — parses as YAML, no placeholder tokens left, `platform` present
 7. Merge-settings reads: squash allowed, but `squash_merge_commit_message` is `COMMIT_MESSAGES` and `review.auto_merge` is off
-8. Report:
+8. Starter recipe: no recipe on `origin/main`; the `start` script in `package.json` is the one entry point → starter printed
+9. Report:
 
 ```
 ◆ Init IDD — setup complete
@@ -34,6 +35,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ⚠ warn (hand merge drops the PR body)
+  Recipe:            ✓ starter printed (capabilities: 1)
   .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
@@ -41,7 +43,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Decision:          No approval needed.
 
   Config: .idd.yml
-  Next action: set review.auto_merge: true or use /auto-pilot in a mode that merges; commit .idd.yml
+  Next action: set review.auto_merge: true or use /auto-pilot in a mode that merges; commit .idd.yml and the starter recipe
 ```
 
 ## Example: Minimal Python project
@@ -80,6 +82,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ○ skip (gh not installed)
+  Recipe:            ○ skip (no entry point)
   .gitignore:        ✓ created, added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
@@ -116,6 +119,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Config:            ✓ merged into existing .idd.yml (3 new, 8 preserved)
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash allowed
+  Recipe:            ○ skip (recipe on origin/main)
   .gitignore:        ○ already ignored
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML

@@ -26,11 +26,11 @@
         "files": [],
         "measured": 0
       },
-      "budget": 127691,
-      "measured": 127691,
+      "budget": 129012,
+      "measured": 129012,
       "skill_md": {
         "budget": 25315,
-        "measured": 24300
+        "measured": 24999
       }
     },
     "issue-analysis": {

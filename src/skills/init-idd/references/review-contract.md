@@ -17,7 +17,8 @@ finding or stop reason:
 | `CANCELLED` | `.idd.yml` (or a legacy-only `.gitissue.yml`) already existed and was kept unchanged — the user chose `cancel`, or auto mode took the safe default. |
 
 A merge-strategy warning or skip does not change the status: it is a repository
-setting, not part of the generated config.
+setting, not part of the generated config. Neither does the starter recipe: it
+is printed, never written.
 
 The header names the outcome: `◆ Init IDD — setup complete` for `DONE` and
 `PARTIAL`, `— stopped` for `BLOCKED`, `— cancelled` for `CANCELLED`. On `BLOCKED`
@@ -35,6 +36,10 @@ Name the checks that actually ran and what they returned:
   `test_runner_source`) and `file_count_source` (`git ls-files` or a walk).
 - The path written and the parser that re-read it (`PyYAML` or `ruby`).
 - The merge-strategy reads that ran (see `references/merge-strategy-check.md`).
+
+The `Recipe:` row (SKILL.md *Starter recipe*) is `✓ starter printed
+(capabilities: {n})` or `○ skip ({reason})`: `recipe on {default_branch}`,
+`no entry point`, `no default branch`, or `detection inline`.
 
 Print `✓` only for a check that ran and passed. Print `○ skip` for a check that
 did not run and `⚠ warn` for one that ran with a finding. The `Validation:` row
@@ -65,7 +70,8 @@ answered before the report (auto mode answers it with cancel). Name the remainin
 - `DONE` / `PARTIAL`: review and commit `.idd.yml` (and `.gitignore` when it
   changed), then `/issue-creator`.
   After a legacy merge or overwrite, also `git rm .gitissue.yml`.
-  Add each merge-strategy `To fix:` command, and the parse check on `PARTIAL`.
+  Add each merge-strategy `To fix:` command, the parse check on `PARTIAL`,
+  and committing a printed starter recipe.
 - `BLOCKED`: the `To fix:` command of the error that stopped the run.
 - `CANCELLED`: re-run `/init-idd` and choose `merge` or `overwrite` to change
   the file; for a legacy-only `.gitissue.yml`, `git mv .gitissue.yml .idd.yml`.

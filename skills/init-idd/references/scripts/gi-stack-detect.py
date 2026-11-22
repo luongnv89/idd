@@ -23,7 +23,25 @@ Output on stdout, one JSON object:
      "file_count_source": "git ls-files", "issue_templates": 3,
      "derived": {"auto_test": true, "test_timeout": 300,
                  "stale_threshold_days": 14},
-     "unresolved": []}
+     "unresolved": [],
+     "recipe": {"default_branch": "origin/main", "on_base": null,
+                "entry_points": [{"kind": "server", "name": "npm-start",
+                                  "source": "package.json"}],
+                "starter": {...}, "skip": null}}
+
+`recipe` drafts a starter verification recipe (the `.idd-recipe.json` shape
+`gi-recipe.py` validates) with one smoke capability per entry point found at
+the repository root: a `package.json` `bin` or `start` script, a
+`pyproject.toml` `[project.scripts]` entry, `manage.py`, `main.go` or
+`cmd/<name>/main.go`, and a Cargo `src/main.rs` or `[[bin]]`. A recipe has
+one launch, so at most one server is listed (`manage.py` before
+`npm start`); without one the launch is a stand-in loopback server. Only the
+root counts: a fixture or example app nested deeper is not this repo's entry
+point. `starter` is null, and `skip` says why, when git knows no
+`origin/HEAD`, `origin/main` or `origin/master` (`no_default_branch`), that
+ref already carries `.idd-recipe.json` or the legacy `.gitissue-recipe.json`
+(`recipe_on_base`), or no entry point was found (`no_entry_point`). The
+script prints the starter; it never writes it.
 
 `file_count_source` is reported rather than assumed. The count prefers
 `git ls-files`; when git cannot answer, the script walks the tree instead and
@@ -55,6 +73,11 @@ import os
 import re
 import subprocess
 import sys
+
+try:
+    import tomllib
+except ImportError:  # Python < 3.11: pyproject and Cargo entry points go undetected
+    tomllib = None
 
 # Directories excluded from the file count, per the init-idd spec.
 EXCLUDED_DIRS = (
@@ -160,6 +183,26 @@ STALE_THRESHOLDS = {"small": 7, "medium": 14, "large": 30}
 
 # Bounds the content reads so a pathological repository cannot hang the scan.
 MAX_READ_BYTES = 512 * 1024
+
+
+# Starter-recipe drafting. Manifest values are attacker-controlled on a fork,
+# so a name or path reaches the starter only when it matches these: no
+# whitespace, no quoting, no leading `-` that a command would read as a flag.
+ENTRY_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$")
+ENTRY_PATH_RE = re.compile(r"^[A-Za-z0-9_.][A-Za-z0-9@/._-]{0,99}$")
+CAPABILITY_NAME_MAX = 40  # gi-recipe.py's NAME_RE length limit
+MAX_ENTRY_POINTS = 20
+GIT_TIMEOUT_S = 10
+RECIPE_FILES = (".idd-recipe.json", ".gitissue-recipe.json")
+STARTER_NOTE = (
+    "Starter printed by /init-idd. Review and edit it, then commit it to the "
+    "default branch as .idd-recipe.json: the skills read it from there only. "
+    "auto is empty, so only interactive runs offer it."
+)
+STANDIN_NOTE = (
+    " No server was detected: the launch is a stand-in loopback server, so "
+    "replace it if the app has one."
+)
 
 
 class InvalidInput(Exception):
@@ -376,6 +419,169 @@ def size_band(count: int) -> str:
     return "large"
 
 
+def git_out(root: str, *args: str) -> str | None:
+    """Stripped stdout of one git command, or None when it fails in any way."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", root, *args],
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT_S,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def default_branch(root: str) -> str | None:
+    """The remote default branch as git last fetched it, without the network."""
+    head = git_out(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if head:
+        return head
+    for name in ("main", "master"):
+        if git_out(root, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{name}") is not None:
+            return f"origin/{name}"
+    return None
+
+
+def load_toml(index: RepoIndex, rel: str) -> dict:
+    if tomllib is None:
+        return {}
+    try:
+        return tomllib.loads(index.read(rel))
+    except tomllib.TOMLDecodeError:
+        return {}
+
+
+def load_json(index: RepoIndex, rel: str) -> dict:
+    try:
+        loaded = json.loads(index.read(rel))
+    except ValueError:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def entry_points(index: RepoIndex) -> list[tuple[dict, list[str]]]:
+    """Root-level entry points, each with the command that smoke-tests it.
+
+    A server's command is its launch; a CLI's is its `--help` drive.
+    """
+    root_files = set(index.files)
+    found: list[tuple[dict, list[str]]] = []
+
+    def add(kind: str, name: object, source: str, command: list[str]) -> None:
+        if isinstance(name, str) and ENTRY_NAME_RE.match(name):
+            found.append(({"kind": kind, "name": name, "source": source}, command))
+
+    if "manage.py" in root_files:
+        add("server", "manage.py", "manage.py",
+            ["python3", "manage.py", "runserver", "127.0.0.1:{port}"])
+    package = load_json(index, "package.json") if "package.json" in root_files else {}
+    scripts = package.get("scripts")
+    if not found and isinstance(scripts, dict) and isinstance(scripts.get("start"), str):
+        add("server", "npm-start", "package.json",
+            ["env", "PORT={port}", "HOST=127.0.0.1", "npm", "start"])
+    bins = package.get("bin")
+    if isinstance(bins, str) and isinstance(package.get("name"), str):
+        bins = {package["name"].rpartition("/")[2]: bins}
+    if isinstance(bins, dict):
+        for name, path in sorted(bins.items()):
+            if isinstance(path, str) and ENTRY_PATH_RE.match(path) and ".." not in path.split("/"):
+                add("cli", name, "package.json", ["node", path, "--help"])
+    if "pyproject.toml" in root_files:
+        project = load_toml(index, "pyproject.toml").get("project")
+        commands = project.get("scripts") if isinstance(project, dict) else None
+        for name in sorted(commands) if isinstance(commands, dict) else []:
+            add("cli", name, "pyproject.toml", [name, "--help"])
+    if "main.go" in root_files:
+        go_mod = index.read("go.mod") if "go.mod" in root_files else ""
+        module = re.search(r"^module\s+(\S+)", go_mod, re.MULTILINE)
+        add("cli", module.group(1).rpartition("/")[2] if module else "main", "main.go",
+            ["go", "run", ".", "--help"])
+    for path in sorted(f for f in root_files if re.fullmatch(r"cmd/[^/]+/main\.go", f)):
+        name = path.split("/")[1]
+        add("cli", name, path, ["go", "run", f"./cmd/{name}", "--help"])
+    if "Cargo.toml" in root_files:
+        cargo = load_toml(index, "Cargo.toml")
+        names = []
+        package_table = cargo.get("package")
+        if "src/main.rs" in root_files and isinstance(package_table, dict):
+            names.append(package_table.get("name"))
+        targets = cargo.get("bin")
+        names += [t.get("name") for t in targets if isinstance(t, dict)] if isinstance(targets, list) else []
+        for name in dict.fromkeys(n for n in names if isinstance(n, str)):
+            add("cli", name, "Cargo.toml",
+                ["cargo", "run", "--quiet", "--bin", name, "--", "--help"])
+    return found[:MAX_ENTRY_POINTS]
+
+
+def capability_name(kind: str, name: str, taken: set[str]) -> str:
+    slug = re.sub(r"[^a-z0-9-]+", "-", f"{kind}-{name}".lower())
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")[:CAPABILITY_NAME_MAX].rstrip("-")
+    candidate, n = slug, 2
+    while candidate in taken:
+        suffix = f"-{n}"
+        candidate = slug[:CAPABILITY_NAME_MAX - len(suffix)].rstrip("-") + suffix
+        n += 1
+    taken.add(candidate)
+    return candidate
+
+
+def starter_recipe(found: list[tuple[dict, list[str]]]) -> dict:
+    server = next((command for entry, command in found if entry["kind"] == "server"), None)
+    note = STARTER_NOTE
+    if server is None:
+        note += STANDIN_NOTE
+        launch = {
+            "command": ["python3", "-I", "-m", "http.server", "{port}",
+                        "--bind", "127.0.0.1", "--directory", "{instance_dir}"],
+            "ready": {"url": "/", "timeout_s": 20},
+        }
+    else:
+        launch = {"command": server, "ready": {"url": "/", "timeout_s": 60}}
+    taken: set[str] = set()
+    capabilities = []
+    for entry, command in found:
+        capability = {"name": capability_name(entry["kind"], entry["name"], taken)}
+        if entry["kind"] == "server":
+            capability["drive"] = ["curl", "-sf", "-o", "{evidence_dir}/index.html", "{app_url}/"]
+        else:
+            capability["drive"] = command
+            if command[0] in ("go", "cargo"):
+                capability["timeout_s"] = 300  # the first run compiles
+        capabilities.append(capability)
+    return {"_comment": note, "version": 1, "auto": [], "launch": launch,
+            "capabilities": capabilities}
+
+
+def detect_recipe(root: str, index: RepoIndex) -> dict:
+    branch = default_branch(root)
+    on_base = None
+    if branch is not None:
+        on_base = next(
+            (name for name in RECIPE_FILES
+             if git_out(root, "cat-file", "-e", f"{branch}:{name}") is not None),
+            None,
+        )
+    found = entry_points(index)
+    if branch is None:
+        skip = "no_default_branch"
+    elif on_base is not None:
+        skip = "recipe_on_base"
+    elif not found:
+        skip = "no_entry_point"
+    else:
+        skip = None
+    return {
+        "default_branch": branch,
+        "on_base": on_base,
+        "entry_points": [entry for entry, _ in found],
+        "starter": starter_recipe(found) if skip is None else None,
+        "skip": skip,
+    }
+
+
 def load_rules(path: str) -> dict:
     """Read a rules override file and validate its shape."""
     try:
@@ -438,6 +644,7 @@ def main(argv: list[str] | None = None) -> int:
         language, language_source = detect_language(index, language_rules)
         framework, framework_source = detect_framework(index, framework_rules)
         runner, runner_source = detect_test_runner(index, runner_rules)
+        recipe = detect_recipe(root, index)
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-stack-detect: {exc}\n")
         return 3
@@ -480,6 +687,7 @@ def main(argv: list[str] | None = None) -> int:
                     "stale_threshold_days": STALE_THRESHOLDS[band],
                 },
                 "unresolved": unresolved,
+                "recipe": recipe,
             }
         )
     )

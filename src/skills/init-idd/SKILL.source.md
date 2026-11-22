@@ -150,7 +150,8 @@ python3 shared/scripts/gi-stack-detect.py --root .
 Exit 0 prints one JSON object: `language`, `framework`, `test_runner` (each with
 its `_source` file), `repo_size`, `file_count`, `file_count_source`,
 `issue_templates`, a `derived` block carrying the Step 2 values
-(`auto_test`, `test_timeout`, `stale_threshold_days`), and `unresolved`.
+(`auto_test`, `test_timeout`, `stale_threshold_days`), `unresolved`, and the
+`recipe` block that *Starter recipe* reads.
 
 **`unresolved` is the LLM fallback trigger, and the only one.** It names the
 fields nothing in the table matched. A `null` there is a real answer ("no marker
@@ -345,6 +346,21 @@ After a validated write, run the two read-only repository-settings reads in
 skipped, how `review.merge_method` is judged, and the `Merge settings:` report
 row. The check never changes a repository setting and never changes `Result`.
 
+### Starter recipe (optional)
+
+After a validated write, read Step 1's `recipe` (absent after an inline
+detect). When `starter` is non-null, print it as a fenced `json` block, then:
+
+```
+○ Review this starter, then commit it to {default_branch} as .idd-recipe.json.
+  Skills read a recipe from the base ref only.
+```
+
+Print it, never write it (*When to Use*). A set `skip` (a recipe, or the
+legacy `.gitissue-recipe.json`, already on the base ref; no root entry point;
+no default branch) prints nothing. The `Recipe:` row is in
+`references/review-contract.md`; it never changes `Result`.
+
 ---
 
 ## Step 4 — Report
@@ -370,6 +386,7 @@ a check that ran and passed.
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash allowed
+  Recipe:            ✓ starter printed (capabilities: {n})
   .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with {parser}
