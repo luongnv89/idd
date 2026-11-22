@@ -103,7 +103,11 @@ cp revert-body.md "$EVAL_OUT/revert-body.md"
 
 # 5. Reopen N with a comment linking the revert, then re-read it.
 gh issue reopen "$issue"
-printf 'Reopened: #12 is being reverted in #%s (%s).\n' "$revert_pr" "$pr_url" > reopen-comment.md
+{
+  printf 'Reopened: #12 is being reverted in #%s (%s).\n' "$revert_pr" "$pr_url"
+  printf 'Missed in review: the x feature caused a regression in production.\n'
+  printf 'Proposed guard (regression test): cover the x feature path that regressed. A proposal only: nothing is written until a maintainer approves it.\n'
+} > reopen-comment.md
 gh issue comment "$issue" --body-file reopen-comment.md
 cp reopen-comment.md "$EVAL_OUT/reopen-comment.md"
 issue_state="$(gh issue view "$issue" --json state --jq .state)"

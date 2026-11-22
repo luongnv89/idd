@@ -19,7 +19,15 @@ Undo merged PR `M` through a new PR `R` and reopen its issue `N`. This replaces 
    ```
 
    With no issue, drop `Reopens #{N}`. No closing keyword may name an issue anywhere in the body, reason included: `R` must not re-close `N`. Two lines, because IDD's merge passes the body to the squash commit (`--body-file`), a hand squash under `COMMIT_MESSAGES` keeps git's line, and `Reverts …#M` holds for any method. A hand merge under `PR_TITLE` or `BLANK` drops both: warn. Re-read `gh pr view {R} --json number,url,state`.
-5. **Reopen N.** `gh issue reopen {N}`, then `gh issue comment {N} --body-file "$comment_file"` with `Reopened: #{M} is being reverted in #{R} ({R url}).` Re-read `gh issue view {N} --json state`: it must be `OPEN`.
+5. **Reopen N.** `gh issue reopen {N}`, then `gh issue comment {N} --body-file "$comment_file"` with these lines, the second from step 4's reason and M's diff, no closing keyword:
+
+   ```text
+   Reopened: #{M} is being reverted in #{R} ({R url}).
+   Missed in review: {one sentence: what the bug was}.
+   Proposed guard ({review rule | recipe capability | regression test}): {one line}. A proposal only: nothing is written until a maintainer approves it.
+   ```
+
+   This path writes no rule, test or recipe. Re-read `gh issue view {N} --json state`: it must be `OPEN`.
 6. **Log.** Pipe `{"issue":N,"mode":"interactive|auto","skill":"issue-pr-review","outcome":"revert_opened","pr":M,"revert_pr":R}` to `python3 references/scripts/gi-runlog.py --append`. `pr` is `M`, never `R`; omit `skill_version`. Exit 3: fix the record, never raw-append. Exit 4 or no `python3`: `mkdir -p .idd` and append the line, with `ts` (ISO-8601 UTC), to `.idd/runs.jsonl`.
 
 If `R` is later closed unmerged, close `N` again by hand.
