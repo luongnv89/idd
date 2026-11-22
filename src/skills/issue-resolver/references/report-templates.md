@@ -45,6 +45,7 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 
 ## Test Results
 
+- **Verification:** tests {tests} · recipe {recipe} · criteria {criteria} · review {review}
 - Unit tests: {count} passed
 - Integration tests: {count} passed (or skipped)
 - E2e tests: {count} passed (or skipped)
@@ -81,6 +82,24 @@ With a template, build the body in this order:
 5. The `<!-- idd:qa v1 … -->` marker stays the last line, exactly once, under its own rule.
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `docs/naming-conventions.md`.
+
+### Verification line <!-- a:rt-verification-line -->
+
+The **Verification** bullet under `## Test Results` states how the PR was verified. Write it on every PR, exactly once, with all four parts in this order. A part that did not run reads `none`; never drop it.
+
+| Part | Value |
+|------|-------|
+| tests | `{count}@{sha_short}` from `tests_state`, the last green suite this session recorded (*Step 4 — QA*); `failed` when the last suite this session ran was red; `none` when no suite ran |
+| recipe | `pass {k}/{n}` or `fail {k}/{n}`, the capabilities the last verification recipe run drove (`recipe_state` on a clean exit); `none` when the base ref has no recipe or it did not run (the Decision Record's *Verification recipe* line keeps the reason) |
+| criteria | `{p} pass, {u} unverified, {f} fail`, the tallies of the *Acceptance Criteria Verification* table; `none` when the issue has no acceptance criteria |
+| review | `clean ({n} cycles)` when QA exited clean in this session; `open ({k} findings)` when the cycle cap was reached with findings left; `none` when no Step 4 review ran in this session, as on a run resumed past Step 4 |
+
+The line does not depend on the QA handoff marker, which a non-clean exit still drops. It is a list bullet inside a section, never the body's last paragraph, so git never parses it as a commit trailer, and IDD's squash or merge-commit merge carries it into the commit body. It is informational: nothing gates on it. To find merges by how they were verified:
+
+```bash
+git log --oneline --grep "Verification:"
+git log --oneline --grep "review none" --grep "review open" --grep "tests none"
+```
 
 ### QA handoff marker
 

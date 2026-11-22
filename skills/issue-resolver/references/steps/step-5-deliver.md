@@ -50,4 +50,6 @@ Write each effect's intent to the progress record **before** the effect — the 
 session's successor reconciles it live instead of repeating it (*Reconciling
 effects*, `references/steps/step-0j-resume.md`). A run that resumed past
 Step 4 did not see QA exit clean in this session: it drops the QA marker and writes
-no receipt, and the reviewer runs its full pipeline.
+no receipt, and the reviewer runs its full pipeline. It still writes the PR body's
+**Verification** line, with `review none` (*Verification line* in
+`references/report-templates.md`).

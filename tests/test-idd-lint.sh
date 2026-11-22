@@ -866,6 +866,96 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T32: Verification line (issue #667). Like T31, the line is read from the
+# authored PR Body Template and its slots filled, so every check below tests
+# the line that ships.
+# ───────────────────────────────────────────────────────────
+# shellcheck source=lib/anchors.bash
+. "$REPO_ROOT/tests/lib/anchors.bash"
+VLINE_RE='^- \*\*Verification:\*\* tests {tests} · recipe {recipe} · criteria {criteria} · review {review}$'
+for rt in "$RT" "$REPO_ROOT/skills/issue-resolver/references/report-templates.md"; do
+  rel="${rt#"$REPO_ROOT"/}"
+  in_results="$(sed -n '/^## Test Results$/,/^## Acceptance Criteria Verification$/p' "$rt" | grep -c "$VLINE_RE" || true)"
+  v_at="$(grep -n "$VLINE_RE" "$rt" | head -1 | cut -d: -f1 || true)"
+  qa_at="$(grep -n '^<!-- idd:qa v1' "$rt" | head -1 | cut -d: -f1 || true)"
+  if [ "$in_results" = "1" ] && [ "$(grep -c '^- \*\*Verification:\*\*' "$rt")" = "1" ] \
+    && [ -n "$v_at" ] && [ -n "$qa_at" ] && [ "$v_at" -lt "$qa_at" ]; then
+    pass "T32a: $rel writes one four-part Verification line in Test Results, above the QA marker"
+  else
+    fail "T32a: $rel writes one four-part Verification line in Test Results, above the QA marker"
+  fi
+  region="$(anchor_region "$rt" rt-verification-line || true)"
+  missing=""
+  for part in tests recipe criteria review; do
+    printf '%s\n' "$region" | grep -E "^\| $part \|" | grep -qF '`none`' || missing="$missing $part"
+  done
+  if [ -n "$region" ] && [ -z "$missing" ]; then
+    pass "T32b: $rel fill rules give every part a 'none' value"
+  else
+    fail "T32b: $rel fill rules give every part a 'none' value (missing:${missing:- region})"
+  fi
+done
+
+VTPL="$(grep -m1 '^- \*\*Verification:\*\*' "$RT" || true)"
+fill_verification() {  # tests recipe criteria review
+  printf '%s' "$VTPL" | sed -e "s/{tests}/$1/" -e "s|{recipe}|$2|" -e "s/{criteria}/$3/" -e "s/{review}/$4/"
+}
+VCLEAN="$(fill_verification '12@9f2c1ab' 'pass 2/2' '2 pass, 0 unverified, 0 fail' 'clean (1 cycles)')"
+VNONE="$(fill_verification none none none none)"
+add_results() {  # file verification-line... — a Test Results section before the AC table
+  local f="$1"; shift
+  awk -v lines="$(printf '%s\n' "$@")" '
+    /^## Acceptance Criteria Verification$/ { print "## Test Results\n"; print lines; print "- QA cycles: 1\n" }
+    { print }' "$TMP/pr-good.md" > "$TMP/$f.md"
+}
+add_results pr-verif-clean "$VCLEAN"
+add_results pr-verif-none "$VNONE"
+add_results pr-verif-dup "$VCLEAN" "$VNONE"
+add_results pr-verif-bad "$(printf '%s' "$VCLEAN" | sed 's/ · review .*$//')"
+lint_r() { python3 "$LINT" pr "$TMP/$1.md" --title "fix(auth): resolve mobile redirect loop (#42)" 2>&1; echo "|$?"; }
+for f in pr-verif-clean pr-verif-none; do
+  case "$(lint_r "$f")" in *"✓ [P08]"*"|0") pass "T32c: $f passes P08" ;;
+    *) fail "T32c: $f passes P08" ;; esac
+done
+for pair in "pr-good:no '" "pr-verif-dup:appears 2 times" "pr-verif-bad:malformed"; do
+  f="${pair%%:*}" why="${pair#*:}"
+  case "$(lint_r "$f")" in *"⚠ [P08] "*"$why"*"Errors: 0"*"|0") pass "T32d: $f warns (P08: $why) without failing" ;;
+    *) fail "T32d: $f warns (P08: $why) without failing" ;; esac
+done
+
+# Trailer safety: with the QA marker dropped, Test Results can sit at the end
+# of a message; neither the line alone nor its section is ever a trailer. The
+# control shows the same words without the bullet are one.
+if [ -n "$VTPL" ] && [ -z "$(trailers_of "$VNONE" | tr -d '[:space:]')" ] \
+  && [ -z "$(trailers_of "$(printf '%s\n- Unit tests: 3 passed\n- QA cycles: 1' "$VNONE")" | tr -d '[:space:]')" ] \
+  && [ -n "$(trailers_of "Verification: tests none" | tr -d '[:space:]')" ]; then
+  pass "T32e: the Verification line is never parsed as a commit trailer"
+else
+  fail "T32e: the Verification line is never parsed as a commit trailer"
+fi
+
+# AC3: the line survives a squash merge that takes the PR body as the commit
+# body (what `gh pr merge --squash --body-file` does), and git log finds it.
+SQ="$TMP/squash"
+mkdir -p "$SQ"
+git -C "$SQ" init -q -b main && git -C "$SQ" config user.email t@t && git -C "$SQ" config user.name t \
+  && git -C "$SQ" config commit.gpgsign false && git -C "$SQ" config core.hooksPath /dev/null
+git -C "$SQ" commit -q --allow-empty -m "chore: init"
+git -C "$SQ" checkout -q -b fix/42-mobile-auth
+echo fix > "$SQ/auth.txt" && git -C "$SQ" add auth.txt && git -C "$SQ" commit -q -m "fix(auth): resolve mobile redirect loop (#42)"
+git -C "$SQ" checkout -q main
+{ printf 'fix(auth): resolve mobile redirect loop (#42)\n\n'; cat "$TMP/pr-verif-none.md"; } > "$TMP/squash-body.txt"
+git -C "$SQ" merge -q --squash fix/42-mobile-auth >/dev/null && git -C "$SQ" commit -q -F "$TMP/squash-body.txt"
+head_sha="$(git -C "$SQ" rev-parse HEAD)"
+if [ -n "$VTPL" ] && [ "$(git -C "$SQ" log --format=%H --grep "Verification:")" = "$head_sha" ] \
+  && [ "$(git -C "$SQ" log --format=%H --grep "review none")" = "$head_sha" ] \
+  && [ -z "$(git -C "$SQ" log --format=%H --grep "review none" fix/42-mobile-auth)" ]; then
+  pass "T32f: git log --grep finds the Verification line on the squash merge commit"
+else
+  fail "T32f: git log --grep finds the Verification line on the squash merge commit"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
