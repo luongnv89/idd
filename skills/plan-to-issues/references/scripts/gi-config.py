@@ -66,13 +66,48 @@ its place (`first_run` false, `config_file` naming it) with
 `⚠ legacy .gitissue.yml found — rename to .idd.yml` on stderr. When both exist
 `.idd.yml` wins and the legacy file is reported as ignored.
 
+Reading a git ref (`--ref REF`). A repository's `.idd.yml` decides how strict a
+review of that repository is, so a reviewer with a pull request's branch checked
+out would otherwise let the branch set the gates that judge it. With `--ref` the
+config is read from the blob `<REF>:.idd.yml` (else the legacy
+`<REF>:.gitissue.yml`, with a ⚠ line) and the work tree is never read. REF is
+resolved to one commit first, and every read goes through that commit's id:
+
+  * a 40- or 64-character lowercase hex object id must name a commit;
+  * a `refs/...` name must be listed exactly by `git for-each-ref`. When it is
+    not, git's lookup falls through to `refs/heads/refs/...`, a local branch a
+    checked-out pull request can create;
+  * any other name must match at most one of git's five short-name lookup
+    forms, because `refs/heads/<name>` shadows `refs/remotes/<name>`.
+
+An empty or `-`-prefixed REF is exit 2. A REF that does not resolve or is
+ambiguous, or a config blob that exists but cannot be read, is exit 4. A REF
+that resolves and carries no config yields the built-in defaults (`config_file`
+null, `first_run` true), never the work-tree file. An invalid config at REF is
+exit 3. Under `--ref` the schema is the copy bundled beside this script or
+`--schema`; the working-directory walk is skipped, because the checked-out tree
+would choose it.
+
+`--compare-ref REF2` (only with `--ref`) also reads REF2's config, raw, and
+reports `changed_keys`: the sorted dotted keys, in any section, that are added,
+removed or hold a different raw value at REF2 than at REF. A key set explicitly
+to its default counts. REF2 is never merged or validated, and a failure to
+resolve, read or parse it never fails the run: the exit stays 0 with REF's
+config, `changed_keys: null` and `compare_error` naming the reason.
+
+Under `--ref` the payload adds `config_source: "ref:<REF as passed>"` — the
+`ref:` form of the vocabulary gi-secscan's `policy_source` uses (`ref:<REF>`,
+`file:<path>`, `defaults`) — and under `--compare-ref` also `changed_keys` and
+`compare_error`. Without `--ref` the payload is exactly the three keys above.
+
 Exit codes
   0  merged config printed
   2  usage error
   3  `.idd.yml` is invalid (stderr: `✗ Invalid .idd.yml: <key> — <why>`)
-  4  cannot complete — schema missing/unparsable, or the config file could not
-     be read (stderr: `⚠ gi-config: <reason>`). Callers fall back to their
-     inline defaults rather than failing the run.
+  4  cannot complete — schema missing/unparsable, the config file could not
+     be read, or `--ref` did not resolve to exactly one commit (stderr:
+     `⚠ gi-config: <reason>`). Callers fall back to their inline defaults
+     rather than failing the run.
 
 Authored at src/shared/scripts/gi-config.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
@@ -91,6 +126,22 @@ from pathlib import Path
 SCHEMA_NAME = "config-schema.md"
 DEFAULT_CONFIG_NAME = ".idd.yml"
 LEGACY_CONFIG_NAME = ".gitissue.yml"
+
+# A full object id, SHA-1 or SHA-256. Matched with `fullmatch`, so a trailing
+# newline or an abbreviation is not an object id.
+_OID_RE = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+
+# git's lookup order for a short `<refname>`, minus `$GIT_DIR/<refname>` (git
+# honours that only for all-caps root refs like `HEAD`). Copied from
+# gi-secscan.py, which applies the same check to `--policy-ref`; scripts ship
+# standalone, so it is copied rather than imported.
+_REF_LOOKUP_RULES = (
+    "refs/{ref}",
+    "refs/tags/{ref}",
+    "refs/heads/{ref}",
+    "refs/remotes/{ref}",
+    "refs/remotes/{ref}/HEAD",
+)
 
 # `git rev-parse --show-cdup` can only ever be empty or a run of `../`. Anything
 # else is not an answer this script will resolve a path against.
@@ -174,6 +225,10 @@ class Unavailable(Exception):
 
 class ParseError(Exception):
     """The restricted-YAML parser met syntax it does not support."""
+
+
+class UsageError(Exception):
+    """A malformed invocation — exit 2."""
 
 
 def _parse_yaml_scalar(value: str) -> object:
@@ -283,8 +338,12 @@ def search_ceiling() -> Path:
     return Path(os.path.normpath(os.path.join(os.getcwd(), cdup))) if cdup else Path.cwd().resolve()
 
 
-def find_schema(explicit: str | None) -> Path:
-    """Locate the schema document: explicit path, bundled copy, then repo tree."""
+def find_schema(explicit: str | None, allow_walk: bool = True) -> Path:
+    """Locate the schema document: explicit path, bundled copy, then repo tree.
+
+    `allow_walk` is False under `--ref`: the schema decides which keys are
+    valid, and the working directory then holds the branch under review.
+    """
     if explicit:
         path = Path(explicit)
         if not path.is_file():
@@ -295,6 +354,11 @@ def find_schema(explicit: str | None) -> Path:
     bundled = Path(__file__).resolve().parent.parent / "docs" / SCHEMA_NAME
     if bundled.is_file():
         return bundled
+    if not allow_walk:
+        raise Unavailable(
+            f"no {SCHEMA_NAME} beside this script; under --ref the working "
+            "directory is not searched (pass --schema)"
+        )
     # Source tree: walk up from the working directory, stopping at the top of
     # the working tree. A schema above the repository is not this repository's
     # schema, and it decides which keys are valid and which are tombstoned.
@@ -350,7 +414,16 @@ def _flatten(mapping: dict, prefix: str = "") -> dict[str, object]:
 
 
 def load_user_config(path: Path) -> dict[str, object]:
-    """Parse the user's config file into dotted keys.
+    """Read the user's config file and parse it into dotted keys."""
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise Unavailable(f"cannot read {path}: {exc}") from exc
+    return parse_user_config(data, str(path))
+
+
+def parse_user_config(data: bytes, label: str) -> dict[str, object]:
+    """Parse config bytes — a file's or a blob's — into dotted keys.
 
     PyYAML is used when the interpreter has it and the restricted parser is the
     fallback, so a config using YAML this project's own parser does not model
@@ -359,9 +432,7 @@ def load_user_config(path: Path) -> dict[str, object]:
     a user error.
     """
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise Unavailable(f"cannot read {path}: {exc}") from exc
+        text = data.decode("utf-8")
     except UnicodeDecodeError as exc:
         # UnicodeDecodeError subclasses ValueError, not OSError, so it escapes
         # the clause above and would leave the interpreter to print a traceback
@@ -370,7 +441,7 @@ def load_user_config(path: Path) -> dict[str, object]:
         # The file was found and read: its *bytes* are wrong, which is a user
         # error (an editor saving cp1252), so it is exit 3, stop and report.
         raise ConfigError(
-            f"{path} is not valid UTF-8 — {exc.reason} at byte {exc.start}; "
+            f"{label} is not valid UTF-8 — {exc.reason} at byte {exc.start}; "
             "re-save the file as UTF-8"
         ) from exc
     try:
@@ -381,18 +452,158 @@ def load_user_config(path: Path) -> dict[str, object]:
         try:
             loaded = yaml.safe_load(text)
         except yaml.YAMLError as exc:
-            raise ConfigError(f"{path} is not valid YAML — {exc}") from exc
+            raise ConfigError(f"{label} is not valid YAML — {exc}") from exc
         if loaded is None:
             return {}
         if not isinstance(loaded, dict):
-            raise ConfigError(f"{path} must contain a mapping at the top level")
+            raise ConfigError(f"{label} must contain a mapping at the top level")
         return _flatten(loaded)
     try:
-        return _parse_config_mapping(text, str(path))
+        return _parse_config_mapping(text, label)
     except ParseError as exc:
         raise Unavailable(
-            f"cannot parse {path} without PyYAML — {exc}"
+            f"cannot parse {label} without PyYAML — {exc}"
         ) from exc
+
+
+# --- Reading a git ref -------------------------------------------------------
+
+
+def _git(args: list[str]) -> subprocess.CompletedProcess:
+    """Run one read-only git command with replace objects ignored.
+
+    `--no-replace-objects` is a top-level option (a subcommand rejects it): a
+    `refs/replace` entry could otherwise swap the commit or blob this read
+    reports for one that never shipped.
+    """
+    try:
+        return subprocess.run(
+            ["git", "--no-replace-objects", *args],
+            capture_output=True,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+    except (OSError, ValueError) as exc:  # git missing, or a bad argv
+        raise Unavailable(f"cannot run git — {exc}") from exc
+
+
+def _commit_of(spec: str) -> str | None:
+    """The commit id `spec` peels to, or None when it names no commit."""
+    proc = _git(["rev-parse", "--verify", "--quiet", f"{spec}^{{commit}}"])
+    oid = proc.stdout.decode("ascii", errors="replace").strip()
+    return oid if proc.returncode == 0 and _OID_RE.fullmatch(oid) else None
+
+
+def check_ref_arg(flag: str, ref: str) -> None:
+    """Reject a value that is not a revision at all — exit 2."""
+    if not ref:
+        raise UsageError(f"{flag} value must not be empty")
+    if ref.startswith("-"):
+        # It would reach git as an option, not a revision.
+        raise UsageError(f"{flag} value must be a revision, not an option: {ref!r}")
+
+
+def resolve_ref(flag: str, ref: str) -> str:
+    """Resolve `ref` to exactly one commit id, or raise Unavailable — exit 4."""
+    if _OID_RE.fullmatch(ref):
+        oid = _commit_of(ref)
+        if oid is None:
+            raise Unavailable(f"{flag} {ref} names no commit in this repository")
+        return oid
+    if ref.startswith("refs/"):
+        # A fully-qualified name that does not exist is not an error to git: it
+        # tries `refs/heads/<name>` next, so `refs/remotes/origin/main` would
+        # resolve to a local branch named `refs/remotes/origin/main`.
+        listed = _git(["for-each-ref", "--format=%(refname)", "--", ref])
+        names = os.fsdecode(listed.stdout).split("\n")
+        if listed.returncode != 0 or names.count(ref) != 1:
+            raise Unavailable(
+                f"{flag} {ref} is not an existing ref — pass a ref "
+                "`git for-each-ref` lists, or a commit id"
+            )
+    elif ref != "HEAD":
+        candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
+        listed = _git(["for-each-ref", "--format=%(refname)", "--", *candidates])
+        if listed.returncode != 0:
+            raise Unavailable(f"cannot list refs to check {flag} {ref}")
+        # Exact membership: a for-each-ref pattern also matches anything below
+        # it, which is not a ref this lookup would reach.
+        wanted = set(candidates)
+        found = {n for n in os.fsdecode(listed.stdout).split("\n") if n in wanted}
+        if len(found) > 1:
+            raise Unavailable(
+                f"{flag} {ref} is ambiguous — it names "
+                + ", ".join(sorted(found))
+                + "; pass the fully-qualified name of the one you mean"
+            )
+    oid = _commit_of(ref)
+    if oid is None:
+        raise Unavailable(f"{flag} {ref} does not resolve to a commit")
+    return oid
+
+
+def _read_blob(oid: str, name: str) -> bytes | None:
+    """The bytes of `<oid>:<name>`, or None when no such path exists there.
+
+    Raises Unavailable when the path exists but is not a readable blob — a
+    tree, or a blob a partial clone never fetched — so an unreadable config is
+    never mistaken for an absent one.
+    """
+    spec = f"{oid}:{name}"
+    if _git(["rev-parse", "--verify", "--quiet", spec]).returncode != 0:
+        return None
+    proc = _git(["cat-file", "blob", spec])
+    if proc.returncode != 0:
+        raise Unavailable(f"{name} exists at {oid} but could not be read")
+    return proc.stdout
+
+
+def read_ref_config(oid: str) -> tuple[bytes | None, str | None]:
+    """(config bytes, the name read) at `oid`; (None, None) when it has none.
+
+    The legacy name is read only when `.idd.yml` is absent: a present but
+    unreadable `.idd.yml` has already raised.
+    """
+    data = _read_blob(oid, DEFAULT_CONFIG_NAME)
+    if data is not None:
+        return data, DEFAULT_CONFIG_NAME
+    data = _read_blob(oid, LEGACY_CONFIG_NAME)
+    if data is not None:
+        return data, LEGACY_CONFIG_NAME
+    return None, None
+
+
+def changed_keys(base: dict[str, object], other: dict[str, object]) -> list[str]:
+    """Dotted keys added, removed or holding a different raw value.
+
+    Values are compared by their JSON form, so `true` and `1` differ (Python's
+    `True == 1` would hide that change).
+    """
+    def form(value: object) -> str:
+        return json.dumps(value, sort_keys=True, default=str)
+
+    return sorted(
+        key
+        for key in set(base) | set(other)
+        if key not in base or key not in other or form(base[key]) != form(other[key])
+    )
+
+
+def compare_overrides(
+    ref2: str, base: dict[str, object]
+) -> tuple[list[str] | None, str | None]:
+    """(changed_keys, None), or (None, reason) when REF2 cannot be compared.
+
+    Every failure here is reported, never raised: REF2 is the side under
+    review, and its config being unreadable must not stop the review.
+    """
+    try:
+        oid = resolve_ref("--compare-ref", ref2)
+        data, name = read_ref_config(oid)
+        other = {} if data is None else parse_user_config(data, f"{ref2}:{name}")
+    except (Unavailable, ConfigError) as exc:
+        return None, str(exc).replace("\n", "; ")
+    return changed_keys(base, other), None
 
 
 # --- Validation and merge ----------------------------------------------------
@@ -559,6 +770,33 @@ def merge(
 # --- CLI ---------------------------------------------------------------------
 
 
+def load_from_ref(args: argparse.Namespace) -> tuple[dict[str, object], list[str], dict[str, object]]:
+    """Merge the config at `--ref` (never the work tree's) onto the defaults.
+
+    Returns (config, warnings, the payload's file/source/compare fields).
+    """
+    oid = resolve_ref("--ref", args.ref)
+    data, name = read_ref_config(oid)
+    if name == LEGACY_CONFIG_NAME:
+        print(
+            f"⚠ legacy {LEGACY_CONFIG_NAME} found at {args.ref} — rename to {DEFAULT_CONFIG_NAME}",
+            file=sys.stderr,
+        )
+    overrides = {} if data is None else parse_user_config(data, f"{args.ref}:{name}")
+    defaults, removed, complete = load_schema(find_schema(args.schema, allow_walk=False))
+    config, warnings = merge(defaults, overrides, removed, complete)
+    fields: dict[str, object] = {
+        "config_file": name,
+        "config_source": f"ref:{args.ref}",
+        "first_run": data is None,
+    }
+    if args.compare_ref is not None:
+        keys, error = compare_overrides(args.compare_ref, overrides)
+        fields["changed_keys"] = keys
+        fields["compare_error"] = error
+    return config, warnings, fields
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gi-config.py",
@@ -568,7 +806,9 @@ def main(argv: list[str] | None = None) -> int:
         ),
         epilog=(
             "Exit codes: 0 ok; 2 usage; 3 invalid config; 4 cannot complete "
-            "(caller falls back to its inline defaults)."
+            "(caller falls back to its inline defaults). With --ref the payload "
+            "adds config_source (ref:<REF>), and with --compare-ref also "
+            "changed_keys and compare_error."
         ),
     )
     parser.add_argument(
@@ -576,7 +816,7 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_CONFIG_NAME,
         help=(
             f"config file to read (default: {DEFAULT_CONFIG_NAME}, else the legacy "
-            f"{LEGACY_CONFIG_NAME}, relative to cwd)"
+            f"{LEGACY_CONFIG_NAME}, relative to cwd); not with --ref"
         ),
     )
     parser.add_argument(
@@ -584,7 +824,8 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             f"{SCHEMA_NAME} to derive defaults from (default: the copy bundled "
-            "beside this script, then the nearest one above the working directory)"
+            "beside this script, then — without --ref only — the nearest one "
+            "above the working directory)"
         ),
     )
     parser.add_argument(
@@ -593,9 +834,53 @@ def main(argv: list[str] | None = None) -> int:
         metavar="DOTTED",
         help="print only this dotted key's value, as raw JSON",
     )
+    parser.add_argument(
+        "--ref",
+        default=None,
+        metavar="REF",
+        help=(
+            f"read <REF>:{DEFAULT_CONFIG_NAME} (else <REF>:{LEGACY_CONFIG_NAME}) "
+            "instead of the work tree: a full commit id, an existing refs/... "
+            "name, or an unambiguous short name; no config there = defaults"
+        ),
+    )
+    parser.add_argument(
+        "--compare-ref",
+        default=None,
+        metavar="REF2",
+        help=(
+            "with --ref: also list in changed_keys every dotted key added, "
+            "removed or changed at REF2; a REF2 that cannot be read sets "
+            "changed_keys null and compare_error, never a non-zero exit"
+        ),
+    )
     args = parser.parse_args(argv)
 
     explicit_config = args.config != DEFAULT_CONFIG_NAME
+    try:
+        if args.compare_ref is not None and args.ref is None:
+            raise UsageError("--compare-ref needs --ref")
+        if args.ref is not None:
+            if explicit_config:
+                raise UsageError("--config cannot be combined with --ref")
+            check_ref_arg("--ref", args.ref)
+        if args.compare_ref is not None:
+            check_ref_arg("--compare-ref", args.compare_ref)
+    except UsageError as exc:
+        parser.error(str(exc))
+
+    if args.ref is not None:
+        try:
+            config, warnings, fields = load_from_ref(args)
+        except ConfigError as exc:
+            for line in str(exc).splitlines():
+                print(f"✗ Invalid config at {args.ref}: {line}", file=sys.stderr)
+            return 3
+        except Unavailable as exc:
+            print(f"⚠ gi-config: {exc}", file=sys.stderr)
+            return 4
+        return emit(args, config, warnings, fields)
+
     config_path = Path(args.config)
     # The name an exit-3 message blames: the file actually parsed.
     config_name = DEFAULT_CONFIG_NAME
@@ -631,6 +916,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"⚠ gi-config: {exc}", file=sys.stderr)
         return 4
 
+    return emit(
+        args,
+        config,
+        warnings,
+        {
+            "config_file": str(config_path) if config_path.is_file() else None,
+            "first_run": not config_path.is_file(),
+        },
+    )
+
+
+def emit(
+    args: argparse.Namespace,
+    config: dict[str, object],
+    warnings: list[str],
+    fields: dict[str, object],
+) -> int:
+    """Print the warnings, then the payload (or the one `--key` value)."""
     for warning in warnings:
         print(f"⚠ gi-config: {warning}", file=sys.stderr)
 
@@ -641,11 +944,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(config[args.key], sort_keys=True))
         return 0
 
-    payload = {
-        "config": config,
-        "config_file": str(config_path) if config_path.is_file() else None,
-        "first_run": not config_path.is_file(),
-    }
+    payload = {"config": config, **fields}
     sys.stdout.write(json.dumps(payload, sort_keys=True) + "\n")
     return 0
 
