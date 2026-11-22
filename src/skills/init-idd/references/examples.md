@@ -18,7 +18,23 @@ Full example outputs for five scenarios. Every report follows `references/review
 5. Write `.idd.yml` with Next.js-specific comments
 6. Validate the written file — parses as YAML, no placeholder tokens left, `platform` present
 7. Merge-settings reads: squash allowed, but `squash_merge_commit_message` is `COMMIT_MESSAGES` and `review.auto_merge` is off
-8. Starter recipe: no recipe on `origin/main`; the `start` script in `package.json` is the one entry point → starter printed
+8. Starter recipe: no `.idd-recipe.json` (or legacy `.gitissue-recipe.json`) on `origin/main`; the `start` script in `package.json` is the one entry point → starter printed:
+
+```json
+{
+  "_comment": "Starter printed by /init-idd. Review and edit it, then commit it to the default branch as .idd-recipe.json: the skills read it from there only. auto is empty, so only interactive runs offer it.",
+  "version": 1,
+  "auto": [],
+  "launch": {"command": ["env", "PORT={port}", "HOST=127.0.0.1", "npm", "start"], "ready": {"url": "/", "timeout_s": 60}},
+  "capabilities": [{"name": "server-npm-start", "drive": ["curl", "-sf", "-o", "{evidence_dir}/index.html", "{app_url}/"]}]
+}
+```
+
+```
+○ Review this starter, then commit it to origin/main as .idd-recipe.json.
+  Skills read a recipe from the base ref only.
+```
+
 9. Report:
 
 ```

@@ -188,8 +188,9 @@ MAX_READ_BYTES = 512 * 1024
 # Starter-recipe drafting. Manifest values are attacker-controlled on a fork,
 # so a name or path reaches the starter only when it matches these: no
 # whitespace, no quoting, no leading `-` that a command would read as a flag.
-ENTRY_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$")
-ENTRY_PATH_RE = re.compile(r"^[A-Za-z0-9_.][A-Za-z0-9@/._-]{0,99}$")
+# Apply them with fullmatch: `$` under match would accept a trailing newline.
+ENTRY_NAME_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}")
+ENTRY_PATH_RE = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9@/._-]{0,99}")
 CAPABILITY_NAME_MAX = 40  # gi-recipe.py's NAME_RE length limit
 MAX_ENTRY_POINTS = 20
 GIT_TIMEOUT_S = 10
@@ -420,7 +421,11 @@ def size_band(count: int) -> str:
 
 
 def git_out(root: str, *args: str) -> str | None:
-    """Stripped stdout of one git command, or None when it fails in any way."""
+    """Stripped stdout of one git command, or None when it fails in any way.
+
+    GIT_NO_LAZY_FETCH stops a partial clone from fetching a missing object
+    from the remote: the scan stays offline.
+    """
     try:
         proc = subprocess.run(
             ["git", "-C", root, *args],
@@ -428,6 +433,7 @@ def git_out(root: str, *args: str) -> str | None:
             text=True,
             timeout=GIT_TIMEOUT_S,
             check=False,
+            env={**os.environ, "GIT_NO_LAZY_FETCH": "1"},
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -471,7 +477,7 @@ def entry_points(index: RepoIndex) -> list[tuple[dict, list[str]]]:
     found: list[tuple[dict, list[str]]] = []
 
     def add(kind: str, name: object, source: str, command: list[str]) -> None:
-        if isinstance(name, str) and ENTRY_NAME_RE.match(name):
+        if isinstance(name, str) and ENTRY_NAME_RE.fullmatch(name):
             found.append(({"kind": kind, "name": name, "source": source}, command))
 
     if "manage.py" in root_files:
@@ -487,7 +493,7 @@ def entry_points(index: RepoIndex) -> list[tuple[dict, list[str]]]:
         bins = {package["name"].rpartition("/")[2]: bins}
     if isinstance(bins, dict):
         for name, path in sorted(bins.items()):
-            if isinstance(path, str) and ENTRY_PATH_RE.match(path) and ".." not in path.split("/"):
+            if isinstance(path, str) and ENTRY_PATH_RE.fullmatch(path) and ".." not in path.split("/"):
                 add("cli", name, "package.json", ["node", path, "--help"])
     if "pyproject.toml" in root_files:
         project = load_toml(index, "pyproject.toml").get("project")
@@ -559,9 +565,11 @@ def detect_recipe(root: str, index: RepoIndex) -> dict:
     branch = default_branch(root)
     on_base = None
     if branch is not None:
+        # rev-parse resolves the path from the tree without reading the blob,
+        # which a partial clone may not hold locally.
         on_base = next(
             (name for name in RECIPE_FILES
-             if git_out(root, "cat-file", "-e", f"{branch}:{name}") is not None),
+             if git_out(root, "rev-parse", "--verify", "--quiet", f"{branch}:{name}") is not None),
             None,
         )
     found = entry_points(index)

@@ -439,7 +439,8 @@ mkdir -p "$EP/cmd/worker" "$EP/src" "$EP/bin"
 cat > "$EP/package.json" <<'EOF'
 {"name": "@me/webapp", "scripts": {"start": "node server.js"},
  "bin": {"mycli": "bin/cli.js", "-evil": "bin/x.js", "bad name": "bin/y.js",
-         "escape": "../outside.js", "naïve": "bin/z.js"}}
+         "escape": "../outside.js", "naïve": "bin/z.js",
+         "trail\n": "bin/cli.js", "nlpath": "bin/w.js\n"}}
 EOF
 printf '[project]\nname = "pt"\n[project.scripts]\npytool = "pt:main"\n"-rf" = "pt:bad"\n' > "$EP/pyproject.toml"
 printf 'module example.com/me/goapp\n' > "$EP/go.mod"
@@ -463,9 +464,9 @@ if [ "$got" = "$want" ]; then
 else
   fail "#668: root entry points wrong (got: $got)"
 fi
-# Manifest names are untrusted: a leading dash, whitespace, non-ASCII or a
-# path escaping the repo never reaches the starter.
-if ! printf '%s' "$got" | grep -qE -- "-evil|bad name|escape|naïve|-rf|npm-start"; then
+# Manifest names are untrusted: a leading dash, whitespace (a trailing newline
+# included), non-ASCII or a path escaping the repo never reaches the starter.
+if ! printf '%s' "$got" | grep -qE -- "-evil|bad name|escape|naïve|-rf|npm-start|trail|nlpath"; then
   pass "#668: unsafe manifest names and paths are dropped, and only one server is listed"
 else
   fail "#668: an unsafe manifest name or a second server reached entry_points (got: $got)"
@@ -517,6 +518,25 @@ if [ "$(rkey "$out" 'r["on_base"], r["skip"], r["starter"]')" = "('.idd-recipe.j
   pass "#668: a recipe on the default branch → no starter (recipe_on_base)"
 else
   fail "#668: a committed recipe should skip recipe_on_base (got: $(rkey "$out" 'r'))"
+fi
+
+# A partial clone (--filter=blob:none) lacks the recipe blob. The probe reads
+# the tree, so the committed recipe still counts and nothing is fetched: the
+# source repo is gone, and the blob stays missing after the scan.
+PS="$TMP/partial-src"
+mkdir -p "$PS"
+printf 'package main\n' > "$PS/main.go"
+printf '{}\n' > "$PS/.idd-recipe.json"
+git_base "$PS" && git -C "$PS" config uploadpack.allowFilter true
+git clone -q --no-checkout --filter=blob:none "file://$PS" "$TMP/partial-clone" 2>/dev/null
+blob="$(git -C "$TMP/partial-clone" rev-parse origin/main:.idd-recipe.json)"
+rm -rf "$PS"
+out="$(python3 "$STACK" --root "$TMP/partial-clone")"
+if [ "$(rkey "$out" 'r["on_base"], r["skip"]')" = "('.idd-recipe.json', 'recipe_on_base')" ] \
+   && git -C "$TMP/partial-clone" rev-list --objects --missing=print --all | grep -qx "?$blob"; then
+  pass "#668: a blob:none partial clone still sees the committed recipe, offline"
+else
+  fail "#668: partial-clone recipe probe wrong or fetched (got: $(rkey "$out" 'r'))"
 fi
 
 # The legacy name counts as present; origin/master is the fallback default
