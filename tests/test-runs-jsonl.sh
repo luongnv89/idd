@@ -747,6 +747,44 @@ fi
 has "$RUNLOG" '| `revert_pr` |' "T15c: run-log schema documents revert_pr"
 has "$RUNLOG" 'Revert path: `revert_opened`' "T15c: run-log schema lists the revert_opened outcome"
 
+# --- T16: review-fix scopes that recur become rule candidates (issue #669) ---
+# The reviewer reports the scopes of its review-fix commits; the summary lists
+# a scope seen in at least two distinct PRs as a candidate, information only:
+# no approval gate, and nothing in the loop writes a rule from it.
+flat() { tr '\n' ' ' < "$1" | tr -s ' '; }
+for t16 in "$REPO_ROOT/src/skills/auto-pilot" "$REPO_ROOT/skills/auto-pilot"; do
+  t16l="${t16#$REPO_ROOT/}"
+  sf="$t16/references/summary-format.md"
+  has "$t16/references/prompts/reviewer.md" '- fix_scopes: the scope of each `fix(<scope>): address review feedback` commit' \
+    "T16a: $t16l reviewer reports its review-fix scopes"
+  flat "$t16/references/phases/phase-3-4-review.md" | grep -qF '`ci_status`, `fix_scopes` (missing reads `[]`' \
+    && pass "T16b: $t16l Step 3.2 extracts fix_scopes, missing reads []" \
+    || fail "T16b: $t16l Step 3.2 does not extract fix_scopes"
+  if grep -A2 -F '  Uncertainty:             {' "$sf" | sed -n 2p | grep -qxF '  Rule candidates:         {review-fix:{scope} (PRs #{a}, #{b}); …}' \
+     && grep -qxF '  Decision:                {No approval needed. | the pending critical decision}' "$sf"; then
+    pass "T16c: $t16l template has the Rule candidates row after Uncertainty; Decision row unchanged"
+  else
+    fail "T16c: $t16l Rule candidates row missing or misplaced, or Decision row changed"
+  fi
+  sfx="$(flat "$sf")"
+  for p in 'only when a scope (compared lowercase) is in the `fix_scopes` of at least two distinct PRs this run' \
+    'The row only informs: never on `Decision:` or `Next action:`, it adds no approval gate' \
+    'nothing in the loop writes a rule, test, recipe or proposal from it' \
+    'shared-agent-conventions.md` (*Correction-to-enforcement*)' \
+    'Never add an approval gate the loop does not already have.'; do
+    grep -qF -- "$p" <<<"$sfx" && pass "T16d: $t16l summary contract: $p" \
+      || fail "T16d: $t16l summary contract lacks: $p"
+  done
+  if grep -qE 'improvement-proposals|src/' "$sf"; then
+    fail "T16e: $t16l summary-format.md names a proposal file or src/ to write"
+  else
+    pass "T16e: $t16l summary-format.md writes no proposal and edits no source"
+  fi
+done
+grep -qx '## Correction-to-enforcement' "$REPO_ROOT/skills/auto-pilot/references/docs/shared-agent-conventions.md" \
+  && pass "T16f: auto-pilot bundles the Correction-to-enforcement section the summary cites" \
+  || fail "T16f: the cited Correction-to-enforcement section is not in auto-pilot's bundle"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"
