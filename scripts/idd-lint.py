@@ -95,6 +95,17 @@ PRODUCED_BY_RE = re.compile(
     re.MULTILINE,
 )
 
+# IDD resolver verification line (issue #667): how the PR was verified, `none`
+# for a part that did not run.
+VERIFICATION_LINE_RE = re.compile(r"^- \*\*Verification:\*\*", re.MULTILINE)
+VERIFICATION_RE = re.compile(
+    r"^- \*\*Verification:\*\* tests (?:none|failed|\d+@[0-9a-f]{7,40})"
+    r" · recipe (?:none|(?:pass|fail) \d+/\d+)"
+    r" · criteria (?:none|\d+ pass, \d+ unverified, \d+ fail)"
+    r" · review (?:none|clean \(\d+ cycles?\)|open \(\d+ findings?\))[ \t]*$",
+    re.MULTILINE,
+)
+
 LEVELS = ("L1", "L2", "L3")
 
 BRANCH_NAME_WARN_LENGTH = 50
@@ -511,6 +522,18 @@ def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) ->
             findings.append(ok("P07", "'**Produced by:**' provenance line present (IDD convention, §4.1 MAY)"))
         else:
             findings.append(warn("P07", "no well-formed '- **Produced by:** model … · effort … · skill <name>@<version> · locally modified yes|unknown' line (IDD convention, §4.1 MAY)"))
+
+    # P08 (L3) — verification line, an IDD resolver convention
+    lines = VERIFICATION_LINE_RE.findall(body)
+    shape = "'- **Verification:** tests … · recipe … · criteria … · review …'"
+    if len(lines) > 1:
+        findings.append(warn("P08", f"{shape} line appears {len(lines)} times — write it exactly once (IDD convention)"))
+    elif VERIFICATION_RE.search(body):
+        findings.append(ok("P08", "'**Verification:**' line present (IDD convention)"))
+    elif lines:
+        findings.append(warn("P08", f"malformed {shape} line — each part is a value or 'none' (IDD convention)"))
+    else:
+        findings.append(warn("P08", f"no {shape} line (IDD convention)"))
 
     return findings
 
