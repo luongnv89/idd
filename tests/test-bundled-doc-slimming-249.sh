@@ -294,7 +294,14 @@ FAIL=0
 # +237 bytes per digest copy, shipped to its 2 skills (issue-pr-review,
 # issue-resolver): +474. HEAD measured 627,222, so 627,222 + 474 = 627,696;
 # the line keeps its six bytes of headroom, so the ratchet is not widened.
-BUDGET=627702
+#
+# Issue #667 is the eighteenth raise (2026-11-22): every resolver PR body
+# carries one Verification line, so docs/idd-methodology.md's durable-memory
+# digest section gains one sentence (+151 bytes, shipped to 7 skills: +1,057)
+# and docs/naming-conventions.md's PR body example gains the bullet (+82
+# bytes, shipped to 4 skills: +328). HEAD measured 627,694, so
+# 627,694 + 1,385 = 629,079; six bytes of headroom keep the ratchet as tight.
+BUDGET=629085
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
