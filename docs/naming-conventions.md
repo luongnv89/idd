@@ -175,6 +175,7 @@ Closes #<issue-number>
 | `file1` | {what changed} |
 
 ## Test Results
+- **Verification:** tests {…} · recipe {…} · criteria {…} · review {…}
 {Test summary}
 
 ## Acceptance Criteria Verification

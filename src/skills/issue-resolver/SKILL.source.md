@@ -356,7 +356,7 @@ Once the PR is created or adopted, run the claim's *Release* (`docs/plan-and-cla
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean** in this session, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
+**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results with its one **Verification** line, or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean** in this session, else drop it — never append a second copy (*QA handoff marker* owns each field's rules, `head=` included).
 
 Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens; never re-word or recall a field name:
 
