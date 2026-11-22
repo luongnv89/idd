@@ -271,7 +271,7 @@ read the selected packs before the inline implementation.
 
 1. Implementation code with atomic commits
 2. One focused test per behavior stated in the plan or an acceptance criterion, plus the bug regression test; reuse existing coverage and size tests like their neighbors
-3. Tests in the appropriate existing unit, integration, or e2e layer; no new e2e framework and no committed scratch checks
+3. Each criterion's test at the plan's recorded type (`criterion_tests`), else the existing layer that fits; no new test framework or library and no committed scratch checks
 4. All committed following conventional commit format
 5. The *Sensitivity* and *Test Integrity* records below
 
