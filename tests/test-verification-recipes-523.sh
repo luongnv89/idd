@@ -27,6 +27,9 @@
 #        second run on the same commit does not disturb it, tampering does.
 #   V10  wiring: both skills bundle and precheck the script, invoke it with the
 #        base ref, and the shared doc stays skill-agnostic.
+#   V11  the starter recipe gi-stack-detect drafts for /init-idd (#668) — with a
+#        server and CLI-only — passes this script's own validate(), with one
+#        capability per detected entry point and auto left empty.
 #
 # Usage: bash tests/test-verification-recipes-523.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -112,6 +115,39 @@ std = set(sys.stdlib_module_names) | {"__future__"}
 sys.exit(1 if mods - std else 0)
 PY
 check "V1: imports the standard library only" "$?"
+
+# ── V11: /init-idd's starter recipe validates (needs no curl) ──
+STACK="$REPO_ROOT/src/shared/scripts/gi-stack-detect.py"
+# starter_repo <dir> — commit the tree and fake a fetched origin/main.
+starter_repo() {
+  (cd "$1" && git init -q -b main && git config user.email t@example.invalid && git config user.name t \
+    && git config commit.gpgsign false && git add -A && git commit -qm init \
+    && git update-ref refs/remotes/origin/main HEAD \
+    && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main)
+}
+SV="$TMP/starter-server"; mkdir -p "$SV/bin"
+printf 'x\n' > "$SV/manage.py"
+printf '{"name": "w", "bin": {"tool": "bin/tool.js"}}\n' > "$SV/package.json"
+starter_repo "$SV"
+SC="$TMP/starter-cli"; mkdir -p "$SC/cmd/worker"
+printf '[project]\nname = "pt"\n[project.scripts]\npytool = "pt:main"\n' > "$SC/pyproject.toml"
+printf 'package main\n' > "$SC/cmd/worker/main.go"
+starter_repo "$SC"
+for fixture in "$SV:2" "$SC:2"; do
+  dir="${fixture%:*}"; want="${fixture##*:}"
+  python3 "$STACK" --root "$dir" > "$TMP/stack.json" 2>/dev/null
+  python3 - "$SCRIPT" "$TMP/stack.json" "$want" <<'PY'
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("gi_recipe", sys.argv[1])
+recipe = importlib.util.module_from_spec(spec); spec.loader.exec_module(recipe)
+block = json.load(open(sys.argv[2]))["recipe"]
+valid = recipe.validate(block["starter"])
+assert len(valid["capabilities"]) == len(block["entry_points"]) == int(sys.argv[3]), block
+assert valid["auto"] == [], valid["auto"]
+PY
+  rc=$?  # before the label's command substitution resets $?
+  check "V11: the ${dir##*/} starter validates, one capability per entry point, auto empty" "$rc"
+done
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "  ○ curl not found — the behavioural legs need it to drive the pilot"
