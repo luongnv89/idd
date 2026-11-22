@@ -45,6 +45,25 @@ All errors follow the rich format: symbol + description + fix action.
 
 ---
 
+## Configuration Errors
+
+### Invalid config on the default branch
+
+**Trigger:** `gi-config.py --ref "$base_oid"` exits 3 (SKILL.md *Configuration*).
+
+```
+✗ Invalid config: .idd.yml
+
+  origin/{base}: {key} — {reason}
+
+  To fix:  correct .idd.yml on {base}; a PR cannot fix the config that judges it
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+
+`⚠ Review settings: built-in defaults (base branch unreadable)` warns and continues on the built-in defaults, never the working tree's file.
+
+---
+
 ## PR Errors
 
 ### PR not found

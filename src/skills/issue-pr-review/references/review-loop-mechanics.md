@@ -4,15 +4,48 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 ## Config keys and what they gate
 
-SKILL.md's *Configuration* section names the loader and its degrade path; this is
+SKILL.md's *Configuration* section names the loader and its exit handling; this is
 the full key list — every default value, and what each key does to the pipeline.
-It is also the list to read `.idd.yml` (else legacy `.gitissue.yml`) against by hand when `gi-config` is
+It is also the list to read the base branch's `.idd.yml` (else legacy `.gitissue.yml`) against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `docs/config-schema.md`.
 
-**Run `gi-config.py` from the repo root, by its skill-relative path.** It reads
-`.idd.yml` from the working directory: run elsewhere it exits 0 with
-`config_file: null`, silently running on defaults. The script path resolves like
-the *Bundled dependency precheck*, against the skill's directory.
+**The gates come from the default branch, never the checked-out tree:** a PR
+must not set the gates that judge it. The block reads the default branch's tip
+by full object id, from `refs/remotes/origin/<base>` only once `git show-ref
+--verify` proves it exists: a short `origin/<base>`, or a missing remote ref,
+would resolve a local branch the PR author named (`gh pr checkout` creates
+them). Run it once, as one shell command, from the repo root; the script path
+resolves against the skill's directory:
+
+```bash
+is_oid() { case "$1" in ''|*[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ] || [ "${#1}" -eq 64 ]; }
+base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"; base_oid=""
+if [ -n "$base" ] && git fetch --quiet origin -- "+refs/heads/${base}:refs/remotes/origin/${base}" \
+   && git show-ref --verify --quiet "refs/remotes/origin/${base}"; then
+  base_oid="$(git rev-parse --verify --quiet "refs/remotes/origin/${base}^{commit}")"
+fi
+src="defaults — no .idd.yml at the base"
+if ! is_oid "$base_oid"; then date +%s >&2; src=""
+else
+  out=$( (python3 shared/scripts/gi-config.py --ref "$base_oid"; ec=$?; date +%s >&2; exit "$ec") ); ec=$?
+  if [ "$ec" -eq 3 ]; then echo "✗ Invalid config at origin/${base} — stop"; src=stop
+  elif [ "$ec" -eq 0 ] && printf '%s' "$out" | grep -qF "\"config_source\": \"ref:$base_oid\""; then
+    printf '%s\n' "$out"
+    f="$(printf '%s' "$out" | grep -oE '"config_file": "[^"]*"' | cut -d'"' -f4)"; src="${f:-$src}"
+  else
+    echo "⚠ gi-config unavailable — reading .idd.yml by hand"
+    for f in .idd.yml .gitissue.yml; do   # the legacy name only when .idd.yml is absent
+      git --no-replace-objects rev-parse --verify --quiet "${base_oid}:${f}" >/dev/null || continue
+      if git --no-replace-objects show "${base_oid}:${f}"; then src="$f"; else src=""; fi; break
+    done
+  fi
+fi
+case "$src" in stop) ;; "") echo "⚠ Review settings: built-in defaults (base branch unreadable)" ;;
+  *) echo "○ Review settings: origin/$base @ $base_oid ($src)" ;; esac
+```
+
+It never reads the working tree's `.idd.yml`, the index, or a short ref. Exit 3
+stops; any other script failure prints the base blob, to read against this table.
 
 | Key (default) | What it gates |
 |-----|---------------|
