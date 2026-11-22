@@ -173,7 +173,7 @@ has "$REVIEWER" "**Stated constraints** (category \`constraints\`)" "T3.12: the 
 has "$REVIEWER" "is always reported, at any confidence" "T3.13: an invariant touch is never dropped by the threshold"
 has "$REVIEWER" "edge_cases|constraints" "T3.14: the output shape carries the constraints category"
 has "$QA" "plus the issue's \`## Constraints\` section verbatim" "T3.15: the resolver's reviewer gets the issue's Constraints"
-has "$LOOP" "plus the linked issue's \`## Constraints\` section, verbatim" "T3.16: the PR reviewer gets the issue's Constraints"
+has "$LOOP" "and the linked issue's \`## Constraints\` and \`## Acceptance Criteria\`, verbatim" "T3.16: the PR reviewer gets the issue's Constraints"
 
 # ── T4: built bundles ─────────────────────────────────────────────────────
 has "$ROOT/skills/issue-creator/templates/feature.md" "## Constraints" "T4.1: the built creator template carries the section"

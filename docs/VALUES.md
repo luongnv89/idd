@@ -159,7 +159,10 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
 - [x] **VW11 — Criterion evidence is independent and reproducible.** An isolated criteria
   judge sees the issue and the diff only, never the PR body, and `gi-criteria.py`
   downgrades to `unverified` a `pass` without a test green at head or a command with its
-  observed output. Guard: `tests/test-criteria-evidence-555.sh` T1–T3 (behavioural), T4
+  observed output. The PR review's code-reviewer is isolated the same way: it gets the PR
+  title, the author's approach and residual risk and the linked issue's constraints and
+  criteria, never the author's test results, criteria table, sensitivity rows or QA
+  marker. Guard: `tests/test-criteria-evidence-555.sh` T1–T3 (behavioural), T4 and T7
   (prose pin).
 - [ ] **VW12 — Tests prove what they claim.** Partial: the implementer must report mutation
   sensitivity, pinned outputs and any weakened test

@@ -521,7 +521,7 @@ Agent(
 Pass to the reviewer:
 - `branch_name`: PR head branch
 - `base_branch`: PR base branch
-- `pr_context`: PR title and body, plus the linked issue's `## Constraints` section, verbatim
+- `pr_context`: the PR title, the body's `## Approach` section and **Residual risk** line, and the linked issue's `## Constraints` and `## Acceptance Criteria`, verbatim. Never the rest of the body (Test Results, Acceptance Criteria Verification, Sensitivity evidence, `idd:qa` marker): a grader shown the author's verdicts anchors on them. The confirmation pass binds the same
 - `diff_command`: `gh pr diff {N}`
 - `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor, except a `constraints` finding, reported at any confidence; ui-reviewer keeps its own 75 floor
 - `review_mode`: `review` (`challenge_context` empty) — the PR body never selects challenge mode

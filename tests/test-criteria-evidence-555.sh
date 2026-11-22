@@ -14,7 +14,8 @@
 #       mistakes are exit 3;
 #   T4  the judge is given the issue and the diff only (prose pins);
 #   T5  the built bundles carry the judge and the script, pr-review only;
-#   T6  the CI step exists.
+#   T6  the CI step exists;
+#   T7  the PR review's code-reviewer gets no author verdicts (prose pins, #662).
 #
 # Usage: bash tests/test-criteria-evidence-555.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -169,6 +170,27 @@ case "$spawn" in
   *issue_context*diff_command*head_sha*) pass "T4.14 the judge spawn binds the issue, the diff and the head" ;;
   *) fail "T4.14 the judge spawn line lost a binding" ;;
 esac
+
+# ── T7: the PR review's code-reviewer never sees the author's verdicts (#662) ──
+RLM="$RV/references/review-loop-mechanics.md"
+CR="$ROOT/src/shared/agents/code-reviewer.md"
+VALUES="$ROOT/docs/VALUES.md"
+lacks "$RLM" '`pr_context`: PR title and body' "T7.1 the reviewer no longer gets the whole PR body"
+rbind="$(grep -F -- '- `pr_context`: the PR title,' "$RLM" || true)"
+case "$rbind" in
+  *'`## Approach`'*'**Residual risk**'*'`## Constraints`'*'`## Acceptance Criteria`'*) pass "T7.2 the reviewer gets the title, approach, residual risk, constraints and criteria" ;;
+  *) fail "T7.2 the reviewer binding lost an allowed section" ;;
+esac
+case "$rbind" in
+  *'Test Results'*'Acceptance Criteria Verification'*'Sensitivity evidence'*'`idd:qa`'*) pass "T7.3 the binding names the withheld verdicts" ;;
+  *) fail "T7.3 the binding no longer names the withheld verdicts" ;;
+esac
+has "$RLM" 'The confirmation pass binds the same' "T7.4 the confirmation reviewer is isolated too"
+lacks "$CR" '(PR title/body or empty)' "T7.5 the reviewer contract no longer promises the PR body"
+has "$CR" "\`{pr_context}\` (the caller's task context, never a PR body's verdicts; or empty)" "T7.6 the reviewer contract excludes the author's verdicts"
+has "$VALUES" "The PR review's code-reviewer is isolated the same way" "T7.8 VW11 records the reviewer's isolation"
+has "$VALUES" 'T4 and T7' "T7.9 VW11 names this guard"
+has "$ROOT/skills/issue-pr-review/references/review-loop-mechanics.md" '- `pr_context`: the PR title,' "T7.10 the built bundle carries the isolated binding"
 
 # ── T5: built bundles ────────────────────────────────────────────────────
 B="$ROOT/skills/issue-pr-review"
