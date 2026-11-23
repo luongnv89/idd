@@ -538,7 +538,7 @@ The fixer applied changes. Re-review the PR diff to check if the issues were res
 
 Run: {diff_command}
 
-Return the same JSON format as before.
+Return the same JSON format as before, with your full current `pre_existing` list.
 ```
 
 ## Confirmation pass

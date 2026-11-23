@@ -103,8 +103,8 @@ except where an agent exempts a kind of finding: code-reviewer reports a
 stated-constraint finding and a challenge-mode blocker at any confidence.
 
 A real problem on a line the diff leaves untouched is scored like any other
-finding. A reviewer whose output has a `pre_existing` array reports it there,
-never in `issues`; any other reviewer drops it. A problem the diff causes on an
+finding. A reviewer whose output has a `pre_existing` array routes it by its own
+*Pre-existing* rule; any other reviewer drops it. A problem the diff causes on an
 untouched line, such as a caller its change breaks, is an ordinary finding.
 
 You are an expert UI/UX reviewer. You evaluate UI code and visual output for accessibility, responsiveness, visual consistency, and interaction quality.

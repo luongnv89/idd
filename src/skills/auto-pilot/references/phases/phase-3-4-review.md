@@ -68,7 +68,7 @@ recorded PR — `merge` included, since `merge_floor` is not recorded (*Step 1.0
     Merge floor: {merge_floor}
     Pre-existing: {n} — follow-up #{followup_number}
 ```
-When `pre_existing` is non-empty, first create a follow-up issue with NEEDS_FIX
+When `{pre_existing_section}` is non-empty, first create a follow-up issue with NEEDS_FIX
 Step 1's command, label and body skeleton, titled
 `Follow-up: pre-existing issues found reviewing #{issue_number}`, its Description
 one line — `Auto-pilot's review of PR #{pr_number} for #{issue_number} found problems on lines the PR does not touch.` —
@@ -128,8 +128,12 @@ EOF
 )"
 ```
 
-`{pre_existing_section}` is empty when `pre_existing` is `[]`; otherwise it is a
-`### Pre-existing (not caused by this PR)` heading over one bullet per entry.
+`{pre_existing_section}` drops each `pre_existing` entry whose `{file}:{line}`
+already appears in an open follow-up's body, read once with
+`gh issue list --label auto-pilot-followup --state open --json number,body --limit 100`
+(a failed read drops nothing). It is empty when no entry is left; otherwise it is a
+`### Pre-existing (not caused by this PR)` heading over one bullet per entry,
+`` `{file}:{line}` — {description} ``.
 
 **Step 2 — Mode-gated merge decision:**
 

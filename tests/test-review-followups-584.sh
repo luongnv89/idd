@@ -16,7 +16,7 @@
 #   T7  the built skills carry the changes, and the CI step exists;
 #   T8  a real problem on untouched lines is reported as pre-existing, capped,
 #       listed and routed to a follow-up, and never blocks or takes a fix
-#       cycle (issue #666).
+#       cycle, nor files a duplicate follow-up (issue #666).
 #
 # Usage: bash tests/test-review-followups-584.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -135,9 +135,9 @@ scale="$(awk '/^## Confidence scale \(review agents\)/{on=1;next} on&&/^## /{exi
 grep -qxF '| 0 | False positive |' "$CONV" && ! grep -qF 'False positive / pre-existing' "$CONV" \
   && pass "T8.1: confidence 0 means a false positive only, not a pre-existing problem" \
   || fail "T8.1: confidence 0 still scores a pre-existing problem as a false positive"
-grep -qF 'A real problem on a line the diff leaves untouched is scored like any other finding. A reviewer whose output has a `pre_existing` array reports it there, never in `issues`; any other reviewer drops it. A problem the diff causes on an untouched line, such as a caller its change breaks, is an ordinary finding.' <<<"$scale" \
-  && pass "T8.2: *Confidence scale* routes an untouched-line problem to \`pre_existing\`, and a diff-caused one to \`issues\`" \
-  || fail "T8.2: *Confidence scale* lacks the pre-existing routing sentence or the diff-caused exclusion"
+grep -qF 'A real problem on a line the diff leaves untouched is scored like any other finding. A reviewer whose output has a `pre_existing` array routes it by its own *Pre-existing* rule; any other reviewer drops it. A problem the diff causes on an untouched line, such as a caller its change breaks, is an ordinary finding.' <<<"$scale" \
+  && pass "T8.2: *Confidence scale* defers an untouched-line problem to the reviewer's own *Pre-existing* rule, and keeps a diff-caused one ordinary" \
+  || fail "T8.2: *Confidence scale* lacks the deferral to the reviewer's *Pre-existing* rule or the diff-caused exclusion"
 has "$CR" 'goes in `pre_existing`, never in `issues`' "T8.3: the code-reviewer reports an untouched-line problem in pre_existing, never in issues"
 has "$CR" 'report at most 5 per review, highest confidence first' "T8.4: the code-reviewer caps pre_existing per review"
 cap_homes="$(cd "$ROOT" && grep -rlF 'at most 5 per review' src docs --include='*.md' | grep -v '^docs/release-notes/' || true)"
@@ -175,7 +175,7 @@ hasflat "$AP/phases/phase-3-4-review.md" '`pre_existing` (missing reads `[]`). `
 has "$AP/phases/phase-3-4-review.md" '`### Pre-existing (not caused by this PR)` heading over one bullet per entry' "T8.21: the follow-up body gains a Pre-existing section"
 [ "$(grep -cxF '{pre_existing_section}' "$AP/phases/phase-3-4-review.md")" = 1 ] \
   && pass "T8.22: the NEEDS_FIX follow-up body carries {pre_existing_section}" || fail "T8.22: the NEEDS_FIX follow-up body lacks {pre_existing_section}"
-hasflat "$AP/phases/phase-3-4-review.md" 'When `pre_existing` is non-empty, first create a follow-up issue with NEEDS_FIX Step 1'"'"'s command, label and body skeleton, titled `Follow-up: pre-existing issues found reviewing #{issue_number}`' \
+hasflat "$AP/phases/phase-3-4-review.md" 'When `{pre_existing_section}` is non-empty, first create a follow-up issue with NEEDS_FIX Step 1'"'"'s command, label and body skeleton, titled `Follow-up: pre-existing issues found reviewing #{issue_number}`' \
   "T8.23: a PASS with pre-existing findings creates the auto-pilot follow-up"
 # Built copies: both review skills bundle the agent, auto-pilot the reviewer prompt.
 for b in issue-pr-review issue-resolver; do
@@ -202,6 +202,21 @@ grep -qxF '  Pre-existing: {n}' <<<"$crit" && grep -qF 'Omit the `Pre-existing:`
   && pass "T8.29: the critical-issue prompt lists pre-existing findings" || fail "T8.29: the critical-issue prompt drops pre-existing findings"
 grep -qxF '  Pre-existing: {n}' "$DIST/auto-pilot/references/phases/phase-3-4-review.md" \
   && pass "T8.29: built auto-pilot critical prompt lists pre-existing findings" || fail "T8.29: built auto-pilot critical prompt lacks Pre-existing — rebuild skills/"
+# The error catalog's copy of the critical prompt matches the phase file's.
+cat_crit="$(awk '/^### Review cycles exhausted \(critical issue\)/{on=1;next} on&&/^\*\*Trigger/{exit} on' "$AP/error-messages.md")"
+for l in '  Pre-existing: {n}' '    ● {pre_existing_description_1}'; do
+  grep -qxF "$l" <<<"$cat_crit" && grep -qxF "$l" <<<"$crit" \
+    && pass "T8.30: both critical prompts carry '$l'" || fail "T8.30: a critical prompt lacks '$l'"
+done
+# A re-messaged reviewer returns its full pre_existing list, since Step 7 reads only the final cycle's.
+has "$RLM" 'Return the same JSON format as before, with your full current `pre_existing` list.' \
+  "T8.31: the cycles 2+ re-review asks for the full current pre_existing list"
+# The code-reviewer drops an untouched-line problem its rule does not route.
+has "$CR" 'In challenge mode `pre_existing` stays `[]`. Drop any other problem on an untouched line.' \
+  "T8.32: the code-reviewer drops an untouched-line problem outside its pre_existing categories"
+# Auto-pilot skips a pre-existing entry an open follow-up already lists, and a failed read keeps all.
+hasflat "$AP/phases/phase-3-4-review.md" '`{pre_existing_section}` drops each `pre_existing` entry whose `{file}:{line}` already appears in an open follow-up'"'"'s body, read once with `gh issue list --label auto-pilot-followup --state open --json number,body --limit 100` (a failed read drops nothing). It is empty when no entry is left;' \
+  "T8.33: the pre-existing section skips entries an open follow-up already lists"
 
 echo ""
 echo "  Passed: $PASS"
