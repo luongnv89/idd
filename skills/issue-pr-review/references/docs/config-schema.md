@@ -32,6 +32,8 @@ Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `re
 platform: github
 
 # PR review settings (used by /issue-pr-review and /auto-pilot)
+# /issue-pr-review reads them from the default branch (gi-config.py --ref,
+# reporting config_source), never the PR; --compare-ref lists changed_keys.
 review:
   # Max review-fix cycles before stopping
   # Type: integer

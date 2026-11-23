@@ -536,3 +536,6 @@ jobs:
 
       - name: test-image-upload-branch-546
         run: bash tests/test-image-upload-branch-546.sh
+
+      - name: test-review-config-base-ref-659
+        run: bash tests/test-review-config-base-ref-659.sh

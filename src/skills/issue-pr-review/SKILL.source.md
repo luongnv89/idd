@@ -33,6 +33,7 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 
 - Re-bind with `gh pr view {N} --json state,headRefName,headRefOid`, where `N` is the PR number already bound in this conversation. Any use of the fork-controlled `headRefName` keeps *Step 1* item 6's `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` form; never paste the literal.
 - Read the current step from this conversation's `[N/7]` lines and re-read its reference. Before repeating a comment, fixer commit or push, label or merge, confirm with a live `--json` read that it has not happened.
+- `base_oid` is the id on the `○ Review settings:` line; if lost, re-run only the block's resolution.
 - **Review loop:** if the review/fix cycle count cannot be read from this conversation, treat `review.max_cycles` as reached and take the existing max-cycles path. **Never restart the loop at cycle 1.**
 
 ## Prerequisites
@@ -105,12 +106,14 @@ Before any fix, sync with the **stash-first pattern** (`docs/sync-conventions.md
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** resolved against this SKILL.md's directory (why: `references/review-loop-mechanics.md`).
+Load config once at skill start, in every mode (`--review-only` included); never re-read it. **The gates come from the default branch, never the checked-out tree: a PR must not set the gates that judge it.** Run the block in `references/review-loop-mechanics.md` (*Config keys and what they gate*) — **read it now**; it runs `python3 shared/scripts/gi-config.py --ref "$base_oid"` — **Working directory:** the repo root; **Script path:** resolved against this SKILL.md's directory.
 
-- **Exit 0** — use `config`.
+- **Exit 0** with `config_source` exactly `ref:<base_oid>` — use `config`.
 - **Exit 3** — print `✗ Invalid config: .idd.yml` with the offending key and reason from stderr, and stop.
 - **Script file absent** — a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`).
+- **Anything else** — the block prints `⚠ gi-config unavailable — reading .idd.yml by hand` and `git show "${base_oid}:.idd.yml"` (else legacy `.gitissue.yml`). Never the working tree's file; no usable `base_oid` means built-in defaults.
+
+It prints `○ Review settings: origin/<base> @ <base_oid> (.idd.yml)`, `(defaults — no .idd.yml at the base)`, or `⚠ Review settings: built-in defaults (base branch unreadable)`.
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
 
@@ -129,6 +132,7 @@ A killed review can resume (`--resume`). Except under `--review-only`, which nev
 **Expected output** — example of a clean run, one line per step:
 
 ```
+  ○ Review settings: origin/main @ 4a45550c1f0e9d2b7a3c6e8f1d0b9a7c5e3f2d1b (.idd.yml)
   ◆ PR Review Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full, qa: absent
@@ -200,6 +204,8 @@ The parse, *What `trusted` skips*, *Precedence*, and *Never gated*: `references/
 ---
 
 ## Step 2 — Script Pre-pass [2/7] <!-- a:rv-step2-prepass -->
+
+**First, in every mode (`--review-only` included):** a PR changing `.idd.yml` or `.gitissue.yml` gets a non-blocking finding naming each changed key (`--compare-ref`): `references/prepass-tests-ci-mechanics.md` (*Config-change comparison*).
 
 Run deterministic tools before any LLM reviewer; under `--review-only` this is detection-only (*Review-only mode*, Step 7). Otherwise:
 

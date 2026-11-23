@@ -31,7 +31,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      degraded tool that left a check unevaluated. Never merged. A `trusted` test
      skip is not on this list: Step 4's own completion report reads
      `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
-     stays `PASS`.
+     stays `PASS`. Nor is the *Config-change finding*.
    - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
      findings remain after the cycle cap, a stagnation stop, an AC or traceability hard-block, or a
      strict-pass blocker. Never merged.
@@ -40,8 +40,9 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      config, no PR or a closed PR, a `gi-secscan` block or stop, a merge
      conflict, or `BLOCKED (manual merge required)`.
 2. **Evidence.** Name the checks that actually ran, with their observed result
-   and the commit they ran on: test count and `headRefOid` short SHA, the
-   `gi-ci-wait` verdict and `ci_status`, the `gi-secscan` exit and
+   and the commit they ran on: the settings source (`origin/{base} @
+   {base_sha7}` or `built-in defaults`), test count and `headRefOid` short SHA,
+   the `gi-ci-wait` verdict and `ci_status`, the `gi-secscan` exit and
    `policy_source`, the PR-body re-read after a `Closes` edit, the *Bug proof*. Print `✓ pass` only
    for a check that ran and passed; print `○ skipped ({reason})` for one that did
    not run. Each remaining finding keeps its `[dimension]` tag and `file:line`.
@@ -75,6 +76,17 @@ Markdown table to paste into a PR comment), render it from the same results and
 keep the `Result`, `Evidence`, `Uncertainty`, and `Decision` rows. When the host
 cannot render the requested format, say so and print the terminal summary.
 
+### Config-change finding
+
+After the dimension lines when *Config-change comparison* triggered; a
+report-level finding, non-blocking, outside the soft-pass and strict note count:
+
+```
+  ⚠ Config change — report-level finding, non-blocking
+    {key} — changed by this PR; base value in force
+    keys could not be compared; the base branch's values are in force
+```
+
 ## Summary — Clean PR
 
 ```
@@ -100,7 +112,7 @@ cannot render the requested format, say so and print the terminal summary.
   Pre-existing:      ○ {n} not caused by this PR (not blocking)
     ● [{category}] {description} ({file}:{line})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Evidence:          tests {count} passed @ {sha7}; CI {ci_status}
+  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}
   Uncertainty:       {inherited/skipped/model-judged items, or "none"}
   Decision:          No approval needed.
   Next action:       {check the gap named on Result:, then} merge PR #{pr_number} (this run does not merge)
@@ -154,7 +166,7 @@ commit it is inherited from, never `✓ pass`:
     Standards axis:
       ● [traceability] PR body missing Closes #{N}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Evidence:          tests {count} passed @ {sha7}; CI {ci_status}; {max} cycles run
+  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}; {max} cycles run
   Uncertainty:       {unverified criteria, model-judged findings, skipped legs}
   Decision:          No approval needed.
   Next action:       fix the Remaining findings, then re-run /issue-pr-review {pr_number}

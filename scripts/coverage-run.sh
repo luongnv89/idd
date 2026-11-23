@@ -54,6 +54,9 @@ run "$SCRIPTS/gi-backlog.py" --fields bogus --cache-dir "$TMP/backlog"
 # gi-config — merge defaults with this repo's real config, then a dotted key.
 run "$SCRIPTS/gi-config.py"
 run "$SCRIPTS/gi-config.py" --key resolve.qa_max_cycles
+# --ref reads the committed config at a commit; the compare side may be absent
+# in a shallow checkout, which exercises the compare_error path instead.
+run "$SCRIPTS/gi-config.py" --ref HEAD --schema docs/config-schema.md --compare-ref HEAD~1
 
 # gi-deps — local dependency numbers out of an issue body on stdin.
 printf '%s' 'Depends on #12, blocked by #8. Cross-repo org/repo#77 is ignored.' | \

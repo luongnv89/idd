@@ -1324,7 +1324,10 @@ EXPECTED_SITES = {
     # lane branch via gi-branch.py (beside the two issue-resolver sites).
     "gi-branch.py": 3, "gi-ci-wait.py": 4,
     # 7 since issue #502: /plan-to-issues loads config through gi-config.
-    "gi-config.py": 7,
+    # 9 since issue #659: /issue-pr-review's config block reads the default
+    # branch (`--ref "$base_oid"`) and its config-change comparison runs
+    # `--ref "$mb_oid" --compare-ref "$head_oid"`, both in the mechanics files.
+    "gi-config.py": 9,
     # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
     # record on demand, because Phase 1's bulk list no longer carries `body`.
     # 14 since issue #285: the dependency-parsing step in
@@ -1501,6 +1504,8 @@ ALLOWED_VARS = {
     # Issue #515. The PR head SHA GitHub computed, checked against
     # ^[0-9a-f]{40}$ at the call site and again by gi-receipt (exit 3 otherwise).
     "$head_oid": "40-hex headRefOid GitHub reported, format-checked twice",
+    "$base_oid": "default-branch commit id from refs/remotes/origin/<base>, is_oid-checked (40/64 hex) first",
+    "$mb_oid": "git merge-base of two checked ids, is_oid-checked (40/64 hex) first",
     # Issues #518/#519. Ledgers the resolver composed; each reaches its script
     # on stdin through printf, like $run_json — never as an argument.
     "$sensitive_json": "labels + planned paths the resolver composed; reaches gi-sensitive on stdin",

@@ -309,7 +309,15 @@ FAIL=0
 # *Pre-existing* rule, plus one keeping a problem the diff causes on an
 # untouched line an ordinary finding (+301 bytes, shipped to 2 skills: +602).
 # HEAD measured 629,681; six bytes of headroom keep the ratchet as tight.
-BUDGET=629687
+#
+# Issue #659 is the twentieth raise (2026-11-23): /issue-pr-review now reads
+# its gates from the default branch through `gi-config.py --ref`, and
+# config-schema.md says so in a two-line comment on the `review` section,
+# where the excerpt carries it only to the 3 bundles that name `review.*`
+# (auto-pilot, init-idd, issue-pr-review) rather than all 8 through Config
+# Loading Flow: +151 bytes per copy, +453. HEAD measured 629,681, so
+# 629,681 + 453 = 630,134; six bytes of headroom keep the ratchet as tight.
+BUDGET=630140
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
