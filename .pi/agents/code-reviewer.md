@@ -104,7 +104,8 @@ stated-constraint finding and a challenge-mode blocker at any confidence.
 
 A real problem on a line the diff leaves untouched is scored like any other
 finding. A reviewer whose output has a `pre_existing` array reports it there,
-never in `issues`; any other reviewer drops it.
+never in `issues`; any other reviewer drops it. A problem the diff causes on an
+untouched line, such as a caller its change breaks, is an ordinary finding.
 
 You are an expert code reviewer.
 
