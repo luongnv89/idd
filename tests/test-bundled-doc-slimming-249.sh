@@ -305,9 +305,11 @@ FAIL=0
 # Issue #666 is the nineteenth raise (2026-11-23): a real problem on an
 # untouched line is reported as pre-existing instead of being scored 0, so
 # docs/shared-agent-conventions.md's *Confidence scale* drops "pre-existing"
-# from score 0 and gains a routing sentence (shipped to 2 skills: +376).
-# HEAD measured 629,455; six bytes of headroom keep the ratchet as tight.
-BUDGET=629461
+# from score 0 and gains a routing sentence, plus one sentence keeping a
+# problem the diff causes on an untouched line an ordinary finding (shipped to
+# 2 skills: +376 + 216). HEAD measured 629,671; six bytes of headroom keep the
+# ratchet as tight.
+BUDGET=629677
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

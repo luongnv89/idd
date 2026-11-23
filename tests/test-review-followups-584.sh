@@ -135,9 +135,9 @@ scale="$(awk '/^## Confidence scale \(review agents\)/{on=1;next} on&&/^## /{exi
 grep -qxF '| 0 | False positive |' "$CONV" && ! grep -qF 'False positive / pre-existing' "$CONV" \
   && pass "T8.1: confidence 0 means a false positive only, not a pre-existing problem" \
   || fail "T8.1: confidence 0 still scores a pre-existing problem as a false positive"
-grep -qF 'A real problem on a line the diff leaves untouched is scored like any other finding. A reviewer whose output has a `pre_existing` array reports it there, never in `issues`; any other reviewer drops it.' <<<"$scale" \
-  && pass "T8.2: *Confidence scale* routes an untouched-line problem to \`pre_existing\`" \
-  || fail "T8.2: *Confidence scale* lacks the pre-existing routing sentence"
+grep -qF 'A real problem on a line the diff leaves untouched is scored like any other finding. A reviewer whose output has a `pre_existing` array reports it there, never in `issues`; any other reviewer drops it. A problem the diff causes on an untouched line, such as a caller its change breaks, is an ordinary finding.' <<<"$scale" \
+  && pass "T8.2: *Confidence scale* routes an untouched-line problem to \`pre_existing\`, and a diff-caused one to \`issues\`" \
+  || fail "T8.2: *Confidence scale* lacks the pre-existing routing sentence or the diff-caused exclusion"
 has "$CR" 'goes in `pre_existing`, never in `issues`' "T8.3: the code-reviewer reports an untouched-line problem in pre_existing, never in issues"
 has "$CR" 'report at most 5 per review, highest confidence first' "T8.4: the code-reviewer caps pre_existing per review"
 cap_homes="$(cd "$ROOT" && grep -rlF 'at most 5 per review' src docs --include='*.md' | grep -v '^docs/release-notes/' || true)"
