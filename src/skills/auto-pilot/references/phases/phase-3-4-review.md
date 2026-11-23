@@ -35,7 +35,9 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 `issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
 `partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`, `fix_scopes` (missing reads `[]`; for the summary's
-`Rule candidates:`).
+`Rule candidates:`), `pre_existing` (missing reads `[]`). `pre_existing` feeds
+only the follow-up issue: it never changes the verdict, the merge decision or the
+critical-label path.
 
 **`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
 `disabled_dimensions` by `docs/run-log-schema.md` (*`verification`*); a missing
@@ -64,7 +66,14 @@ recorded PR — `merge` included, since `merge_floor` is not recorded (*Step 1.0
     Issues found/fixed: {issues_found}/{issues_fixed}
     Verification: {verification} — AC {p}/{f}/{u} pass/fail/unverified{; partial: {dims}}{; disabled: {dims}}
     Merge floor: {merge_floor}
+    Pre-existing: {n} — follow-up #{followup_number}
 ```
+When `pre_existing` is non-empty, first create a follow-up issue with NEEDS_FIX
+Step 1's command, label and body skeleton, titled
+`Follow-up: pre-existing issues found reviewing #{issue_number}`, its Description
+one line — `Auto-pilot's review of PR #{pr_number} for #{issue_number} found problems on lines the PR does not touch.` —
+then `{pre_existing_section}`, and its first criterion `- [ ] Each listed problem is fixed or closed as not a bug`.
+Otherwise omit the `Pre-existing:` line.
 Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
@@ -103,6 +112,8 @@ The following review issues were not resolved:
 
 {remaining_issues_bulleted}
 
+{pre_existing_section}
+
 Original issue #{issue_number}; partial fix PR #{pr_number} ({branch_name}); {review_cycles} review cycles; mode {mode} (merge_partial={merge_partial}).
 
 ## Acceptance Criteria
@@ -116,6 +127,9 @@ Original issue #{issue_number}; partial fix PR #{pr_number} ({branch_name}); {re
 EOF
 )"
 ```
+
+`{pre_existing_section}` is empty when `pre_existing` is `[]`; otherwise it is a
+`### Pre-existing (not caused by this PR)` heading over one bullet per entry.
 
 **Step 2 — Mode-gated merge decision:**
 

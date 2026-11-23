@@ -97,6 +97,8 @@ cannot render the requested format, say so and print the terminal summary.
   CI status:         ✓ pass ({checks_count} checks passed)
   Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
   Issues noted:      ○ {note_count} (medium, not blocking)
+  Pre-existing:      ○ {n} not caused by this PR (not blocking)
+    ● [{category}] {description} ({file}:{line})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          tests {count} passed @ {sha7}; CI {ci_status}
   Uncertainty:       {inherited/skipped/model-judged items, or "none"}
@@ -109,6 +111,11 @@ cannot render the requested format, say so and print the terminal summary.
 The `maintainability: partial` and `Issues noted` lines above are valid only when
 `review.soft_pass: true`. With `review.soft_pass: false`, use the remaining-issues
 summary below instead whenever a note or partial remains.
+
+Print the `Pre-existing:` row, one line per finding, only when the final review
+cycle's `pre_existing` is non-empty (`references/review-loop-mechanics.md`,
+*Pre-existing findings*). It is never part of Remaining or the strict blockers,
+and this skill writes nothing to GitHub for it.
 
 When Step 4 was skipped under `qa_handoff = trusted`, its `Result: PARTIAL` is
 carried here rather than dropped — the `Tests:` line reports the skip and the
@@ -137,6 +144,8 @@ commit it is inherited from, never `✓ pass`:
   Tests:             ✓ pass
   CI status:         ✓ pass
   Issues fixed:      ✓ {total_fixed} total across {max} cycles
+  Pre-existing:      ○ {n} not caused by this PR (not blocking)
+    ● [{category}] {description} ({file}:{line})
 
   Remaining (grouped by axis):
     Spec axis:

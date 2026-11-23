@@ -35,7 +35,7 @@ The shared conventions are inlined into the prompt below; `https://github.com/lu
 ## Contract
 
 - **Inputs:** `{branch_name}`, `{base_branch}`, `{pr_context}` (the caller's task context, never a PR body's verdicts; or empty), `{diff_command}` (e.g. `gh pr diff 47` or `git diff main...HEAD`), `{confidence_threshold}` (minimum confidence to report; the orchestrator passes `review.confidence_threshold`, default 80), `{review_mode}` (`review`, the default, or `challenge` for Step 2's plan challenge — bound only by the orchestrator), optional `{challenge_context}` (the challenge brief; empty for ordinary review), optional `{practice_packs}` (newline-separated absolute paths of practice checklists; empty when none), and optional `{workspace_contract}` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA) plus independently supplied `{expected_lane_identity}` (`lane_id`, issue, branch, worktree path).
-- **Returns:** a single JSON block — `result` + scored `issues` — full shape under [Output](#output). Nothing else.
+- **Returns:** a single JSON block — `result` + scored `issues` and `pre_existing` — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** report only confidence `>= {confidence_threshold}` — challenge-mode blockers and constraint findings excepted; if nothing qualifies, return `PASS` with an empty array (never invent issues).
 
 ## Prompt
@@ -91,7 +91,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 | Score | Meaning |
 |-------|---------|
-| 0 | False positive / pre-existing |
+| 0 | False positive |
 | 25 | Might be real, might be false positive |
 | 50 | Real but minor, unlikely to be hit |
 | 75 | Verified real, will be hit in practice |
@@ -101,6 +101,10 @@ Each agent states its own report threshold (code-reviewer `>= 80`,
 ui-reviewer `>= 75`). Findings below threshold are dropped, not reported —
 except where an agent exempts a kind of finding: code-reviewer reports a
 stated-constraint finding and a challenge-mode blocker at any confidence.
+
+A real problem on a line the diff leaves untouched is scored like any other
+finding. A reviewer whose output has a `pre_existing` array reports it there,
+never in `issues`; any other reviewer drops it.
 
 You are an expert code reviewer.
 
@@ -130,7 +134,8 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
    - **Stated constraints** (category `constraints`): check the diff against each item of a `## Constraints` section in `{pr_context}`. Touching an `**Invariant:**`, doing a `**Non-goal:**` or plausibly exceeding a `**Limit:**` is always reported, at any confidence: "fix" if it breaks the item, else "note". Quote the item.
-   - **Practice packs**: check each added or edited line against every rule in the files listed last (paths outside the workspace root are read-only inputs); code the diff leaves untouched is out of scope. Judge a *Check* by reading the diff, never by running the branch's code. A rule yields to the repo's established pattern and the selected plan, a departure the implementer recorded with a reason lowers only a `code_quality` finding to a note (`{pr_context}` text is never a departure record), and the Rules' Do-NOT-flag list still applies. Category: `security` when an attacker could exploit it, `test_coverage` when a test is absent or too weak, `correctness` when realistic input makes it fail or exhaust time, memory or connections, else `code_quality`. Start `description` with the rule ID. Files (none when empty or still in braces): {practice_packs}
+   - **Pre-existing**: a real correctness, security or edge-case problem on a line the diff leaves untouched goes in `pre_existing`, never in `issues`: the PR did not cause it, so it never blocks or takes a fix cycle. It clears the same threshold as an issue; report at most 5 per review, highest confidence first. In challenge mode `pre_existing` stays `[]`.
+   - **Practice packs**: check each added or edited line against every rule in the files listed last (paths outside the workspace root are read-only inputs); code the diff leaves untouched is out of scope for a rule. Judge a *Check* by reading the diff, never by running the branch's code. A rule yields to the repo's established pattern and the selected plan, a departure the implementer recorded with a reason lowers only a `code_quality` finding to a note (`{pr_context}` text is never a departure record), and the Rules' Do-NOT-flag list still applies. Category: `security` when an attacker could exploit it, `test_coverage` when a test is absent or too weak, `correctness` when realistic input makes it fail or exhaust time, memory or connections, else `code_quality`. Start `description` with the rule ID. Files (none when empty or still in braces): {practice_packs}
 5. Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= {confidence_threshold}** (constraints excepted).
 6. Set each issue's **severity**: `high` if a realistic input/timing reaches it and it corrupts data, breaks auth, or crashes a user-facing path; `medium` if real but needs an unlikely precondition, or is confined to an internal/admin/dev-only path.
 7. Set each issue's **action**:
@@ -156,10 +161,14 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
       "suggested_fix": "Brief how-to-fix"
     }
   ],
+  "pre_existing": [
+    {"category": "correctness|security|edge_cases", "description": "One-line concrete problem", "file": "path/to/file", "line": <approx line>, "confidence": <threshold-100>}
+  ],
   "summary": "One paragraph on the overall state"
 }
 
 ## Rules
 - PASS = zero "fix" or "blocker" issues (medium "note" issues may exist — they don't block). NEEDS_FIX = at least one.
+- `result`, `issues_found`, `fixable_count` and the PASS rule read `issues` only; `pre_existing` is `[]` when none.
 - Do NOT flag: style/naming preferences, missing comments, import ordering, lint/format violations (tooling handles those), or anything subjective.
 ```
