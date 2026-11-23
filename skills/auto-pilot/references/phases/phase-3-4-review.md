@@ -36,8 +36,8 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 `partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`, `fix_scopes` (missing reads `[]`; for the summary's
 `Rule candidates:`), `pre_existing` (missing reads `[]`). `pre_existing` feeds
-only the follow-up issue: it never changes the verdict, the merge decision or the
-critical-label path.
+only the follow-up issue and the critical-issue prompt: it never changes the
+verdict, the merge decision or the critical-label path.
 
 **`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
 `disabled_dimensions` by `references/docs/run-log-schema.md` (*`verification`*); a missing
@@ -234,6 +234,9 @@ If the original issue has any label in `autopilot.critical_labels` (default: `["
     ● {issue_description_1}
     ● {issue_description_2}
 
+  Pre-existing: {n}
+    ● {pre_existing_description_1}
+
   ⚠ This issue is marked critical — auto-pilot requires your decision.
 
   Options:
@@ -244,7 +247,8 @@ If the original issue has any label in `autopilot.critical_labels` (default: `["
   What would you like to do?
 ```
 
-The loop pauses and waits for the user's response. Based on the user's choice:
+Omit the `Pre-existing:` lines when `pre_existing` is `[]`; they are shown
+whichever option is chosen. The loop pauses and waits for the user's response. Based on the user's choice:
 - **Option 1:** Create follow-up issue (same as non-critical flow), run the Step 2a gates (Step 5.1c included), merge PR with the Step 2b guarded command, continue loop
 - **Option 2:** Leave PR open, do not merge, continue loop to the next issue
 - **Option 3:** Skip issue, leave PR open, continue loop

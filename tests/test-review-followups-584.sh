@@ -153,7 +153,7 @@ has "$CR" '`result`, `issues_found`, `fixable_count` and the PASS rule read `iss
 has "$CR" 'In challenge mode `pre_existing` stays `[]`' "T8.11: challenge mode reports no pre-existing findings"
 RLM="$SRC/issue-pr-review/references/review-loop-mechanics.md"
 RT="$SRC/issue-pr-review/references/report-templates.md"
-has "$RLM" '`pre_existing` array (real problems on lines the diff leaves untouched) never enters `findings_json`, the Step 6 fix filter, the soft or strict pass, the stagnation signature or the progress record' \
+has "$RLM" '`pre_existing` array (real problems the PR did not cause, on lines the diff leaves untouched) never enters `findings_json`, the Step 6 fix filter, the soft or strict pass, the stagnation signature or the progress record' \
   "T8.12: pre_existing never reaches the fixer, the pass rules, stagnation or the progress record"
 has "$RLM" "Step 7 lists the final review cycle's \`pre_existing\`" "T8.13: Step 7 lists the final cycle's pre_existing"
 has "$SRC/issue-pr-review/references/verification-checks.md" 'Status reads the reviewer'"'"'s `issues` only: a `pre_existing` finding never makes a dimension `partial` or `fail`.' \
@@ -170,7 +170,7 @@ remaining="$(awk '/^  Remaining \(grouped by axis\):/{on=1;next} on&&/^  ┄/{ex
 hasflat "$RT" 'It is never part of Remaining or the strict blockers, and this skill writes nothing to GitHub for it.' \
   "T8.18: standalone review reports pre_existing and writes nothing to GitHub for it"
 has "$AP/prompts/reviewer.md" "- pre_existing: the final review cycle's pre-existing findings, one" "T8.19: the auto-pilot reviewer reports pre_existing"
-hasflat "$AP/phases/phase-3-4-review.md" '`pre_existing` (missing reads `[]`). `pre_existing` feeds only the follow-up issue: it never changes the verdict, the merge decision or the critical-label path.' \
+hasflat "$AP/phases/phase-3-4-review.md" '`pre_existing` (missing reads `[]`). `pre_existing` feeds only the follow-up issue and the critical-issue prompt: it never changes the verdict, the merge decision or the critical-label path.' \
   "T8.20: Step 3.2 extracts pre_existing and it never changes the verdict or merge"
 has "$AP/phases/phase-3-4-review.md" '`### Pre-existing (not caused by this PR)` heading over one bullet per entry' "T8.21: the follow-up body gains a Pre-existing section"
 [ "$(grep -cxF '{pre_existing_section}' "$AP/phases/phase-3-4-review.md")" = 1 ] \
@@ -189,6 +189,19 @@ has "$DIST/issue-pr-review/references/report-templates.md" '  Pre-existing:     
 for f in prompts/reviewer.md phases/phase-3-4-review.md; do
   has "$DIST/auto-pilot/references/$f" 'pre_existing' "T8.27: built auto-pilot $f carries pre_existing"
 done
+# The code-reviewer's own routing rule carries the diff-caused exclusion, so a
+# break the PR causes on an untouched line keeps blocking.
+CR_RULE='a real correctness, security or edge-case problem the PR did not cause, on a line the diff leaves untouched, goes in `pre_existing`, never in `issues`, so it never blocks or takes a fix cycle; a problem the diff causes on an untouched line, such as a caller its change breaks, stays in `issues`.'
+has "$CR" "$CR_RULE" "T8.28: the code-reviewer's pre-existing rule keeps a diff-caused break in issues"
+for b in issue-pr-review issue-resolver; do
+  has "$DIST/$b/references/agents/code-reviewer.md" "$CR_RULE" "T8.28: $b's built code-reviewer keeps a diff-caused break in issues"
+done
+# The critical-label prompt shows pre-existing findings whichever option is chosen.
+crit="$(awk '/^#### Critical issues: stop and ask the user/{on=1;next} on&&/^---/{exit} on' "$AP/phases/phase-3-4-review.md")"
+grep -qxF '  Pre-existing: {n}' <<<"$crit" && grep -qF 'Omit the `Pre-existing:` lines when `pre_existing` is `[]`; they are shown whichever option is chosen.' <<<"$(tr '\n' ' ' <<<"$crit" | tr -s ' ')" \
+  && pass "T8.29: the critical-issue prompt lists pre-existing findings" || fail "T8.29: the critical-issue prompt drops pre-existing findings"
+grep -qxF '  Pre-existing: {n}' "$DIST/auto-pilot/references/phases/phase-3-4-review.md" \
+  && pass "T8.29: built auto-pilot critical prompt lists pre-existing findings" || fail "T8.29: built auto-pilot critical prompt lacks Pre-existing — rebuild skills/"
 
 echo ""
 echo "  Passed: $PASS"
