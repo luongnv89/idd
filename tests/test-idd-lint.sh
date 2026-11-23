@@ -904,8 +904,9 @@ VCLEAN="$(fill_verification '12@9f2c1ab' 'pass 2/2' '2 pass, 0 unverified, 0 fai
 VNONE="$(fill_verification none none none none)"
 add_results() {  # file verification-line... — a Test Results section before the AC table
   local f="$1"; shift
-  awk -v lines="$(printf '%s\n' "$@")" '
-    /^## Acceptance Criteria Verification$/ { print "## Test Results\n"; print lines; print "- QA cycles: 1\n" }
+  # The lines go through ENVIRON, not -v: BSD awk rejects a newline in a -v value.
+  lines="$(printf '%s\n' "$@")" awk '
+    /^## Acceptance Criteria Verification$/ { print "## Test Results\n"; print ENVIRON["lines"]; print "- QA cycles: 1\n" }
     { print }' "$TMP/pr-good.md" > "$TMP/$f.md"
 }
 add_results pr-verif-clean "$VCLEAN"
