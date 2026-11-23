@@ -35,7 +35,9 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 `issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
 `partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`, `fix_scopes` (missing reads `[]`; for the summary's
-`Rule candidates:`).
+`Rule candidates:`), `pre_existing` (missing reads `[]`). `pre_existing` feeds
+only the follow-up issue and the critical-issue prompt: it never changes the
+verdict, the merge decision or the critical-label path.
 
 **`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
 `disabled_dimensions` by `docs/run-log-schema.md` (*`verification`*); a missing
@@ -64,7 +66,14 @@ recorded PR — `merge` included, since `merge_floor` is not recorded (*Step 1.0
     Issues found/fixed: {issues_found}/{issues_fixed}
     Verification: {verification} — AC {p}/{f}/{u} pass/fail/unverified{; partial: {dims}}{; disabled: {dims}}
     Merge floor: {merge_floor}
+    Pre-existing: {n} — follow-up #{followup_number}
 ```
+When `{pre_existing_section}` is non-empty, first create a follow-up issue with NEEDS_FIX
+Step 1's command, label and body skeleton, titled
+`Follow-up: pre-existing issues found reviewing #{issue_number}`, its Description
+one line — `Auto-pilot's review of PR #{pr_number} for #{issue_number} found problems on lines the PR does not touch.` —
+then `{pre_existing_section}`, and its first criterion `- [ ] Each listed problem is fixed or closed as not a bug`.
+Otherwise omit the `Pre-existing:` line.
 Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
@@ -103,6 +112,8 @@ The following review issues were not resolved:
 
 {remaining_issues_bulleted}
 
+{pre_existing_section}
+
 Original issue #{issue_number}; partial fix PR #{pr_number} ({branch_name}); {review_cycles} review cycles; mode {mode} (merge_partial={merge_partial}).
 
 ## Acceptance Criteria
@@ -116,6 +127,13 @@ Original issue #{issue_number}; partial fix PR #{pr_number} ({branch_name}); {re
 EOF
 )"
 ```
+
+`{pre_existing_section}` drops each `pre_existing` entry whose `{file}:{line}`
+already appears in an open follow-up's body, read once with
+`gh issue list --label auto-pilot-followup --state open --json number,body --limit 100`
+(a failed read drops nothing). It is empty when no entry is left; otherwise it is a
+`### Pre-existing (not caused by this PR)` heading over one bullet per entry,
+`` `{file}:{line}` — {description} ``.
 
 **Step 2 — Mode-gated merge decision:**
 
@@ -220,6 +238,9 @@ If the original issue has any label in `autopilot.critical_labels` (default: `["
     ● {issue_description_1}
     ● {issue_description_2}
 
+  Pre-existing: {n}
+    ● {pre_existing_description_1}
+
   ⚠ This issue is marked critical — auto-pilot requires your decision.
 
   Options:
@@ -230,7 +251,8 @@ If the original issue has any label in `autopilot.critical_labels` (default: `["
   What would you like to do?
 ```
 
-The loop pauses and waits for the user's response. Based on the user's choice:
+Omit the `Pre-existing:` lines when `pre_existing` is `[]`; they are shown
+whichever option is chosen. The loop pauses and waits for the user's response. Based on the user's choice:
 - **Option 1:** Create follow-up issue (same as non-critical flow), run the Step 2a gates (Step 5.1c included), merge PR with the Step 2b guarded command, continue loop
 - **Option 2:** Leave PR open, do not merge, continue loop to the next issue
 - **Option 3:** Skip issue, leave PR open, continue loop

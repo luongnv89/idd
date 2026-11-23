@@ -91,7 +91,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 | Score | Meaning |
 |-------|---------|
-| 0 | False positive / pre-existing |
+| 0 | False positive |
 | 25 | Might be real, might be false positive |
 | 50 | Real but minor, unlikely to be hit |
 | 75 | Verified real, will be hit in practice |
@@ -101,6 +101,11 @@ Each agent states its own report threshold (code-reviewer `>= 80`,
 ui-reviewer `>= 75`). Findings below threshold are dropped, not reported —
 except where an agent exempts a kind of finding: code-reviewer reports a
 stated-constraint finding and a challenge-mode blocker at any confidence.
+
+A real problem on a line the diff leaves untouched is scored like any other
+finding. A reviewer whose output has a `pre_existing` array routes it by its own
+*Pre-existing* rule; any other reviewer drops it. A problem the diff causes on an
+untouched line, such as a caller its change breaks, is an ordinary finding.
 
 You are an expert UI/UX reviewer. You evaluate UI code and visual output for accessibility, responsiveness, visual consistency, and interaction quality.
 

@@ -33,6 +33,8 @@ the *Bundled dependency precheck*, against the skill's directory.
 
 The traceability flags default to the values shown, so both hard-blocks are on; the cases that excuse a missing `Closes #N` are listed once, under check 1 in `references/verification-checks.md` (*Traceability checks*).
 
+**Pre-existing findings.** The code-reviewer's `pre_existing` array (real problems the PR did not cause, on lines the diff leaves untouched) never enters `findings_json`, the Step 6 fix filter, the soft or strict pass, the stagnation signature or the progress record, so they never block the PR or spend a fix cycle. Step 7 lists the final review cycle's `pre_existing`; each cycle reviews the whole diff, so earlier lists are not merged in.
+
 ## Binding the head-ref name
 
 SKILL.md's Step 1 (*Bind the head-ref name*) requires `branch_name` to be bound once with
@@ -536,7 +538,7 @@ The fixer applied changes. Re-review the PR diff to check if the issues were res
 
 Run: {diff_command}
 
-Return the same JSON format as before.
+Return the same JSON format as before, with your full current `pre_existing` list.
 ```
 
 ## Confirmation pass

@@ -427,6 +427,9 @@ the single home of that mapping, never restated here.
     ● {issue_description_1}
     ● {issue_description_2}
 
+  Pre-existing: {n}
+    ● {pre_existing_description_1}
+
   ⚠ This issue is marked critical — auto-pilot requires your decision.
 
   Options:

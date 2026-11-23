@@ -15,7 +15,7 @@ Both default to `true`; `false` lifts that dimension's hard-block (SKILL.md *Rev
 
 ## Reviewer-category → dimension mapping
 
-SKILL.md (Step 3, *Dimensions*) names the five user-facing dimensions; this section owns the fixed mapping from reviewer categories. The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` + `constraints` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`. ○ `disabled` is reserved for a dimension a verification gate switched off.
+SKILL.md (Step 3, *Dimensions*) names the five user-facing dimensions; this section owns the fixed mapping from reviewer categories. The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` + `constraints` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`. Status reads the reviewer's `issues` only: a `pre_existing` finding never makes a dimension `partial` or `fail`. ○ `disabled` is reserved for a dimension a verification gate switched off.
 
 ## Two-axis grouping — Spec vs Standards
 

@@ -13,8 +13,8 @@
         ],
         "measured": 47297
       },
-      "budget": 452211,
-      "measured": 452211,
+      "budget": 454080,
+      "measured": 454080,
       "skill_md": {
         "budget": 27636,
         "measured": 27636
@@ -71,7 +71,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 125561,
+        "budget": 126680,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 125561
+        "measured": 126680
       },
-      "budget": 339601,
-      "measured": 339601,
+      "budget": 342173,
+      "measured": 342173,
       "skill_md": {
         "budget": 32554,
         "measured": 32554
@@ -98,8 +98,8 @@
         ],
         "measured": 11179
       },
-      "budget": 473380,
-      "measured": 473372,
+      "budget": 475126,
+      "measured": 475126,
       "skill_md": {
         "budget": 35213,
         "measured": 35202

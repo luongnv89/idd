@@ -68,4 +68,6 @@ When done, report back ONLY these fields:
   the value, so a bare or stale one costs only a re-poll — never a wrong merge.
 - fix_scopes: the scope of each `fix(<scope>): address review feedback` commit
   this review made, as an array ([] if none)
+- pre_existing: the final review cycle's pre-existing findings, one
+  `file:line — description` each ([] if none); they never change `result`
 ```

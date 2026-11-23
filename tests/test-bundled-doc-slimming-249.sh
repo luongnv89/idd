@@ -301,7 +301,15 @@ FAIL=0
 # and docs/naming-conventions.md's PR body example gains the bullet (+82
 # bytes, shipped to 4 skills: +328). HEAD measured 627,694, so
 # 627,694 + 1,385 = 629,079; six bytes of headroom keep the ratchet as tight.
-BUDGET=629085
+#
+# Issue #666 is the nineteenth raise (2026-11-23): a real problem on an
+# untouched line is reported as pre-existing instead of being scored 0, so
+# docs/shared-agent-conventions.md's *Confidence scale* drops "pre-existing"
+# from score 0 and gains a sentence deferring to the reviewer's own
+# *Pre-existing* rule, plus one keeping a problem the diff causes on an
+# untouched line an ordinary finding (+301 bytes, shipped to 2 skills: +602).
+# HEAD measured 629,681; six bytes of headroom keep the ratchet as tight.
+BUDGET=629687
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
