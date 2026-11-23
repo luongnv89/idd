@@ -43,6 +43,7 @@ outcome. Later runs skip the issue as an ordinary label skip.
   Mode:                    {conservative / balanced / aggressive}
   Evidence:                {observed checks — see Review contract}
   Uncertainty:             {unverified or degraded items, or "none observed"}
+  Rule candidates:         {review-fix:{scope} (PRs #{a}, #{b}); …}
   Decision:                {No approval needed. | the pending critical decision}
 
   Remaining:               {remaining_count} open issues
@@ -113,6 +114,12 @@ to qualify.
    split (`large_scope`, `max_commits_exceeded`), and the
    dependency to merge for a `blocked_by_dependency` PR. Never add an approval
    gate the loop does not already have.
+5. **Rule candidates.** Print `Rule candidates:` only when a scope (compared
+   lowercase) is in the `fix_scopes` of at least two distinct PRs this run; list
+   each such scope with its PRs. The row only informs: never on `Decision:` or
+   `Next action:`, it adds no approval gate, and nothing in the loop writes a
+   rule, test, recipe or proposal from it. A maintainer approves any rule through
+   `docs/shared-agent-conventions.md` (*Correction-to-enforcement*).
 
 
 ## Persisted run report

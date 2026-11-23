@@ -34,7 +34,8 @@ Spawn the **PR Reviewer Subagent** (`references/prompts/reviewer.md`) per `refer
 Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found`,
 `issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
 `partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
-`tests_passed`, `ci_status`.
+`tests_passed`, `ci_status`, `fix_scopes` (missing reads `[]`; for the summary's
+`Rule candidates:`).
 
 **`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
 `disabled_dimensions` by `references/docs/run-log-schema.md` (*`verification`*); a missing

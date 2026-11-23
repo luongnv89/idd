@@ -439,6 +439,18 @@ if grep -qF 'title="$(gh pr view {M} --json title --jq .title)"' "$REVERT_DOC" \
 else
   fail "T10d: revert-path.md pastes M's title into a command instead of binding it"
 fi
+# T10e (#669): the reopen comment says what review missed and proposes a guard,
+# as a proposal only, in the source and the built copy.
+for rv in "$REVERT_DOC" "$REPO_ROOT/skills/issue-pr-review/references/revert-path.md"; do
+  if grep -qF 'Reopened: #{M} is being reverted in #{R} ({R url}).' "$rv" \
+     && grep -qxF '   Missed in review: {one sentence: what the bug was}.' "$rv" \
+     && grep -qF 'Proposed guard ({review rule | recipe capability | regression test}): {one line}. A proposal only: nothing is written until a maintainer approves it.' "$rv" \
+     && grep -qF 'This path writes no rule, test or recipe.' "$rv"; then
+    pass "T10e: ${rv#$REPO_ROOT/} reopen comment names the miss and proposes a guard"
+  else
+    fail "T10e: ${rv#$REPO_ROOT/} reopen comment lacks the miss, the guard or the proposal-only line"
+  fi
+done
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

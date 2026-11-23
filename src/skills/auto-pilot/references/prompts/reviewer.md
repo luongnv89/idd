@@ -66,4 +66,6 @@ When done, report back ONLY these fields:
   review.check_ci false, or a degraded path where headRefOid could not be read.
   Phase 5's Step 5.1a re-verifies the SHA against the live head before it trusts
   the value, so a bare or stale one costs only a re-poll — never a wrong merge.
+- fix_scopes: the scope of each `fix(<scope>): address review feedback` commit
+  this review made, as an array ([] if none)
 ```
