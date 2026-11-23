@@ -68,10 +68,9 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Config-change comparison
 
-Runs first in Step 2, in **every** mode, `--review-only` included; it only
-reports, and the values in force stay *Configuration*'s. From the repo root, with
-`base_oid` from the `○ Review settings:` line and `head_oid` from Step 1's
-`headRefOid`, as one shell command:
+Runs first in Step 2, in every mode (`--review-only` included), and only
+reports. From the repo root, with `base_oid` from the `○ Review settings:` line
+and `head_oid` = Step 1's `headRefOid`, as one shell command:
 
 ```bash
 is_oid() { case "$1" in ''|*[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ] || [ "${#1}" -eq 64 ]; }
@@ -84,29 +83,15 @@ if is_oid "$base_oid" && is_oid "$head_oid" && [ "$(git cat-file -t "$head_oid")
 fi
 ```
 
-**Trigger:** the PR adds or modifies `.idd.yml` or `.gitissue.yml` (the diff or
-Step 1's `files` names one). The review report then **always** carries one of:
-
-- `⚠ Config change — report-level finding, non-blocking`, then per entry of
-  `changed_keys`: `{key} — changed by this PR; base value in force` (an empty
-  list: the file changed, no key differs).
-- `⚠ Config change — .idd.yml changed — keys could not be compared; the base
-  branch's values are in force` when no list came back: any non-zero exit (3
-  included — never a stop here), no `python3`, unparsable stdout,
-  `changed_keys: null` (name `compare_error`), a failed `is_oid`, or no merge
-  base. Then name the keys by hand from
-  `git diff "$mb_oid" "$head_oid" -- .idd.yml .gitissue.yml`. With no merge
-  base, `base_oid` replaces `mb_oid`, and the finding says base-branch changes
-  may be among the keys.
-
-Name a changed `security:` block as a reviewable change too (`--policy-ref`
-denies it any effect on the scan); a PR that adds
-`.idd.yml` while legacy `.gitissue.yml` exists supersedes that file entirely —
-name that as well.
-
-The finding sits outside the code-reviewer's `fix`/`note` actions and the
-soft-pass and strict note count, never blocks the merge, and — "could not be
-compared" included — is neither an unevaluated check nor a `PARTIAL` cause.
+When the PR adds or modifies `.idd.yml` or `.gitissue.yml`, the report carries
+*Config-change finding* (`report-templates.md`): a line per `changed_keys`
+entry, or, when no list came back (any non-zero exit, 3 included,
+`changed_keys: null`, a failed `is_oid`), keys could not be compared: name them
+by hand from
+`git diff "$mb_oid" "$head_oid" -- .idd.yml .gitissue.yml`; with no merge base
+`base_oid` replaces `mb_oid`. Name a changed `security:` block, and a new
+`.idd.yml` beside `.gitissue.yml`, which supersedes that file. The finding never blocks the merge and
+is neither an unevaluated check nor a `PARTIAL` cause.
 
 ### Commit auto-fixes
 
@@ -180,9 +165,6 @@ the trusted ref, which is the allow-list feature working as designed. And do not
 reduce this to `scanned > 0` — a *narrow* allow pattern naming only the
 secret-bearing file leaves `scanned` healthy and still hides the secret. The
 provenance check, not the count, is what closes that variant.
-
-A PR that changes `.idd.yml` or `.gitissue.yml` gets its report finding from
-*Config-change comparison* above, which runs in every mode.
 
 The exit contract (summarized in SKILL.md *Step 2 — Commit auto-fixes*) is not
 optional: **exit 1 is a block** — stop, do not commit, unstage the auto-fix with

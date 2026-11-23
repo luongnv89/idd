@@ -4,18 +4,15 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 ## Config keys and what they gate
 
-SKILL.md's *Configuration* section names the loader and its exit handling; this is
+SKILL.md's *Configuration* section names the loader and its degrade path; this is
 the full key list — every default value, and what each key does to the pipeline.
 It is also the list to read the base branch's `.idd.yml` (else legacy `.gitissue.yml`) against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `references/docs/config-schema.md`.
 
-**The gates come from the default branch, never the checked-out tree:** a PR
-must not set the gates that judge it. The block reads the default branch's tip
-by full object id, from `refs/remotes/origin/<base>` only once `git show-ref
---verify` proves it exists: a short `origin/<base>`, or a missing remote ref,
-would resolve a local branch the PR author named (`gh pr checkout` creates
-them). Run it once, as one shell command, from the repo root; the script path
-resolves against the skill's directory:
+The block reads the default branch's tip by full object id, only from a
+`refs/remotes/origin/<base>` that `git show-ref --verify` found: a short or
+missing ref could resolve a local branch the PR author named. Run it once, as
+one shell command, from the repo root:
 
 ```bash
 is_oid() { case "$1" in ''|*[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ] || [ "${#1}" -eq 64 ]; }
@@ -44,8 +41,8 @@ case "$src" in stop) ;; "") echo "⚠ Review settings: built-in defaults (base b
   *) echo "○ Review settings: origin/$base @ $base_oid ($src)" ;; esac
 ```
 
-It never reads the working tree's `.idd.yml`, the index, or a short ref. Exit 3
-stops; any other script failure prints the base blob, to read against this table.
+Exit 3 stops; any other script failure prints the base blob to read against
+this table.
 
 | Key (default) | What it gates |
 |-----|---------------|
@@ -375,26 +372,14 @@ rollup is ambiguous (just-pushed vs no CI) and fail-safes to RUN the suite.
 When `ci_leg_runnable` is false, ignore `tests=` and run both local test legs
 as if the PR were unmarked. Step 5's CI wait stays ungated.
 
-**`review.ignore_ci_billing_failures` does not enter this predicate — it is
-unchanged by that key, in either direction.** `ci_leg_runnable` asks whether CI
-*ran*; the ignore flag asks whether a CI *failure blocks*. Those questions are
-orthogonal — the flag never observes whether CI ran, only what to do once it
-has — and folding it into the predicate would not merely be untidy, it would
-answer the wrong question: a flag set to ignore failures would drive
-`ci_leg_runnable` **false**, which forces both local test legs to *run* on a PR
-whose marker says they already did. So a `trusted` marker's `tests=` skip is
-decided exactly as above whatever the ignore flag says. The safe direction is
-the same one: a wrong answer here makes the local suite *run*, never skip.
-
-The composition a maintainer has to see is the other one. With a `trusted`
-marker, `review.check_ci: true`, and a non-empty rollup, `ci_leg_runnable` stays
-true, so **both local test legs are skipped** — and if CI then goes red, the
-ignore flag drops that verdict too. Nothing this review ran independently
-verified that head. That is by design and not a hole, but only because the
-local suite's skip is justified by the resolver's own QA marker — the `tests=`
-SHA equalling the live head — and never by the ignore flag, which supplies no
-evidence about anything. If that marker is not trusted and head-bound, the suite
-runs.
+**`review.ignore_ci_billing_failures` does not enter this predicate.**
+`ci_leg_runnable` asks whether CI *ran*; the flag asks whether a CI *failure
+blocks*. Folded in, it would drive `ci_leg_runnable` false and run both local
+test legs on a PR whose marker says they already ran, so the `tests=` skip is
+decided as above whatever the flag says; a wrong answer here makes the suite
+run, never skip. Under a `trusted` marker and a non-empty rollup both local legs
+skip, and if CI then goes red the flag drops that verdict too: the skip rests on
+the head-bound `tests=` marker, never on the flag, which supplies no evidence.
 
 `ui=` is split into legs because the code UI review is environment-independent
 while the browser leg is fail-soft and skips on a headless host. A flat verdict
@@ -475,13 +460,9 @@ The procedure is the same for both:
 A step or cycle that pushed nothing leaves the head where it was, so there is
 nothing to recompute.
 
-Skipping this recomputation is the one way the *self-invalidation* property fails
-in practice: the variable stays `trusted` after a push moved the head, so Step 4
-keeps comparing `tests=` against the marker's own now-stale `head=` and the local
-suite never runs on the pushed commit — precisely the commit that most needs it.
-Restoring the full pipeline is **not** a widening of what `qa_handoff` may
-do: its power is bounded against the ungated pipeline, and the ungated pipeline
-is exactly what `stale` runs (*Precedence* above owns that rule).
+Skip it and `trusted` survives a push that moved the head, so the local suite
+never runs on the pushed commit. Restoring the full pipeline is not a widening
+(*Precedence* above).
 
 ### Never gated <!-- a:rvm-never-gated -->
 
@@ -520,17 +501,8 @@ To minimize token usage, the review loop **reuses the same reviewer agent** acro
 
 This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.
 
-**What the `trusted` collapse actually buys.** Under `qa_handoff = trusted` the
-cycle-1 cold start is collapsed into the fresh confirmation pass rather than
-skipped. The PR therefore still receives one independent, full-strength review,
-and it comes from an agent with **no memory of the resolver's own** review — which
-is the whole point of not simply trusting the marker. The collapse saves no
-reviewer spawn: the confirmation pass is itself fix-conditional, so an unmarked
-clean PR already gets exactly one cold-start pass and no confirmation. What
-`trusted` changes is *which* pass runs, not how many; the real saving is the
-duplicated test legs at Steps 2 and 4. Both the collapse and the cycle cap are
-refused by the *Precedence* rule above when the marker says `profile=light`
-against a pr-review `profile=full`.
+Under `qa_handoff = trusted` the cycle-1 cold start is collapsed into the fresh
+confirmation pass (*What `trusted` skips* above).
 
 ## Cycle 1 — Initial review
 

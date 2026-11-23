@@ -31,8 +31,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      degraded tool that left a check unevaluated. Never merged. A `trusted` test
      skip is not on this list: Step 4's own completion report reads
      `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
-     stays `PASS`. Nor is the *Config-change finding* (either form): it is a
-     report-level finding, non-blocking.
+     stays `PASS`. Nor is the *Config-change finding*.
    - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
      findings remain after the cycle cap, a stagnation stop, an AC or traceability hard-block, or a
      strict-pass blocker. Never merged.
@@ -79,13 +78,13 @@ cannot render the requested format, say so and print the terminal summary.
 
 ### Config-change finding
 
-When *Config-change comparison* (`prepass-tests-ci-mechanics.md`) triggered,
-every summary carries this block after the dimension lines: a report-level
-finding, non-blocking, outside the soft-pass and strict note count.
+After the dimension lines when *Config-change comparison* triggered; a
+report-level finding, non-blocking, outside the soft-pass and strict note count:
 
 ```
   ⚠ Config change — report-level finding, non-blocking
     {key} — changed by this PR; base value in force
+    keys could not be compared; the base branch's values are in force
 ```
 
 ## Summary — Clean PR
