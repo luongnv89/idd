@@ -27,8 +27,10 @@
 #        emitted above `## Contract` still satisfies T1/T2 while never reaching
 #        the subagent — AC1 would be false with the suite fully green.
 #
-# Operates on the committed skills/ + .pi/agents/ trees (and dist/agents/ when
-# present) so doc→build drift is caught, not masked by a rebuild.
+# Operates on the committed skills/ + .pi/agents/ trees only, so doc→build
+# drift is caught, not masked by a rebuild. The gitignored dist/agents/ is never
+# scanned: a stale local build there would fail the test while every tracked
+# file is correct (issue #680).
 #
 # Usage: bash tests/test-agent-conventions-inline-245.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -135,9 +137,6 @@ for heading in SECTIONS_ALL + SECTIONS_REVIEW:
 
 agent_files = sorted(root.glob("skills/*/references/agents/*.md"))
 agent_files += sorted((root / ".pi" / "agents").glob("*.md"))
-dist_agents = root / "dist" / "agents"
-if dist_agents.is_dir():
-    agent_files += sorted(dist_agents.glob("*.md"))
 
 # Non-vacuity guard: an empty file list would make every per-file loop below
 # pass without checking anything.
@@ -234,8 +233,7 @@ for f in agent_files:
         where = "absent" if at == -1 else f"offset {at}, fence body {body_start}-{body_end}"
         outside_fence.append(f"{label} ({where})")
 
-# Non-vacuity: 3 fenced agents × (issue-resolver, issue-pr-review, .pi) = 9,
-# plus dist/agents/ when present.
+# Non-vacuity: 3 fenced agents × (issue-resolver, issue-pr-review, .pi) = 9.
 if fenced_seen < 9:
     bad(f"T6: expected >= 9 fenced agent prompts, found {fenced_seen}")
 elif outside_fence:
