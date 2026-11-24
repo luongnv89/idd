@@ -83,6 +83,7 @@ When done, report back ONLY these fields:
 - tokens: the token count your Run Stats Footer printed; omit when the host reported none — never derived, estimated or 0
 - agents: the agents count your Run Stats Footer printed; omit when it printed n/a
 - model, effort: your session's model and reasoning effort, only when the host states them; omit otherwise
+- rules_hit: your run-log rules_hit (see references/docs/run-log-schema.md): [] when QA ran with none; omit when QA never ran
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)

@@ -35,7 +35,8 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 `issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
 `partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`, `fix_scopes` (missing reads `[]`; for the summary's
-`Rule candidates:`), `pre_existing` (missing reads `[]`). `pre_existing` feeds
+`Rule candidates:`), `pre_existing` (missing reads `[]`), `rules_hit` (missing
+reads `[]`; for the run-log line only). `pre_existing` feeds
 only the follow-up issue and the critical-issue prompt: it never changes the
 verdict, the merge decision or the critical-label path.
 

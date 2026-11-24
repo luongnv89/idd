@@ -34,7 +34,7 @@ is invoked with `--no-run-log` (see
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,
-`profile`, `agent_overrides`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`) in its result; fold those into the **single line**
+`profile`, `agent_overrides`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `rules_hit`) in its result; fold those into the **single line**
 auto-pilot writes (enriched with that telemetry) so the per-issue QA signal
 survives even though the resolver stayed silent. The resolver's run `status` informs auto-pilot's decision but is **not**
 copied into the row's `outcome` — that field stays auto-pilot's own six
@@ -120,6 +120,10 @@ resolver's, when it returned them. **`skill_version`** is auto-pilot's own
 **`verification`** comes from the PR review (*Step 3.2*), never the resolver.
 Write it on every line whose PR was reviewed (batch: primary line only); omit
 it on `failed` and `skipped`.
+
+**`rules_hit`** is the union of the resolver's returned list and *Step 3.2*'s:
+`[]` when either review ran with none; omitted when neither ran. Batch: primary
+line only.
 
 **`agent_overrides`** records whether the configured `agents.*` overrides
 reached this issue's spawns (`references/docs/run-log-schema.md`). Merge the resolver's

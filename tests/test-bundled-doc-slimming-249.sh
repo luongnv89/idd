@@ -317,7 +317,14 @@ FAIL=0
 # (auto-pilot, init-idd, issue-pr-review) rather than all 8 through Config
 # Loading Flow: +151 bytes per copy, +453. HEAD measured 629,681, so
 # 629,681 + 453 = 630,134; six bytes of headroom keep the ratchet as tight.
-BUDGET=630140
+#
+# Issue #670 is the twenty-first raise (2026-11-24): the run log records which
+# review rules produced findings, so run-log-schema.md gains the `rules_hit`
+# field row and names it in the single-writer list: +230 bytes per copy,
+# shipped to its 2 skills (auto-pilot, issue-resolver): +460. HEAD measured
+# 630,134, so 630,134 + 460 = 630,594; six bytes of headroom keep the ratchet
+# as tight.
+BUDGET=630600
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

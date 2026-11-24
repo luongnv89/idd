@@ -133,6 +133,7 @@ KEY_ORDER = (
     "pr",
     "revert_pr",
     "verification",
+    "rules_hit",
     "duration_s",
     "phases",
     "tokens",
@@ -154,6 +155,7 @@ OPTIONAL_KEYS = (
     "breach_reason",
     "revert_pr",
     "verification",
+    "rules_hit",
     "duration_s",
     "phases",
     "tokens",
@@ -202,6 +204,12 @@ AGENT_OVERRIDES = frozenset({"applied", "partial", "fallback"})
 
 # What the run verified (#551): full, partial, or disabled by config.
 VERIFICATION = frozenset({"full", "partial", "disabled"})
+
+# Review rule IDs that produced findings: a sorted, unique list of at most
+# MAX_RULES_HIT letter-led tokens; `[]` means a review ran and no rule fired,
+# so it is kept.
+RULE_ID_RE = re.compile(r"[A-Z][A-Z0-9_-]{0,31}")
+MAX_RULES_HIT = 64
 
 # Per-phase wall-clock seconds (issue #467): the one object-valued field, a flat
 # {phase name: non-negative int} map in the writer's pipeline order. Names are
@@ -383,6 +391,17 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
                 raise RecordError(f"phases.{name} must be a non-negative integer")
         if not phases:
             out["phases"] = None  # an empty map is absent, dropped below
+
+    rules = out.get("rules_hit")
+    if rules is not None:
+        if not isinstance(rules, list) or len(rules) > MAX_RULES_HIT or not all(
+            isinstance(r, str) and RULE_ID_RE.fullmatch(r) for r in rules
+        ):
+            raise RecordError(
+                f"rules_hit must be a list of at most {MAX_RULES_HIT} rule IDs "
+                "matching [A-Z][A-Z0-9_-]{0,31}"
+            )
+        out["rules_hit"] = sorted(set(rules))
 
     # Cost and provenance (#562). INT_KEYS/STR_KEYS above already rejected the
     # wrong type (a bool included); these are the range and shape checks.
