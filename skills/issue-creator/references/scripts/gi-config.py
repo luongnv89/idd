@@ -73,20 +73,27 @@ config is read from the blob `<REF>:.idd.yml` (else the legacy
 `<REF>:.gitissue.yml`, with a ⚠ line) and the work tree is never read. REF is
 resolved to one commit first, and every read goes through that commit's id:
 
-  * a 40- or 64-character lowercase hex object id must name a commit;
+  * a 40- or 64-character lowercase hex object id must name a commit, and
+    `HEAD` is the commit checked out;
+  * any other REF must pass `git check-ref-format --allow-onelevel`, so
+    revision syntax (`~`, `^`, `:`, `@{...}`) is refused: git would look the
+    name inside it up again;
   * a `refs/...` name must be listed exactly by `git for-each-ref`. When it is
     not, git's lookup falls through to `refs/heads/refs/...`, a local branch a
     checked-out pull request can create;
-  * any other name must match at most one of git's five short-name lookup
-    forms, because `refs/heads/<name>` shadows `refs/remotes/<name>`.
+  * a short name must match exactly one of git's five short-name lookup forms,
+    because `refs/heads/<name>` shadows `refs/remotes/<name>`; a short name
+    containing `/` must match `refs/remotes/<name>` itself;
+  * the commit is the object id that `for-each-ref` row carries, never git's
+    own lookup of the name, which tries a `$GIT_DIR/<name>` file first.
 
-An empty or `-`-prefixed REF is exit 2. A REF that does not resolve or is
-ambiguous, or a config blob that exists but cannot be read, is exit 4. A REF
-that resolves and carries no config yields the built-in defaults (`config_file`
-null, `first_run` true), never the work-tree file. An invalid config at REF is
-exit 3. Under `--ref` the schema is the copy bundled beside this script or
-`--schema`; the working-directory walk is skipped, because the checked-out tree
-would choose it.
+An empty or `-`-prefixed REF is exit 2. A REF that does not resolve, is
+ambiguous or breaks a rule above, or a config blob that exists but cannot be
+read, is exit 4. A REF that resolves and carries no config yields the
+built-in defaults (`config_file` null, `first_run` true), never the work-tree
+file. An invalid config at REF is exit 3. Under `--ref` the schema is the
+copy bundled beside this script or `--schema`; the working-directory walk is
+skipped, because the checked-out tree would choose it.
 
 `--compare-ref REF2` (only with `--ref`) also reads REF2's config, raw, and
 reports `changed_keys`: the sorted dotted keys, in any section, that are added,
@@ -131,9 +138,10 @@ LEGACY_CONFIG_NAME = ".gitissue.yml"
 # newline or an abbreviation is not an object id.
 _OID_RE = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
-# git's lookup order for a short `<refname>`, minus `$GIT_DIR/<refname>` (git
-# honours that only for all-caps root refs like `HEAD`). Copied from
-# gi-secscan.py, which applies the same check to `--policy-ref`; scripts ship
+# git's lookup order for a short `<refname>`, minus rule 1
+# (`$GIT_DIR/<refname>`): `for-each-ref` never lists that file, and it is kept
+# out by reading through the listed ref's object id rather than by name. Copied
+# from gi-secscan.py, which resolves `--policy-ref` the same way; scripts ship
 # standalone, so it is copied rather than imported.
 _REF_LOOKUP_RULES = (
     "refs/{ref}",
@@ -489,7 +497,7 @@ def _git(args: list[str]) -> subprocess.CompletedProcess:
 
 def _commit_of(spec: str) -> str | None:
     """The commit id `spec` peels to, or None when it names no commit."""
-    proc = _git(["rev-parse", "--verify", "--quiet", f"{spec}^{{commit}}"])
+    proc = _git(["rev-parse", "--verify", "--quiet", "--end-of-options", f"{spec}^{{commit}}"])
     oid = proc.stdout.decode("ascii", errors="replace").strip()
     return oid if proc.returncode == 0 and _OID_RE.fullmatch(oid) else None
 
@@ -503,40 +511,83 @@ def check_ref_arg(flag: str, ref: str) -> None:
         raise UsageError(f"{flag} value must be a revision, not an option: {ref!r}")
 
 
+def _is_ref_name(ref: str) -> bool:
+    """True when `git check-ref-format --allow-onelevel` accepts `ref`.
+
+    That rejects revision syntax — `~`, `^`, `:`, `@{`, `..`, a lone `@` — which
+    git would resolve by looking the name inside it up again by itself.
+    """
+    return _git(["check-ref-format", "--allow-onelevel", ref]).returncode == 0
+
+
 def resolve_ref(flag: str, ref: str) -> str:
-    """Resolve `ref` to exactly one commit id, or raise Unavailable — exit 4."""
+    """Resolve `ref` to exactly one commit id, or raise Unavailable — exit 4.
+
+    A ref name is a search to git, and a checked-out pull request can write a
+    ref that wins it: a local branch `origin/main` (tried before
+    `refs/remotes/origin/main`), a local `refs/heads/refs/remotes/origin/main`
+    (tried when the remote ref is missing), a revision suffix that git looks up
+    again, or a `$GIT_DIR/origin/main` file (tried first). So the name is
+    checked against what `git for-each-ref` lists, and the object id that
+    listing carries is the answer — the name is never resolved by git:
+
+      1. A 40- or 64-hex object id must name a commit; `HEAD` is the commit
+         checked out.
+      2. Anything else must pass `git check-ref-format --allow-onelevel`.
+      3. A `refs/...` name must be listed exactly as itself. A short name must
+         match exactly one of git's five lookup forms; two is ambiguous. A
+         short name containing `/` must match `refs/remotes/<ref>` — a local
+         branch or tag of that name is refused even when it is the only match.
+    """
     if _OID_RE.fullmatch(ref):
         oid = _commit_of(ref)
         if oid is None:
             raise Unavailable(f"{flag} {ref} names no commit in this repository")
         return oid
+    if ref == "HEAD":
+        oid = _commit_of(ref)
+        if oid is None:
+            raise Unavailable(f"{flag} HEAD does not resolve to a commit")
+        return oid
+    if not _is_ref_name(ref):
+        raise Unavailable(
+            f"{flag} {ref} is not a ref name — revision syntax such as ~, ^, : "
+            "or @{...} is looked up by git again and could reach a branch the "
+            "checked-out pull request wrote; pass the ref itself or a commit id"
+        )
     if ref.startswith("refs/"):
-        # A fully-qualified name that does not exist is not an error to git: it
-        # tries `refs/heads/<name>` next, so `refs/remotes/origin/main` would
-        # resolve to a local branch named `refs/remotes/origin/main`.
-        listed = _git(["for-each-ref", "--format=%(refname)", "--", ref])
-        names = os.fsdecode(listed.stdout).split("\n")
-        if listed.returncode != 0 or names.count(ref) != 1:
-            raise Unavailable(
-                f"{flag} {ref} is not an existing ref — pass a ref "
-                "`git for-each-ref` lists, or a commit id"
-            )
-    elif ref != "HEAD":
+        candidates = [ref]
+    else:
         candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
-        listed = _git(["for-each-ref", "--format=%(refname)", "--", *candidates])
-        if listed.returncode != 0:
-            raise Unavailable(f"cannot list refs to check {flag} {ref}")
-        # Exact membership: a for-each-ref pattern also matches anything below
-        # it, which is not a ref this lookup would reach.
-        wanted = set(candidates)
-        found = {n for n in os.fsdecode(listed.stdout).split("\n") if n in wanted}
-        if len(found) > 1:
-            raise Unavailable(
-                f"{flag} {ref} is ambiguous — it names "
-                + ", ".join(sorted(found))
-                + "; pass the fully-qualified name of the one you mean"
-            )
-    oid = _commit_of(ref)
+    listed = _git(["for-each-ref", "--format=%(refname)%00%(objectname)", "--", *candidates])
+    if listed.returncode != 0:
+        raise Unavailable(f"cannot list refs to check {flag} {ref}")
+    # Exact membership: a for-each-ref pattern also matches anything below
+    # it, which is not a ref this lookup would reach.
+    rows = {}
+    for line in os.fsdecode(listed.stdout).split("\n"):
+        name, sep, oid = line.partition("\0")
+        if sep and name in candidates:
+            rows[name] = oid
+    found = [name for name in candidates if name in rows]
+    if len(found) > 1:
+        raise Unavailable(
+            f"{flag} {ref} is ambiguous — it names "
+            + ", ".join(sorted(found))
+            + "; pass the fully-qualified name of the one you mean"
+        )
+    if not found:
+        raise Unavailable(
+            f"{flag} {ref} is not an existing ref — pass a ref "
+            "`git for-each-ref` lists, or a commit id"
+        )
+    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":
+        raise Unavailable(
+            f"{flag} {ref} names {found[0]}, not refs/remotes/{ref} — a short "
+            "name containing / must be a remote-tracking ref; pass the "
+            "fully-qualified name to use any other"
+        )
+    oid = _commit_of(rows[found[0]])
     if oid is None:
         raise Unavailable(f"{flag} {ref} does not resolve to a commit")
     return oid
@@ -840,8 +891,10 @@ def main(argv: list[str] | None = None) -> int:
         metavar="REF",
         help=(
             f"read <REF>:{DEFAULT_CONFIG_NAME} (else <REF>:{LEGACY_CONFIG_NAME}) "
-            "instead of the work tree: a full commit id, an existing refs/... "
-            "name, or an unambiguous short name; no config there = defaults"
+            "instead of the work tree: a full commit id, HEAD, an existing "
+            "refs/... name, or a short name naming exactly one ref (with a /, "
+            "the remote-tracking one); no revision syntax; no config there = "
+            "defaults"
         ),
     )
     parser.add_argument(
