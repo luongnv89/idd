@@ -33,8 +33,8 @@
 #   V12  --ref is exactly one listed ref: a local origin/main, a missing remote
 #        ref falling through to refs/heads/refs/remotes/..., a revision suffix,
 #        a branch and tag of one name, and a $GIT_DIR/origin/main file never
-#        supply the recipe; the legitimate forms still resolve; an empty or
-#        option-shaped --ref is exit 2. Each guard has a reverse-applied mutant.
+#        supply the recipe, nor does a refs/replace entry; the legitimate forms
+#        still resolve; an empty or option-shaped --ref is exit 2. Each guard has a reverse-applied mutant.
 #
 # Usage: bash tests/test-verification-recipes-523.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -201,9 +201,10 @@ shadow|origin/main~0|is not a ref name
 shadow|origin/main^0|is not a ref name
 shadow|origin/main@{0}|is not a ref name
 shadow|origin/main^{commit}|is not a ref name"
+V12_N=0  # a fresh fixture directory per call
 # refused <kind> <ref> <reason> [script] — exit 0 when the recipe is refused (exit 4).
 refused() {
-  local d="$TMP/v12-$1-$RANDOM$RANDOM"
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-$1-$V12_N"
   look_alike "$d" "$1"; plan_caps "$d" "$2" "${4:-}"
   [ "$EC" = 4 ] && [ -z "$CAPS" ] && { [ -z "$3" ] || printf '%s' "$ERR" | grep -qF "$3"; }
 }
@@ -215,7 +216,7 @@ $V12_CELLS
 EOF
 # Every read goes through the listed ref's object id, never the name.
 pinned() {
-  local d="$TMP/v12-gitdir-$RANDOM$RANDOM"
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-gitdir-$V12_N"
   look_alike "$d" gitdir
   [ "$(cd "$d" && git rev-parse origin/main)" = "$(cd "$d" && git rev-parse feat)" ] || return 1
   plan_caps "$d" origin/main "${1:-}"
@@ -229,6 +230,16 @@ for good in origin/main refs/remotes/origin/main main refs/heads/main; do
 done
 plan_caps "$R" HEAD
 [ "$EC" = 0 ] && [ "$CAPS" = "['evil']" ]; check "V12: --ref HEAD resolves to the checked-out commit's recipe (exit $EC)" "$?"
+# A refs/replace entry swapping main's commit for feat's must not change what
+# the base ref supplies.
+replaced() { # [script] — exit 0 when the base recipe still loads
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-replace-$V12_N"
+  look_alike "$d" plain
+  (cd "$d" && git replace "$(git rev-parse main)" "$(git rev-parse feat)")
+  plan_caps "$d" main "${1:-}"
+  [ "$EC" = 0 ] && [ "$CAPS" = "['real']" ]
+}
+replaced; check "V12: a refs/replace entry cannot swap the base-ref recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
 usage_errors() { # [script] — exit 0 when both malformed values are exit 2
   local s="${1:-$SCRIPT}" bad
   for bad in "" "-x"; do
@@ -271,6 +282,9 @@ check "V12-M: the check-ref-format guard is present to reverse-apply" "$?"
 ! refused shadow 'origin/main~0' 'is not a ref name' "$M/format.py"; check "V12-M: without it origin/main~0 is no longer refused as revision syntax" "$?"
 mutate "$M/pin.py" $'    oid = _commit_of(rows[found[0]])\n' $'    oid = _commit_of(ref)\n'; check "V12-M: the read through the listed object id is present to reverse-apply" "$?"
 ! pinned "$M/pin.py"; check "V12-M: resolving the name instead lets \$GIT_DIR/origin/main supply the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/replace.py" '["git", "--no-replace-objects", *args], capture_output=True' '["git", *args], capture_output=True'
+check "V12-M: --no-replace-objects is present to reverse-apply" "$?"
+! replaced "$M/replace.py"; check "V12-M: without it the refs/replace entry supplies the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
 mutate "$M/usage.py" $'    if not args.ref:\n' "$OFF" $'    if args.ref.startswith("-"):\n' "$OFF"; check "V12-M: the usage guards are present to reverse-apply" "$?"
 ! usage_errors "$M/usage.py"; check "V12-M: without them an empty or option-shaped --ref is not a usage error" "$?"
 

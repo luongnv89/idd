@@ -349,11 +349,22 @@ def build_look_alike_repo(kind):
               the PR's commit id. git reads that file first for `origin/main`,
               and `for-each-ref` never lists it, so only a read through the
               listed ref's object id avoids it.
+      legacy  as gitdir, but the file names a commit off main that carries the
+              narrow pattern only as the legacy `.gitissue.yml`.
       tag     a branch `base` at main and a tag `base` at the PR: two refs of
               one short name with no `/`.
     """
     repo = build_repo(r"^leak\\.txt$")
     trusted, hostile = rev(repo, "main"), rev(repo, "feature")
+    if kind == "legacy":
+        git(["checkout", "-q", "-b", "legacy", "main"], repo)
+        with open(os.path.join(repo, ".gitissue.yml"), "w", encoding="utf-8") as handle:
+            handle.write('security:\n  allow_pattern: "^leak\\\\.txt$"\n')
+        git(["add", ".gitissue.yml"], repo)
+        git(["commit", "-qm", "legacy policy"], repo)
+        git(["checkout", "-q", "feature"], repo)
+        hostile = rev(repo, "legacy")
+        kind = "gitdir"
     if kind in ("suffix", "gitdir"):
         git(["update-ref", "refs/remotes/origin/main", trusted], repo)
     if kind == "nested":
@@ -380,9 +391,9 @@ def look_alike_cell(kind, policy_ref, script=SCRIPT, reason=None):
     return ok, f"exit {code}, verdict {got}, stderr {err.strip()[:120]!r}"
 
 
-def pin_cell(script=SCRIPT):
+def pin_cell(script=SCRIPT, kind="gitdir"):
     """`$GIT_DIR/origin/main` names the PR; the listed ref names the base."""
-    repo, hostile = build_look_alike_repo("gitdir")
+    repo, hostile = build_look_alike_repo(kind)
     shadowed = rev(repo, "origin/main") == hostile
     code, verdict, _ = run_err(["--range", "main", "--policy-ref", "origin/main"], repo, script)
     shutil.rmtree(repo, ignore_errors=True)
@@ -417,6 +428,8 @@ emit(ok, f"A15: a short name naming a branch and a tag is refused as ambiguous (
 # name — otherwise `$GIT_DIR/origin/main` re-supplies the PR's policy.
 ok, detail = pin_cell()
 emit(ok, f"A16: the policy is read from the listed ref's commit, not git's own lookup of the name ({detail})")
+ok, detail = pin_cell(kind="legacy")
+emit(ok, f"A16: the legacy .gitissue.yml is read from the listed ref's commit too ({detail})")
 
 # A17: the legitimate forms still resolve and read their own policy.
 repo, _ = build_look_alike_repo("gitdir")
@@ -669,14 +682,17 @@ reverse_apply(
     [("    if len(found) > 1:\n", "    if False:\n")],
     lambda script: look_alike_cell("tag", "base", script),
 )
-# C9: read by the name again — `$GIT_DIR/origin/main` supplies the policy in A16.
+# C9: read by the name again — `$GIT_DIR/origin/main` supplies the policy in
+# A16. Each read is reverted on its own, against the fixture where it matters.
 reverse_apply(
-    "C9: read the config by the ref name instead of the resolved commit (A16)",
-    [
-        ("_read_ref_config(oid, CONFIG_NAME)", "_read_ref_config(ref, CONFIG_NAME)"),
-        ("_read_ref_config(oid, LEGACY_CONFIG_NAME)", "_read_ref_config(ref, LEGACY_CONFIG_NAME)"),
-    ],
+    "C9: read .idd.yml by the ref name instead of the resolved commit (A16)",
+    [("_read_ref_config(oid, CONFIG_NAME)", "_read_ref_config(ref, CONFIG_NAME)")],
     pin_cell,
+)
+reverse_apply(
+    "C9b: read the legacy .gitissue.yml by the ref name instead of the resolved commit (A16 legacy)",
+    [("_read_ref_config(oid, LEGACY_CONFIG_NAME)", "_read_ref_config(ref, LEGACY_CONFIG_NAME)")],
+    lambda script: pin_cell(script, kind="legacy"),
 )
 shutil.rmtree(SCRATCH, ignore_errors=True)
 
