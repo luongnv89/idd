@@ -15,6 +15,9 @@
 #       lint/format command can run tree-wide in either stage, and the type
 #       check is the command the review's build step already runs.
 #
+#  #686: rustfmt passes the crate's edition, and review-only mode reports a
+#        check as not run when it has no approved-paths list.
+#
 # Usage: bash tests/test-static-checks-664.sh
 
 set -uo pipefail
@@ -114,6 +117,10 @@ else
 fi
 [ "$(awk -F'\t' '$1 == "gofmt" { print $4 }' "$TMP/rows.tsv")" = '`gofmt -l`' ]
 check "gofmt checks with -l, never -w" "$?"
+# #686: bare rustfmt parses as Rust 2015 and fails formatted 2018+ code.
+[ "$(awk -F'\t' '$1 == "rustfmt" { print $4 "|" $5 }' "$TMP/rows.tsv")" = '`rustfmt --check --edition <edition>`|`rustfmt --edition <edition>`' ]
+check "rustfmt's Check and Fix commands both pass --edition <edition>" "$?"
+has "$SHARED" "\`<edition>\` is Cargo.toml's \`edition\`, default 2015" "the shared file takes <edition> from Cargo.toml"
 
 # p-tsc-drift: the type check is the review's own build command.
 tsc_shared="$(awk -F'\t' '$1 == "tsc" { print $4 }' "$TMP/rows.tsv")"
@@ -147,6 +154,15 @@ has "$PREPASS" 'each detected lint/format row of `references/static-checks.md`' 
 has "$PREPASS" "never its \`tsc\` row" "the review pre-pass leaves tsc to its build step"
 has "$REV_SKILL" "each detected lint/format row's Check command from \`references/static-checks.md\`" "review-only mode runs the shared Check commands"
 lacks "$REV_SKILL" 'npx eslint .' "review-only mode names no tree-wide command"
+# #686: with no approved-paths list, review-only reports the check not run.
+ro_line="$(grep -F -- '- Step 2 runs lint/format in check mode' "$REV_SKILL")"
+for want in '(*Approved paths*, built first)' 'No list built or readable: the check did not run (`references/report-templates.md` *Evidence*), never clean.'; do
+  if printf '%s\n' "$ro_line" | grep -qF -- "$want"; then
+    pass "the review-only Step 2 line says '$want'"
+  else
+    fail "the review-only Step 2 line lacks '$want'"
+  fi
+done
 
 echo "AC1 — every cycle, check mode only"
 has "$STEP4" '**Static checks** — in every cycle' "the checks are their own part of every cycle"

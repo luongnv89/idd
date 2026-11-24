@@ -6,7 +6,7 @@ Tool-detection tables and command details for *Step 2 — Script Pre-pass*, *Ste
 
 Detect available lint/format/test tools from the project.
 
-**When `--review-only` is set:** run the detection-only variant of this step — see *Review-only mode* in SKILL.md for the exact contract.
+**Under `--review-only`:** detection only, per *Review-only mode* in SKILL.md.
 
 **Default (fix loop):** scope the auto-fix to the approved paths first (below), then run each Fix command over that list only. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
 
