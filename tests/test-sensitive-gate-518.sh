@@ -31,6 +31,14 @@
 #           the submodule ignore settings; the
 #           resolver's Deliver (any delivered sensitive path Step 2 did not
 #           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
+#   G8      verification-config (#661): test-runner, lint, type-check and
+#           coverage config is reported as its own class, checked last; a PR
+#           that lowers a coverage threshold is reported, never an empty
+#           answer. A release tripwire reads CHANGELOG.md: while the entry sits
+#           under [Unreleased] or the newest release heading the class must be
+#           report-only (`observed`, tier unchanged); once a newer release
+#           heading sits above it the class must be in `reasons` and the
+#           changelog must record the switch. A missing entry fails.
 #
 # Usage: bash tests/test-sensitive-gate-518.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -314,6 +322,198 @@ anchor_lacks "$STEP2" rs-sensitive-gate 'classifying by hand' "G7: no hand class
 anchor_lacks "$STEP2" rs-sensitive-gate 'pundit' "G7: Step 2 re-lists no class names"
 anchor_check_flat "$STEP2" rs-sensitive-gate '`tier: sensitive` also revises the profile to `full`' \
   "G7: a sensitive tier revises the resolver profile to full"
+
+# ── G8: verification-config, report-only for one release (#661) ──
+VC=verification-config
+CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+# The two changelog phrases the tripwire anchors on. Rewording either entry
+# without updating these fails the test: it never passes on a missing phrase.
+VC_OBSERVE_PHRASE='the report-only `verification-config` class'
+VC_SWITCH_PHRASE='`verification-config` now makes the merge floor unmet'
+# hit_class JSON → the class of the first hit in `reasons` or `observed`.
+hit_class() { python3 -c 'import json,sys; r=json.loads(sys.argv[1]); h=r["reasons"]+r["observed"]; print(h[0]["class"] if h else "none")' "$1"; }
+for pair in \
+  "pytest.ini:$VC" \
+  "tests/conftest.py:$VC" \
+  "tox.ini:$VC" \
+  "jest.config.js:$VC" \
+  "web/vitest.config.ts:$VC" \
+  "e2e/playwright.config.ts:$VC" \
+  ".eslintrc:$VC" \
+  ".eslintrc.json:$VC" \
+  "eslint.config.mjs:$VC" \
+  "ruff.toml:$VC" \
+  ".ruff.toml:$VC" \
+  ".flake8:$VC" \
+  "mypy.ini:$VC" \
+  "tsconfig.json:$VC" \
+  "packages/web/tsconfig.build.json:$VC" \
+  "TSConfig.json:$VC" \
+  ".coveragerc:$VC" \
+  "codecov.yml:$VC" \
+  ".codecov.yml:$VC" \
+  ".nycrc:$VC" \
+  ".nycrc.json:$VC" \
+  "src/auth/tsconfig.json:auth" \
+  "infra/pytest.ini:infrastructure" \
+  "pyproject.toml:dependency-manifest" \
+  ".github/workflows/codecov.yml:ci-workflow" \
+  "docs/pytest.ini.md:none" \
+  "src/tsconfig.ts:none" \
+  "tsconfig.yaml:none" \
+  "eslint.config:none" \
+  "jest.setup.js:none" \
+  "docs/coverage.md:none"; do
+  path="${pair%%:*}"; want="${pair##*:}"
+  got="$(hit_class "$(classify "{\"labels\":[],\"paths\":[\"$path\"]}")")"
+  [ "$got" = "$want" ]; check "G8: $path → $want" "$?"
+done
+[ "$(field "$(classify '{"labels":["bug"],"paths":["README.md"]}')" observed)" = '[]' ]
+check "G8: observed is present and empty when nothing is report-only" "$?"
+
+# changelog_mode FILE → the mode the changelog requires: `observe` while the
+# entry's section is [Unreleased] or the newest release, `enforce` once a newer
+# release heading sits above that section, `missing` (exit 1) when the entry is
+# absent or sits under no such heading.
+changelog_mode() {
+  python3 - "$1" "$VC_OBSERVE_PHRASE" <<'PY'
+import re, sys
+release = re.compile(r"^## v([0-9]+\.[0-9]+\.[0-9]+)\b")
+releases_above = 0   # release sections that ended before the current one
+section = None       # "unreleased" | "release" | None
+with open(sys.argv[1], encoding="utf-8") as fh:
+    for line in fh:
+        if line.startswith("## "):
+            if section == "release":
+                releases_above += 1
+            if release.match(line):
+                section = "release"
+            elif line.startswith("## [Unreleased]"):
+                section = "unreleased"
+            else:
+                section = None
+        elif sys.argv[2] in line:
+            if section is None:
+                break
+            print("enforce" if section == "release" and releases_above else "observe")
+            sys.exit(0)
+print("missing")
+sys.exit(1)
+PY
+}
+# tripwire FILE STATE → 0 when the script state (`observe` or `enforce`) is the
+# one the changelog requires, and an enforcing changelog records the switch.
+tripwire() {
+  local mode
+  mode="$(changelog_mode "$1")" || return 1
+  [ "$mode" = "$2" ] || return 1
+  [ "$mode" = observe ] || grep -qF -- "$VC_SWITCH_PHRASE" "$1"
+}
+# The script's own state, read from the constant that holds it.
+vc_state="$(python3 - "$SCRIPT" "$VC" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("gi_sensitive", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print("observe" if sys.argv[2] in mod.OBSERVE_ONLY else "enforce")
+PY
+)"
+
+# Both directions of the tripwire, on fixtures: no tag, clock or network.
+CLDIR="$(mktemp -d)"
+trap 'rm -rf "$GITREPO" "$AMBREPO" "$R3REPO" "$STUBDIR" "$CLDIR"' EXIT
+entry="- **scripts:** adds $VC_OBSERVE_PHRASE (#661)."
+switch="- **scripts:** $VC_SWITCH_PHRASE (#661)."
+printf '# Changelog\n\n## [Unreleased]\n\n### Refactoring\n%s\n\n## v9.1.0 — 2030-01-01\n\n- older\n' "$entry" > "$CLDIR/unreleased.md"
+printf '# Changelog\n\n## [Unreleased]\n\n## v9.1.0 — 2030-01-01\n\n### Refactoring\n%s\n\n## v9.0.0 — 2029-01-01\n\n- older\n' "$entry" > "$CLDIR/newest.md"
+printf '# Changelog\n\n## [Unreleased]\n\n## v9.2.0 — 2030-02-01\n\n- other\n\n## v9.1.0 — 2030-01-01\n\n### Refactoring\n%s\n' "$entry" > "$CLDIR/passed.md"
+printf '# Changelog\n\n## [Unreleased]\n\n## v9.2.0 — 2030-02-01\n\n%s\n\n## v9.1.0 — 2030-01-01\n\n### Refactoring\n%s\n' "$switch" "$entry" > "$CLDIR/switched.md"
+printf '# Changelog\n\n## [Unreleased]\n\n- other\n\n## v9.1.0 — 2030-01-01\n\n- older\n' > "$CLDIR/absent.md"
+printf '# Changelog\n\n%s\n\n## [Unreleased]\n\n## v9.1.0 — 2030-01-01\n' "$entry" > "$CLDIR/unplaced.md"
+[ "$(changelog_mode "$CLDIR/unreleased.md")" = observe ]; check "G8: an entry under [Unreleased] requires report-only" "$?"
+[ "$(changelog_mode "$CLDIR/newest.md")" = observe ]; check "G8: an entry under the newest release heading still requires report-only" "$?"
+[ "$(changelog_mode "$CLDIR/passed.md")" = enforce ]; check "G8: a newer release heading above the entry's section requires enforcing" "$?"
+out="$(changelog_mode "$CLDIR/absent.md")"; ec=$?
+[ "$ec" = "1" ] && [ "$out" = missing ]; check "G8: a changelog without the entry is 'missing' (exit 1), never a mode" "$?"
+out="$(changelog_mode "$CLDIR/unplaced.md")"; ec=$?
+[ "$ec" = "1" ] && [ "$out" = missing ]; check "G8: an entry above every release section is 'missing' (exit 1)" "$?"
+tripwire "$CLDIR/unreleased.md" observe && tripwire "$CLDIR/newest.md" observe
+check "G8: tripwire passes a report-only class inside the observe release" "$?"
+! tripwire "$CLDIR/unreleased.md" enforce && ! tripwire "$CLDIR/newest.md" enforce
+check "G8: tripwire fails a class enforced before its observe release is over" "$?"
+! tripwire "$CLDIR/passed.md" observe && ! tripwire "$CLDIR/switched.md" observe
+check "G8: tripwire fails a class still report-only after a newer release" "$?"
+! tripwire "$CLDIR/passed.md" enforce
+check "G8: tripwire fails an enforced class whose switch the changelog does not record" "$?"
+tripwire "$CLDIR/switched.md" enforce
+check "G8: tripwire passes an enforced class with the switch recorded" "$?"
+! tripwire "$CLDIR/absent.md" observe && ! tripwire "$CLDIR/absent.md" enforce
+check "G8: tripwire fails in either state when the entry is missing" "$?"
+
+# The real changelog decides which mode this checkout must be in.
+vc_mode="$(changelog_mode "$CHANGELOG")"; ec=$?
+[ "$ec" = "0" ]; check "G8: CHANGELOG.md carries the entry '$VC_OBSERVE_PHRASE' under [Unreleased] or a release (got ${vc_mode:-nothing})" "$?"
+tripwire "$CHANGELOG" "$vc_state"
+check "G8: release tripwire — CHANGELOG.md requires '$vc_mode', OBSERVE_ONLY is in '$vc_state' (to switch: drop $VC from OBSERVE_ONLY and add a changelog line holding '$VC_SWITCH_PHRASE')" "$?"
+if [ "$vc_mode" = enforce ]; then vc_key=reasons; vc_tier=sensitive; else vc_key=observed; vc_tier=standard; fi
+# vc_reported JSON SOURCE PATH → 0 when that hit sits in the list the mode
+# requires and nowhere else, with the tier the mode requires.
+vc_reported() {
+  python3 -c '
+import json, sys
+r = json.loads(sys.argv[1]); key, tier = sys.argv[4], sys.argv[5]
+hit = {"source": sys.argv[2], "value": sys.argv[3], "class": "verification-config"}
+other = "reasons" if key == "observed" else "observed"
+ok = (hit in r[key] and hit not in r[other] and r["tier"] == tier
+      and r["sensitive"] == (tier == "sensitive"))
+sys.exit(0 if ok else 1)' "$1" "$2" "$3" "$vc_key" "$vc_tier"
+}
+out="$(classify '{"labels":[],"paths":["tox.ini"]}')"
+vc_reported "$out" path tox.ini
+check "G8: a planned tox.ini edit is reported in '$vc_key' with tier $vc_tier — the mode CHANGELOG.md requires (AC1, AC2)" "$?"
+out="$(classify '{"labels":[],"paths":["src/auth/login.py",".eslintrc.json"]}')"
+python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "auth" and len(r["reasons"]) + len(r["observed"]) == 2 else 1)' "$out"
+check "G8: an auth path beside a lint config stays sensitive, and both paths are reported" "$?"
+
+# AC4, the negative case: a PR that lowers a coverage threshold is reported.
+g checkout -q -b covbase main && printf '[report]\nfail_under = 40\n' > "$GITREPO/.coveragerc" && g add .coveragerc && g commit -q -m cov \
+  && g checkout -q -b covlow && printf '[report]\nfail_under = 10\n' > "$GITREPO/.coveragerc" && g commit -q -am lower
+check "G8: a branch lowering fail_under in .coveragerc from 40 to 10" "$?"
+out="$(dclassify "$(rng covbase covlow)")"; ec=$?
+[ "$ec" = "0" ] && vc_reported "$out" diff .coveragerc
+check "G8: a PR that lowers a coverage threshold is reported as verification-config in '$vc_key' (exit 0), never an empty answer (AC4)" "$?"
+g checkout -q -b covdocs covbase && echo 'more' >> "$GITREPO/docs/guide.md" && g commit -q -am docs
+out="$(dclassify "$(rng covbase covdocs)")"
+[ "$(field "$out" observed)" = '[]' ] && [ "$(field "$out" reasons)" = '[]' ]
+check "G8: a PR that leaves the threshold file alone reports no verification-config change" "$?"
+
+# The enforcing path, exercised with the constant emptied: the class joins
+# `reasons` and the tier follows, through the same code a release switch uses.
+python3 - "$SCRIPT" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("gi_sensitive", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+record = {"labels": [], "paths": [".coveragerc", "README.md"]}
+hit = {"source": "path", "value": ".coveragerc", "class": "verification-config"}
+mod.OBSERVE_ONLY = frozenset({"verification-config"})
+watching = mod.classify(record)
+mod.OBSERVE_ONLY = frozenset()
+enforcing = mod.classify(record)
+ok = (watching == {"sensitive": False, "tier": "standard", "reasons": [], "observed": [hit]}
+      and enforcing == {"sensitive": True, "tier": "sensitive", "reasons": [hit], "observed": []})
+sys.exit(0 if ok else 1)
+PY
+check "G8: with the class out of OBSERVE_ONLY the same hit is in reasons and the tier is sensitive; inside it, observed and standard (AC2, AC3)" "$?"
+
+# The Evidence row is where the review prints an observed class.
+for tpl in "$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md" "$REPO_ROOT/skills/issue-pr-review/references/report-templates.md"; do
+  where="${tpl#"$REPO_ROOT"/}"; where="${where%%/issue-pr-review/*}"
+  tr '\n' ' ' < "$tpl" | tr -s ' ' | grep -qF 'Each class in the *Merge floor* classify'"'"'s `observed` list prints as `{class} change ({paths})`; it never changes the floor.'
+  check "G8: the Evidence contract prints each observed class and leaves the floor alone ($where)" "$?"
+  [ "$(grep -cE '^  Evidence: .*; \{class\} change \(\{paths\}\)$' "$tpl")" = "2" ]
+  check "G8: both Evidence examples show the observed-class segment ($where)" "$?"
+done
 
 # ── G3: --adjudicate over every fixture ──────────────────────
 count=0
