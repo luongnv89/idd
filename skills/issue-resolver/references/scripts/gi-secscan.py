@@ -45,9 +45,14 @@ a healthy-looking `scanned`, so a threshold on `scanned` does not close it.
 `--policy-ref REF` closes it by provenance: `security.*` is read from
 `REF:.idd.yml` (else the legacy `REF:.gitissue.yml`, only when `.idd.yml` is
 absent at the ref), a ref the reviewed branch cannot write, and the work tree's
-own file is not consulted at all. `policy_source` reports what was actually
-used — `ref:<REF>`, `file:<path>`, or `defaults` — so a caller can assert it got
-the policy it asked for. The flag is opt-in and changes nothing when absent: the
+own file is not consulted at all. REF must be `HEAD` or exactly one ref that
+`git for-each-ref` lists: a `refs/...` name listed as itself, or a short name
+matching one of git's lookup forms — and, when it contains `/`, matching
+`refs/remotes/<REF>`. Revision syntax (`~`, `^`, `:`, `@{...}`) is refused.
+The config is then read through that ref's commit id, never through the name,
+which git would look up again; anything else is exit 4. `policy_source` reports
+what was actually used — `ref:<REF>`, `file:<path>`, or `defaults` — so a
+caller can assert it got the policy it asked for. The flag is opt-in and changes nothing when absent: the
 default remains the documented upward search from the working directory.
 
 Callers reviewing code they do not control should treat exit 0 as a pass only
@@ -780,13 +785,11 @@ def find_config(explicit: str | None) -> str | None:
         here = parent
 
 
-# The gitrevisions lookup order for a non-fully-qualified `<refname>`, minus
-# rule 1 (`$GIT_DIR/<refname>`): git only honours that form for a handful of
-# all-caps root refs (`HEAD`, `FETCH_HEAD`, `ORIG_HEAD`, ...), which
-# `_reject_ambiguous_ref` returns early on, and `for-each-ref` does not list
-# them anyway. The remaining five are the forms two different refs can both
-# claim — and the order matters: `refs/heads/<ref>` is consulted *before*
-# `refs/remotes/<ref>`, which is the whole of the defect below.
+# The gitrevisions lookup order for a short `<refname>`, minus rule 1
+# (`$GIT_DIR/<refname>`). `for-each-ref` never lists that file, so it can be no
+# candidate here; it is kept out by reading through the listed ref's object id
+# rather than by name (see `_resolve_policy_ref`). The order matters:
+# `refs/heads/<ref>` is consulted *before* `refs/remotes/<ref>`.
 _REF_LOOKUP_RULES = (
     "refs/{ref}",
     "refs/tags/{ref}",
@@ -796,41 +799,84 @@ _REF_LOOKUP_RULES = (
 )
 
 
-def _reject_ambiguous_ref(ref: str) -> None:
-    """Fail closed when `ref` could name more than one ref — exit 4.
+def _is_ref_name(ref: str) -> bool:
+    """True when `git check-ref-format --allow-onelevel` accepts `ref`.
 
-    A short `<refname>` is not a name, it is a *search*: git tries the five
-    forms above in order and takes the first hit. So `refs/heads/origin/main`
-    shadows `refs/remotes/origin/main`, and every caller of this script binds
-    the short `origin/<default-branch>` form. `/issue-pr-review` Step 1 runs
+    That rejects revision syntax — `~`, `^`, `:`, `@{`, `..`, a lone `@` — which
+    git would resolve by looking the name inside it up again by itself.
+    """
+    try:
+        return subprocess.run(
+            ["git", "check-ref-format", "--allow-onelevel", ref],
+            capture_output=True,
+            check=False,
+        ).returncode == 0
+    except (OSError, ValueError) as exc:  # git missing, or a bad argv
+        raise Unavailable(f"cannot run git — {exc}") from exc
+
+
+def _resolve_policy_ref(ref: str) -> str:
+    """The commit id `ref` names as exactly one listed ref — else exit 4.
+
+    A ref name is not a name to git, it is a *search*, and every step of it can
+    land on a ref the reviewed branch wrote. `/issue-pr-review` Step 1 runs
     `gh pr checkout`, which materialises the pull request's own — attacker
-    chosen — `headRefName` as a *local branch*: a branch literally named
-    `origin/main` therefore wins the lookup and re-supplies the reviewed
-    branch's `.idd.yml` as the "trusted" policy, while `policy_source`
-    still reports `ref:origin/main`, exactly the ref the caller asked for.
+    chosen — `headRefName` as a *local branch*, so:
+
+      * a short `origin/main` tries `refs/heads/origin/main` before
+        `refs/remotes/origin/main`;
+      * a fully-qualified `refs/remotes/origin/main` that does not exist falls
+        through to `refs/heads/refs/remotes/origin/main`;
+      * a revision suffix (`origin/main~0`, `^0`, `@{0}`, `^{commit}`) is looked
+        up by git again, past any check made on the plain name;
+      * `$GIT_DIR/origin/main`, a file, is consulted before every `refs/` form.
+
+    Each one re-supplies the reviewed branch's `.idd.yml` as the "trusted"
+    policy while `policy_source` still reports the ref the caller asked for. So
+    the name is checked once, against what `git for-each-ref` lists, and the
+    commit id that listing carries is what every later read uses:
+
+      1. `HEAD` is the commit checked out.
+      2. Anything else must pass `git check-ref-format --allow-onelevel`.
+      3. A `refs/...` name must be listed exactly as itself. A short name must
+         match exactly one of the five forms above; two is ambiguous. A short
+         name containing `/` must match `refs/remotes/<ref>` — a local branch
+         or tag of that name is refused even when it is the only match.
+      4. The listed object id, peeled to a commit, is the answer.
 
     Detected mechanically rather than by reading git's `warning: refname ... is
     ambiguous` line: that text is localizable, version-dependent, and lands on
-    a stderr this script discards. A ref that resolves to anything other than
-    exactly one ref was never read from the reviewing side, so it raises
-    Unavailable rather than being scanned under.
-
-    A fully-qualified `refs/...` name and `HEAD` both resolve unambiguously and
-    are returned early; zero matches fall through to the caller's existing
-    absent-versus-unreadable split, which is unchanged.
+    a stderr this script discards. A ref that is not exactly one listed ref was
+    never read from the reviewing side, so it raises Unavailable rather than
+    being scanned under.
     """
-    if ref.startswith("refs/") or ref == "HEAD":
-        return
-    candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
+    if ref == "HEAD":
+        return _policy_commit(ref, "HEAD")
+    if not _is_ref_name(ref):
+        raise Unavailable(
+            f"--policy-ref {ref} is not a ref name — revision syntax such as "
+            "~, ^, : or @{...} is looked up by git again and could reach a "
+            "branch the reviewed side wrote; pass the ref itself"
+        )
+    if ref.startswith("refs/"):
+        candidates = [ref]
+    else:
+        candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
     # `_git`, not a raw `subprocess.run`: it places `--no-replace-objects` as
     # the top-level option it has to be, and turns a git failure into
     # Unavailable — which is the fail-closed direction this check wants anyway.
-    listed = _git(["for-each-ref", "--format=%(refname)", *candidates])
+    listed = _git(
+        ["for-each-ref", "--format=%(refname)%00%(objectname)", "--", *candidates]
+    )
     # Exact membership, because a `for-each-ref` pattern matches "completely or
     # from the beginning up to a slash": a bare prefix hit is not a ref this
     # lookup would ever reach, and counting it would degrade a healthy repo.
-    wanted = set(candidates)
-    found = {line for line in listed.split("\n") if line in wanted}
+    rows = {}
+    for line in listed.split("\n"):
+        name, sep, oid = line.partition("\0")
+        if sep and name in candidates:
+            rows[name] = oid
+    found = [name for name in candidates if name in rows]
     if len(found) > 1:
         raise Unavailable(
             f"--policy-ref {ref} is ambiguous — it names "
@@ -839,6 +885,33 @@ def _reject_ambiguous_ref(ref: str) -> None:
             "nothing was scanned under it; pass the fully-qualified name of "
             "the one you mean"
         )
+    if not found:
+        raise Unavailable(
+            f"--policy-ref {ref} is not an existing ref — the reviewing side's "
+            "policy could not be read, so nothing was scanned under it; pass a "
+            "ref `git for-each-ref` lists"
+        )
+    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":
+        raise Unavailable(
+            f"--policy-ref {ref} names {found[0]}, not refs/remotes/{ref} — a "
+            "short name containing / must be a remote-tracking ref; pass the "
+            "fully-qualified name to use any other"
+        )
+    return _policy_commit(rows[found[0]], ref)
+
+
+def _policy_commit(spec: str, ref: str) -> str:
+    """The commit `spec` peels to, or Unavailable naming `ref`."""
+    try:
+        oid = _git(
+            ["rev-parse", "--verify", "--quiet", "--end-of-options", f"{spec}^{{commit}}"]
+        ).strip()
+    except Unavailable as exc:
+        raise Unavailable(
+            f"--policy-ref {ref} does not resolve to a commit — the reviewing "
+            "side's policy could not be read, so nothing was scanned under it"
+        ) from exc
+    return oid
 
 
 def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
@@ -862,13 +935,12 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     never a silent fall back to the branch's file, which would hand the decision
     straight back to the artifact. A ref that does not resolve is `Unavailable`
     (exit 4, the documented degrade), because a policy that could not be read is
-    not a policy that permitted anything. And a ref that resolves to *more than
-    one* ref is `Unavailable` too: the short `origin/<branch>` form every call
-    site binds is resolved by git as `refs/heads/` before `refs/remotes/`, and
-    `gh pr checkout` materialises the pull request's attacker-chosen head-ref
-    name as a local branch — so a branch named `origin/main` re-supplies its own
-    policy while `policy_source` still names the ref the caller asked for. See
-    `_reject_ambiguous_ref`.
+    not a policy that permitted anything. And a ref that is not exactly one
+    listed ref — ambiguous, a local branch standing in for a remote-tracking
+    one, or carrying revision syntax — is `Unavailable` too, because each of
+    those can be a branch the pull request wrote while `policy_source` still
+    names the ref the caller asked for. Every read then goes through the commit
+    id that check returns, never the name. See `_resolve_policy_ref`.
     """
     if not ref:
         # An empty value is a malformed invocation, not an opt-out. Treating it
@@ -881,43 +953,39 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
         # a revision. Same rule as `--range` — no shell is involved, but argv
         # injection is still injection.
         raise UsageError(f"--policy-ref value must be a revision, not an option: {ref!r}")
-    # After both usage guards and before `spec`: an empty or option-shaped value
-    # is a malformed invocation (exit 2), while an ambiguous one is a policy that
-    # could not be identified (exit 4). Reordering these flips a pinned contract.
-    _reject_ambiguous_ref(ref)
-    text = _read_ref_config(ref, CONFIG_NAME)
+    # After both usage guards and before any read: an empty or option-shaped
+    # value is a malformed invocation (exit 2), while a ref that is not exactly
+    # one listed ref is a policy that could not be identified (exit 4).
+    # Reordering these flips a pinned contract.
+    oid = _resolve_policy_ref(ref)
+    text = _read_ref_config(oid, CONFIG_NAME)
     if text is None:
         # The legacy name is consulted only when `.idd.yml` is *absent* at the
         # ref. A `.idd.yml` that is present but unreadable has already raised
         # Unavailable above: falling through to the legacy file there would
         # let an unreadable trusted policy be replaced by an older one.
-        text = _read_ref_config(ref, LEGACY_CONFIG_NAME)
+        text = _read_ref_config(oid, LEGACY_CONFIG_NAME)
         if text is not None:
             print(
                 f"⚠ legacy {LEGACY_CONFIG_NAME} found at {ref} — rename to {CONFIG_NAME}",
                 file=sys.stderr,
             )
     if text is None:
-        # Either the ref itself is absent — exit 4, because a policy that could
-        # not be read permitted nothing — or it resolves and simply ships no
-        # config, which is the built-in defaults and never the work-tree file.
-        try:
-            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
-        except Unavailable as exc:
-            raise Unavailable(
-                f"--policy-ref {ref} does not resolve — the reviewing side's "
-                "policy could not be read, so nothing was scanned under it"
-            ) from exc
+        # The ref resolved to a commit that ships no config: the built-in
+        # defaults, never the work-tree file.
         return {}, f"ref:{ref}"
     return parse_security_config(text), f"ref:{ref}"
 
 
-def _read_ref_config(ref: str, name: str) -> str | None:
-    """The text of `<ref>:<name>`, or None when no such path exists there.
+def _read_ref_config(commit: str, name: str) -> str | None:
+    """The text of `<commit>:<name>`, or None when no such path exists there.
+
+    `commit` is the object id `_resolve_policy_ref` returned, never a ref name:
+    a name would be looked up by git again.
 
     Raises Unavailable when the path exists but is not a readable blob.
     """
-    spec = f"{ref}:{name}"
+    spec = f"{commit}:{name}"
     # Ask whether a blob exists at that path *before* reading it, so the two
     # non-zero outcomes below stay distinguishable. Without this probe every
     # failure to read collapses into "the ref has no config": a `.idd.yml`
@@ -1632,7 +1700,10 @@ def main(argv: list[str] | None = None) -> int:
             f"when REF has no {CONFIG_NAME}) instead of the work tree. "
             "For callers reviewing code they do not control: the checked-out "
             "config is written by the branch under review and can allow-list "
-            "its own secrets. Reported as policy_source"
+            "its own secrets. REF is HEAD or exactly one listed ref: an "
+            "existing refs/... name, or a short name naming one ref (with a /, "
+            "the remote-tracking one); no revision syntax. Reported as "
+            "policy_source"
         ),
     )
     tuning.add_argument(
