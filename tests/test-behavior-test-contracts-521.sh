@@ -93,7 +93,7 @@ removal_ok() {
   local s
   s="$(section "$1" '### 2–4. Write tests')"
   has "$s" '\*\*only\*\* when an acceptance criterion or plan item removes the behavior' &&
-    has "$s" 'Never remove a test just to turn the suite green'
+    has "$s" 'Never remove a test, or add a skip, xfail, retry or sleep to an existing test, just to turn the suite green'
 }
 
 reviewer_ok() {

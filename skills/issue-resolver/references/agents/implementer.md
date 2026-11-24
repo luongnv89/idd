@@ -94,7 +94,7 @@ Write one focused test per behavior stated in the plan or an acceptance criterio
 
 **Equivalence — a behavior-preserving change keeps its pinned outputs.** When the plan declares no behavior change (a refactor or cleanup), name the existing tests that pin the touched code's observable outputs before editing — return values, printed text, exit codes, and the negative and error-path tests that pin each rejection — and run them green. If no test pins an output the change touches, add a characterization test first. Afterwards they must pass **unedited**: a pinned assertion you had to change means behavior changed. A `differential` criterion also gets a test that runs the old code (the base revision) and the new code on the same inputs and fails on any difference not in the plan's approved list.
 
-**Removing or weakening a test needs a recorded reason.** Delete a test, drop or loosen an assertion, or retire a negative test **only** when an acceptance criterion or plan item removes the behavior it pins. Name that criterion or item in the commit message body and under *Test Integrity*. Never remove a test just to turn the suite green.
+**Removing or weakening a test needs a recorded reason.** Delete a test, drop or loosen an assertion, or retire a negative test **only** when an acceptance criterion or plan item removes the behavior it pins. Name that criterion or item in the commit message body and under *Test Integrity*. Never remove a test, or add a skip, xfail, retry or sleep to an existing test, just to turn the suite green.
 
 ### 5. Verify tests parse
 

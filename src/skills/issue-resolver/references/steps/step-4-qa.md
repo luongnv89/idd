@@ -43,14 +43,13 @@ Each cycle:
 4. **Evaluate results:** <!-- a:rs-qa-evaluate -->
    - Reviewer returns `PASS` AND all tests pass AND build succeeds AND no static check failed → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
+   - A test that failed in an earlier cycle and passes now with no change on its code path is **flaky**: a finding, never evidence for a criterion. It ends root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue (`gh issue create`); the Decision Record's *Flaky tests* line says which.
 5. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings, failing test/build/static-check output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available. **Before every fix request after the second** (spawn or re-message), run the *Premise reset* check below; its block holds the request.
 
 **Profile carry.** The pipeline profile *Step 0g* selected — `light` or `full` —
 is carried to Deliver and written as the QA handoff marker's `profile=` field
 (`references/report-templates.md`, *QA handoff marker*). Unlike `tests=` and
-`ui=`'s `@<sha40>`, it has no omit rule, so it is never dropped and never guessed:
-it is already in hand from Step 0g, and carrying it costs nothing, exactly as
-`tests_state` and `ui_sha` are carried from where they are captured.
+`ui=`'s `@<sha40>`, it has no omit rule, so it is never dropped and never guessed.
 
 ### Last-green test state <!-- a:rs-last-green-state -->
 
@@ -67,10 +66,7 @@ Captured **where the work ran**, never reconstructed and never restored from a
 progress record: the count the suite
 reported, and `tests_sha` = `git rev-parse HEAD` evaluated in the same step,
 *before* anything else commits. Full 40-character SHA — the short form is
-display-only. It is a
-**run-state variable**, not merely the marker field it renders into;
-`references/report-templates.md` (*QA handoff marker*) describes how to render
-it; it neither defines nor consumes the run-state decision.
+display-only.
 
 Two run-state consumers, and no others:
 
@@ -108,11 +104,6 @@ suite. `resolve.adaptive_effort: false` also forces `run`.
 Never compare against a SHA captured anywhere but
 the step that ran the suite, and never substitute the current head for a missing
 record.
-
-*Update documentation* commits **after** Step 5's Verify (see the Deliver order in
-SKILL.md), so a doc-only commit is never covered by `tests_state`; that is why
-`tests=` is captured
-in Step 4 rather than at push time.
 
 One `○` line per skip, per docs/terminal-style.md:
 

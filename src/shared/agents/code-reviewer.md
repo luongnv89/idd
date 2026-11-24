@@ -39,7 +39,7 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
 4. Review across:
    - **Correctness**: logic errors, off-by-one, wrong conditions, missing returns, races
    - **Test coverage**: are new paths tested? meaningful tests (not trivial assertions)? missing edge cases?
-   - **Test integrity** (category `test_coverage`): the diff deletes a test, drops or loosens an assertion, or retires a negative/error-path test, and no acceptance criterion or plan item in the PR context above or that commit's message removes the behavior it pinned; or a change declared behavior-preserving edits an existing test's expected output
+   - **Test integrity** (category `test_coverage`): the diff deletes a test, drops or loosens an assertion, or retires a negative/error-path test, and no acceptance criterion or plan item in the PR context above or that commit's message removes the behavior it pinned, and neither records the test as flaky; or it adds a skip, xfail, retry or sleep to an existing test; or a change declared behavior-preserving edits an existing test's expected output
    - **Code quality**: dead code, unused imports, duplicated logic, overly complex functions (NOT style)
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
