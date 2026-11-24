@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **tests:** a stale local build no longer fails the shared-agent conventions test (#680). `tests/test-agent-conventions-inline-245.sh` added the gitignored `dist/agents/*.md` to its scan whenever that directory existed, so a `dist/` left by an earlier `bash scripts/build.sh --out dist` failed T2 after `docs/shared-agent-conventions.md` changed, while every tracked file was correct. The test now scans only the committed `skills/*/references/agents/` and `.pi/agents/` trees: 23 files against the `>= 21` guard and 11 fenced prompts against the `>= 9` guard.
 - **tests:** make `tests/test-idd-lint.sh` T32 pass with the stock macOS awk (#679). `add_results()` passed its multi-line value to awk with `-v lines=…`, which BSD awk rejects (`awk: newline in string`), so the T32 fixtures were never written and the script exited 2. `tests/test-config-errors-clock-pin-356.sh` failed with it at T3.4, because it runs that script. The value now reaches awk through the environment (`ENVIRON["lines"]`), which every POSIX awk reads. No value contains a backslash, so the fixtures are byte-identical under gawk, mawk and busybox awk, and no assertion changed.
 
+### Documentation
+- **values checklist:** approve a growth-cap exemption for issue-pr-review against v0.28.0 (#660). The bundle is 6,759 bytes (+1.99%) above its size at that tag, 14 bytes under the 2% cap, and reading reviewer rules from the base branch adds about 384 bytes to `code-reviewer.md`. The new `docs/VALUES.md` *Change log* row names the skill and the tag, so `scripts/skill-budget.py` exempts issue-pr-review for this release; no other bundle is exempted.
+
 ## v0.28.0 — 2026-11-21
 
 ### Features
