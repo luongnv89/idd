@@ -26,9 +26,11 @@
 #       skip, xfail, retry or sleep on an existing test (pinned in the B2/B4
 #       checks); Step 4 treats a test that fails in one cycle and passes in a
 #       later one with no change on its code path as flaky, never as evidence,
-#       and gives it three endings; the Decision Record says which; a flaky
-#       record is the one other reason to delete a test. Source, built copies,
-#       and a targeted mutation per pin.
+#       sends it to the fixer, holds the clean exit until it ends, and gives
+#       it three endings; the Decision Record says which; a flaky record is
+#       the one other reason to delete a test. The reviewer's ban spares a
+#       skip a criterion or plan item asks for. Source, built copies, and a
+#       targeted mutation per pin.
 #
 # Usage: bash tests/test-behavior-test-contracts-521.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -108,6 +110,7 @@ reviewer_ok() {
     grep -qE 'behavior-preserving edits an existing test.s expected output' "$1" &&
     grep -qE '^   - \*\*Test integrity\*\*.*removes the behavior it pinned, and neither records the test as flaky' "$1" &&
     grep -qE '^   - \*\*Test integrity\*\*.*; or it adds a skip, xfail, retry or sleep to an existing test' "$1" &&
+    grep -qE '^   - \*\*Test integrity\*\*.*to an existing test that no criterion or plan item asks for; or a change' "$1" &&
     grep -qE '^   - \*\*"fix"\*\*:.*a test-integrity break at any severity' "$1"
 }
 
@@ -125,10 +128,11 @@ flaky_rule_ok() {
   local r
   r="$(anchor_region "$1" rs-qa-evaluate)" || return 1
   r="$(printf '%s\n' "$r" | tr '\n' ' ')"
-  has "$r" 'failed in an earlier cycle and passes now with no change on its code path is \*\*flaky\*\*: a finding' &&
-    has "$r" 'never evidence for a criterion' &&
-    has "$r" 'root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue' &&
-    has "$r" 'the Decision Record.s \*Flaky tests\* line says which'
+  has "$r" 'failed in an earlier cycle and passes now with no change on its code path is \*\*flaky\*\*: never evidence for a criterion' &&
+    has "$r" 'and a finding for the fixer' &&
+    has "$r" 'that keeps the cycle from clean until it ends root-caused' &&
+    has "$r" 'root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue\.' &&
+    has "$r" 'The Decision Record.s \*Flaky tests\* line says which'
 }
 
 # flaky_record_ok TEMPLATES — the Decision Record line sits directly after
@@ -263,7 +267,10 @@ check "B8: dropping the flaky record from the reviewer's deletion reasons turns 
 mutate "$CR" cr-no-ban.md '; or it adds a skip, xfail, retry or sleep to an existing test' '' \
   && ! reviewer_ok "$TMP/cr-no-ban.md"
 check "B8: dropping the reviewer's skip/xfail/retry/sleep ban turns the reviewer check red" "$?"
-mutate "$STEP4" step4-evidence.md 'a finding, never evidence for a criterion' 'a finding, evidence for a criterion' \
+mutate "$CR" cr-no-exception.md ' that no criterion or plan item asks for' '' \
+  && ! reviewer_ok "$TMP/cr-no-exception.md"
+check "B8: flagging a skip that a criterion or plan item asks for turns the reviewer check red" "$?"
+mutate "$STEP4" step4-evidence.md '**flaky**: never evidence for a criterion' '**flaky**: evidence for a criterion' \
   && ! flaky_rule_ok "$TMP/step4-evidence.md"
 check "B8: letting a flaky test count as evidence turns the Step 4 check red" "$?"
 mutate "$STEP4" step4-not-flaky.md 'with no change on its code path is **flaky**' 'is green' \
@@ -272,7 +279,13 @@ check "B8: accepting a fail-then-pass test as green turns the Step 4 check red" 
 mutate "$STEP4" step4-follow-up.md ' — only when it covers no criterion —' '' \
   && ! flaky_rule_ok "$TMP/step4-follow-up.md"
 check "B8: a follow-up for a test that covers a criterion turns the Step 4 check red" "$?"
-mutate "$STEP4" step4-no-record.md "; the Decision Record's *Flaky tests* line says which" '' \
+mutate "$STEP4" step4-no-fixer.md 'a finding for the fixer that keeps' 'a finding that keeps' \
+  && ! flaky_rule_ok "$TMP/step4-no-fixer.md"
+check "B8: a flaky finding that never reaches the fixer turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-clean.md ' that keeps the cycle from clean until it ends root-caused' '. It ends root-caused' \
+  && ! flaky_rule_ok "$TMP/step4-clean.md"
+check "B8: a flaky test that lets the cycle exit clean turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-no-record.md " The Decision Record's *Flaky tests* line says which." '' \
   && ! flaky_rule_ok "$TMP/step4-no-record.md"
 check "B8: dropping the Decision Record pointer turns the Step 4 check red" "$?"
 mutate "$TEMPLATES" tpl-no-reason.md 'deleted: <reason>' 'deleted' \
