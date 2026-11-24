@@ -97,13 +97,12 @@ plan, writing rebuttals — stays with the agent.
   Checked last, so a path that matches a class above keeps that class
   (pyproject.toml and package.json stay dependency-manifest):
 
-    verification-config  the files that configure the checks a change is
-                     judged by, at any depth. Test runner: pytest.ini,
-                     conftest.py, tox.ini, jest.config.*, vitest.config.*,
-                     playwright.config.*. Lint: .eslintrc*, eslint.config.*,
-                     ruff.toml, .ruff.toml, .flake8. Type check: mypy.ini,
-                     tsconfig*.json. Coverage: .coveragerc, codecov.yml,
-                     .codecov.yml, .nycrc*
+    verification-config  config of the checks that judge a change, at any
+                     depth. Test runner: pytest.ini, conftest.py, tox.ini,
+                     jest.config.*, vitest.config.*, playwright.config.*.
+                     Lint: .eslintrc*, eslint.config.*, ruff.toml, .ruff.toml,
+                     .flake8. Type check: mypy.ini, tsconfig*.json. Coverage:
+                     .coveragerc, codecov.yml, .codecov.yml, .nycrc*
 
 --adjudicate
   Reads the gate's ledger on stdin:
@@ -302,8 +301,7 @@ def path_class(raw: str) -> str | None:
     if dirs & MIGRATION_DIRS:
         return "migration"
     if (
-        low_name in VERIFICATION_FILES
-        or low_name.startswith(VERIFICATION_PREFIXES)
+        low_name in VERIFICATION_FILES or low_name.startswith(VERIFICATION_PREFIXES)
         or (low_name.startswith("tsconfig") and low_name.endswith(".json"))
     ):
         return "verification-config"
