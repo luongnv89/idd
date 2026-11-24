@@ -15,7 +15,8 @@ plan, writing rebuttals — stays with the agent.
        "diff": "<base>...<head>"}
 
   and prints {"sensitive": true | false, "tier": "sensitive" | "standard",
-  "reasons": [{"source", "value", "class"}]}. `tier` is the one risk tier the
+  "reasons": [{"source", "value", "class"}],
+  "observed": [{"source", "value", "class"}]}. `tier` is the one risk tier the
   resolver (Step 2, and again at Deliver) and /issue-pr-review (Depth gate,
   Merge floor) read: `sensitive` exactly when `sensitive` is true (issue #569).
   Size never enters: one sensitive path or label is enough, and no Effort or
@@ -23,6 +24,10 @@ plan, writing rebuttals — stays with the agent.
   `paths` are required (an empty list is fine); a missing key, or any other
   top-level key not starting with `_` (`effort` included), is exit 3 — a
   misspelled `paths` must never read as "no sensitive path".
+
+  `observed` is always present. It lists each hit whose class is in
+  OBSERVE_ONLY: such a hit is reported and never enters `reasons`, so it
+  changes neither `sensitive` nor `tier`. Every other hit goes to `reasons`.
 
   `diff` is optional: a range `<base>...<head>` whose two sides are each
   non-empty, start with neither `-` nor `.`, use only `[A-Za-z0-9._/-]` and
@@ -88,6 +93,16 @@ plan, writing rebuttals — stays with the agent.
                      ansible, pulumi or cloudformation
     migration        a directory named migrations, migration, migrate or
                      alembic
+
+  Checked last, so a path that matches a class above keeps that class
+  (pyproject.toml and package.json stay dependency-manifest):
+
+    verification-config  config of the checks that judge a change, at any
+                     depth. Test runner: pytest.ini, conftest.py, tox.ini,
+                     jest.config.*, vitest.config.*, playwright.config.*.
+                     Lint: .eslintrc*, eslint.config.*, ruff.toml, .ruff.toml,
+                     .flake8. Type check: mypy.ini, tsconfig*.json. Coverage:
+                     .coveragerc, codecov.yml, .codecov.yml, .nycrc*
 
 --adjudicate
   Reads the gate's ledger on stdin:
@@ -197,6 +212,15 @@ INFRA_DIRS = frozenset({
     "pulumi", "cloudformation",
 })
 MIGRATION_DIRS = frozenset({"migrations", "migration", "migrate", "alembic"})
+VERIFICATION_FILES = frozenset({
+    "pytest.ini", "conftest.py", "tox.ini", "ruff.toml", ".ruff.toml", ".flake8", "mypy.ini",
+    ".coveragerc", "codecov.yml", ".codecov.yml",
+})
+VERIFICATION_PREFIXES = (
+    "jest.config.", "vitest.config.", "playwright.config.", ".eslintrc", "eslint.config.", ".nycrc",
+)
+# Classes that are reported in `observed` and kept out of `reasons`.
+OBSERVE_ONLY = frozenset({"verification-config"})
 # One side of a `diff` range: no leading `-` (an option) or `.`, no `..`.
 RANGE_SIDE = re.compile(r"[A-Za-z0-9_/][A-Za-z0-9._/-]*")
 # The head side is a commit, never a ref name a branch could shadow (#605).
@@ -276,6 +300,11 @@ def path_class(raw: str) -> str | None:
         return "infrastructure"
     if dirs & MIGRATION_DIRS:
         return "migration"
+    if (
+        low_name in VERIFICATION_FILES or low_name.startswith(VERIFICATION_PREFIXES)
+        or (low_name.startswith("tsconfig") and low_name.endswith(".json"))
+    ):
+        return "verification-config"
     return None
 
 
@@ -352,7 +381,8 @@ def classify(record: object) -> dict:
     labels = _string_list(record, "labels")
     paths = _string_list(record, "paths")
     changed = diff_paths(record["diff"]) if "diff" in record else []
-    reasons = []
+    reasons: list[dict] = []
+    observed: list[dict] = []
     for label in labels:
         if any(word in label.lower() for word in LABEL_WORDS):
             reasons.append({"source": "label", "value": label, "class": "label"})
@@ -364,10 +394,11 @@ def classify(record: object) -> dict:
             seen.add(path)
             cls = path_class(path)
             if cls:
-                reasons.append({"source": source, "value": path, "class": cls})
+                hits = observed if cls in OBSERVE_ONLY else reasons
+                hits.append({"source": source, "value": path, "class": cls})
     sensitive = bool(reasons)
     return {"sensitive": sensitive, "tier": "sensitive" if sensitive else "standard",
-            "reasons": reasons}
+            "reasons": reasons, "observed": observed}
 
 
 def _text(entry: dict, key: str) -> str:
@@ -517,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--classify", action="store_true",
                       help="labels + planned paths (+ optional diff range) on stdin → "
-                           "{sensitive, tier, reasons}")
+                           "{sensitive, tier, reasons, observed}")
     mode.add_argument("--adjudicate", action="store_true",
                       help="gate ledger on stdin → {verdict, open_blockers, …}")
     args = parser.parse_args(argv)
