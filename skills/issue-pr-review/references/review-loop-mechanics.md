@@ -432,8 +432,7 @@ predicate. Recompute it after **any push this skill makes**, and before the next
 step that reads the verdict. There are exactly two such pushes:
 
 - **Step 2's lint/format auto-fix commit** (*Commit auto-fixes*). It lands
-  before Step 3 and Step 4 ever consult the verdict, and the resolver runs no
-  lint/format of its own, so this is the *likely* case, not an exotic one. Miss
+  before Step 3 and Step 4 ever consult the verdict. Miss
   it and, when CI is runnable, both test legs are skipped on a commit no local
   suite has run — Step 2's leg is skipped before the auto-fix is even
   committed, Step 4's afterwards — leaving only Step 5's CI. Keep this
