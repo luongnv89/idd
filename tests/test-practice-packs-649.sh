@@ -103,6 +103,13 @@ for entry in $PACKS; do
     pass "$name.md installs nothing"
   fi
 done
+# T5 and T7 cover every test line a diff adds or edits, existing tests included
+# (#663): a skip, xfail, retry or sleep added to an existing test is a violation.
+TESTS_PACK="$PRACTICES/practice-tests.md"
+has "$TESTS_PACK" 'unconditional skip, xfail or retry on any test.' "T5 bans the markers on any test"
+has "$TESTS_PACK" '*Check:* no added line sleeps.' "T7's check covers every added line"
+lacks "$TESTS_PACK" 'on a new test' "T5 no longer stops at new tests"
+lacks "$TESTS_PACK" 'no new test sleeps' "T7 no longer stops at new tests"
 count="$(find "$PRACTICES" -type f -name 'practice-*.md' | wc -l | tr -d ' ')"
 if [ "$count" -eq 9 ]; then pass "8 packs plus the selection file are shared references"; else fail "src/shared/references holds $count practice-*.md files, expected 9"; fi
 

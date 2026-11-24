@@ -22,6 +22,13 @@
 #   B6  the built bundles carry the new contract.
 #   B7  sensitivity of this test itself: each targeted mutation of the
 #       contract text turns the matching check red.
+#   B8  the flaky-test policy (#663): implementer, fixer and reviewer ban a
+#       skip, xfail, retry or sleep on an existing test (pinned in the B2/B4
+#       checks); Step 4 treats a test that fails in one cycle and passes in a
+#       later one with no change on its code path as flaky, never as evidence,
+#       and gives it three endings; the Decision Record says which; a flaky
+#       record is the one other reason to delete a test. Source, built copies,
+#       and a targeted mutation per pin.
 #
 # Usage: bash tests/test-behavior-test-contracts-521.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -99,13 +106,48 @@ removal_ok() {
 reviewer_ok() {
   grep -qE '^   - \*\*Test integrity\*\* \(category `test_coverage`\):.*no acceptance criterion or plan item' "$1" &&
     grep -qE 'behavior-preserving edits an existing test.s expected output' "$1" &&
+    grep -qE '^   - \*\*Test integrity\*\*.*removes the behavior it pinned, and neither records the test as flaky' "$1" &&
+    grep -qE '^   - \*\*Test integrity\*\*.*; or it adds a skip, xfail, retry or sleep to an existing test' "$1" &&
     grep -qE '^   - \*\*"fix"\*\*:.*a test-integrity break at any severity' "$1"
 }
 
 fixer_ok() {
   ! grep -q 'without justification' "$1" &&
     grep -qE '^- Never hide a failing test by deleting it, dropping or loosening an assertion, retiring a negative test' "$1" &&
-    grep -qE 'only when an acceptance criterion or plan item removes the behavior it pins, and name that criterion' "$1"
+    grep -qE 'only when an acceptance criterion or plan item removes the behavior it pins, and name that criterion' "$1" &&
+    grep -qE '^- Never hide a failing test.*Delete a test a finding records as flaky only when no root cause is found, and name that reason' "$1" &&
+    grep -qE '^- Never hide a failing test.*Never add a skip, xfail, retry or sleep to an existing test' "$1"
+}
+
+# flaky_rule_ok STEP4 — the Evaluate block carries the one full statement of
+# the flaky rule.
+flaky_rule_ok() {
+  local r
+  r="$(anchor_region "$1" rs-qa-evaluate)" || return 1
+  r="$(printf '%s\n' "$r" | tr '\n' ' ')"
+  has "$r" 'failed in an earlier cycle and passes now with no change on its code path is \*\*flaky\*\*: a finding' &&
+    has "$r" 'never evidence for a criterion' &&
+    has "$r" 'root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue' &&
+    has "$r" 'the Decision Record.s \*Flaky tests\* line says which'
+}
+
+# flaky_record_ok TEMPLATES — the Decision Record line sits directly after
+# Premise reset and names the three endings.
+flaky_record_ok() {
+  awk '
+    prev ~ /^- \*\*Premise reset:\*\* / && /^- \*\*Flaky tests:\*\* / { found = 1 }
+    { prev = $0 }
+    END { exit found ? 0 : 1 }
+  ' "$1" &&
+    grep -qE '^- \*\*Flaky tests:\*\* \{only when Step 4 found one — .*: root-caused \| deleted: <reason> \| follow-up #<n>; omit otherwise\}$' "$1"
+}
+
+# flaky_pointer_ok STEP4 TEMPLATES — the Decision Record line Step 4 names
+# exists under that label in the template.
+flaky_pointer_ok() {
+  local label
+  label="$(grep -oE "Decision Record.s \*[^*]+\* line says which" "$1" | sed -E 's/^[^*]*\*([^*]+)\*.*$/\1/')"
+  [ -n "$label" ] && grep -qF -- "- **${label}:** " "$2"
 }
 
 echo "◆ Behavior-test sensitivity and equivalence (issue #521)"
@@ -129,7 +171,7 @@ check "B3: the contract's Returns line names both records" "$?"
 
 # ── B4: reviewer and fixer ───────────────────────────────────
 reviewer_ok "$CR"; check "B4: the code reviewer blocks an unjustified deleted or weakened test" "$?"
-fixer_ok "$FIXER"; check "B4: the fixer removes a test only with a named AC or plan item" "$?"
+fixer_ok "$FIXER"; check "B4: the fixer removes a test only with a named AC or plan item, or a recorded flaky finding" "$?"
 grep -qE 'when it must not change, keep the tests pinning it unedited' "$FIXER"
 check "B4: a behavior-preserving fix keeps its pinned tests unedited" "$?"
 
@@ -196,6 +238,49 @@ check "B7: demoting a test-integrity break to a note turns the reviewer check re
 mutate "$FIXER" fixer-escape.md 'retiring a negative test, or suppressing an error.' 'or suppressing errors without justification.' \
   && ! fixer_ok "$TMP/fixer-escape.md"
 check "B7: restoring the 'without justification' escape turns the fixer check red" "$?"
+
+# ── B8: the flaky-test policy ────────────────────────────────
+flaky_rule_ok "$STEP4"; check "B8: Step 4 treats a fail-then-pass test with no change on its code path as flaky, never as evidence" "$?"
+flaky_record_ok "$TEMPLATES"; check "B8: the Decision Record's Flaky tests line names the three endings" "$?"
+flaky_pointer_ok "$STEP4" "$TEMPLATES"; check "B8: the line Step 4 points to exists in the PR body template" "$?"
+BUILT_RS="$REPO_ROOT/skills/issue-resolver/references"
+flaky_rule_ok "$BUILT_RS/steps/step-4-qa.md" && flaky_record_ok "$BUILT_RS/report-templates.md" &&
+  flaky_pointer_ok "$BUILT_RS/steps/step-4-qa.md" "$BUILT_RS/report-templates.md"
+check "B8: skills/issue-resolver ships the flaky rule and its Decision Record line" "$?"
+
+mutate "$IMPL" impl-skip.md ', or add a skip, xfail, retry or sleep to an existing test,' '' \
+  && ! removal_ok "$TMP/impl-skip.md"
+check "B8: dropping the implementer's skip/xfail/retry/sleep ban turns the removal check red" "$?"
+mutate "$FIXER" fixer-sleep.md 'Never add a skip, xfail, retry or sleep to an existing test.' 'Never add a skip, xfail or retry to an existing test.' \
+  && ! fixer_ok "$TMP/fixer-sleep.md"
+check "B8: dropping 'sleep' from the fixer's ban turns the fixer check red" "$?"
+mutate "$FIXER" fixer-no-cause.md ' only when no root cause is found' '' \
+  && ! fixer_ok "$TMP/fixer-no-cause.md"
+check "B8: deleting a flaky test without seeking its root cause turns the fixer check red" "$?"
+mutate "$CR" cr-no-flaky.md ', and neither records the test as flaky' '' \
+  && ! reviewer_ok "$TMP/cr-no-flaky.md"
+check "B8: dropping the flaky record from the reviewer's deletion reasons turns the reviewer check red" "$?"
+mutate "$CR" cr-no-ban.md '; or it adds a skip, xfail, retry or sleep to an existing test' '' \
+  && ! reviewer_ok "$TMP/cr-no-ban.md"
+check "B8: dropping the reviewer's skip/xfail/retry/sleep ban turns the reviewer check red" "$?"
+mutate "$STEP4" step4-evidence.md 'a finding, never evidence for a criterion' 'a finding, evidence for a criterion' \
+  && ! flaky_rule_ok "$TMP/step4-evidence.md"
+check "B8: letting a flaky test count as evidence turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-not-flaky.md 'with no change on its code path is **flaky**' 'is green' \
+  && ! flaky_rule_ok "$TMP/step4-not-flaky.md"
+check "B8: accepting a fail-then-pass test as green turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-follow-up.md ' — only when it covers no criterion —' '' \
+  && ! flaky_rule_ok "$TMP/step4-follow-up.md"
+check "B8: a follow-up for a test that covers a criterion turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-no-record.md "; the Decision Record's *Flaky tests* line says which" '' \
+  && ! flaky_rule_ok "$TMP/step4-no-record.md"
+check "B8: dropping the Decision Record pointer turns the Step 4 check red" "$?"
+mutate "$TEMPLATES" tpl-no-reason.md 'deleted: <reason>' 'deleted' \
+  && ! flaky_record_ok "$TMP/tpl-no-reason.md"
+check "B8: a deletion with no written reason turns the Decision Record check red" "$?"
+mutate "$TEMPLATES" tpl-renamed.md '- **Flaky tests:** ' '- **Unstable tests:** ' \
+  && ! flaky_pointer_ok "$STEP4" "$TMP/tpl-renamed.md"
+check "B8: renaming the template line turns the pointer check red" "$?"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Result: $PASS passed, $FAIL failed"
