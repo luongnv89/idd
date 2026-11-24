@@ -107,9 +107,10 @@ done
 # (#663): a skip, xfail, retry or sleep added to an existing test is a violation.
 TESTS_PACK="$PRACTICES/practice-tests.md"
 has "$TESTS_PACK" 'unconditional skip, xfail or retry on any test.' "T5 bans the markers on any test"
-has "$TESTS_PACK" '*Check:* no added line sleeps.' "T7's check covers every added line"
+has "$TESTS_PACK" '*Check:* no added test line sleeps.' "T7's check covers every added test line"
 lacks "$TESTS_PACK" 'on a new test' "T5 no longer stops at new tests"
 lacks "$TESTS_PACK" 'no new test sleeps' "T7 no longer stops at new tests"
+lacks "$TESTS_PACK" 'no added line sleeps' "T7's check stays on test lines"
 count="$(find "$PRACTICES" -type f -name 'practice-*.md' | wc -l | tr -d ' ')"
 if [ "$count" -eq 9 ]; then pass "8 packs plus the selection file are shared references"; else fail "src/shared/references holds $count practice-*.md files, expected 9"; fi
 
