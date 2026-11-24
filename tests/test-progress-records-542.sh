@@ -552,6 +552,87 @@ V2="$(printf '%s' "$COV" | sed 's/ on every device//' | python3 "$READY" --cover
 [ "$V1" = "renumbered" ] && [ "$V2" = "covered" ]
 check "p584e-resume-coverage: a criterion edited between sessions is not covered (got $V1; unedited $V2)" "$?"
 
+# ─── p683: every patch shape the skill docs show is one the script accepts ───
+# Each replay below sends, in order, the patches of a *Writing it* table: the
+# resolver's step-0j-progress-record.md (with its `plan` paragraph) and the
+# reviewer's progress-record-mechanics.md. A doc that shows a key at the wrong
+# level makes the skill lose its record at exit 3, so every write must exit 0.
+K="$TMP/shapes683"; new_repo "$K" fix/83-shapes
+SHA683="$(git -C "$K" rev-parse HEAD)"
+PLAN683='{"step": 3, "plan": {"selected": {"number": 2, "name": "Balanced", "summary": "Nest the \"plan\" & qa shapes — naïve <b>", "files_to_modify": ["src/a.md"], "files_to_create": ["tests/b.sh"], "test_strategy": "replay", "complexity": "S", "risk": "Low"}, "rejected": [{"number": 1, "name": "Minimal", "rejection_reason": "no test"}], "overall_complexity": "S", "overall_risk": "Low", "sensitive": false, "criteria_covered": ["AC1", "AC2"], "criteria": [{"id": "AC1", "text": "one"}, {"id": "AC2", "text": "two"}]}}'
+FAIL683='{"kind": "failure", "premise": "the cache is warm"}'
+put "$K" start issue-resolver 83 '{"step": 0, "base": "main", "issue_updated_at": "2026-01-02T03:04:05Z", "worktree": false, "caller_run_id": "run-683"}'; RC1=$RC
+BAD="$(walk issue-resolver 83 \
+  '{"effect": {"kind": "issue_edit", "state": "intent", "key": {}}}' \
+  '{"step": 1, "profile": "full", "analysis_reuse": "absent"}' \
+  '{"effect": {"kind": "issue_comment", "state": "intent", "key": {}}}' \
+  '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working", "op": "add"}}}' \
+  '{"step": 2, "research": {"affected_files": ["src/a.md"]}, "issue_updated_at": "2026-01-02T03:04:06Z"}' \
+  "$PLAN683" \
+  '{"step": 4, "repro": {"status": "red", "test": "tests/b.sh"}}' \
+  '{"qa": {"cycle": 1, "ceiling": 3}}' \
+  "{\"qa\": {\"premise_ledger\": [$FAIL683], \"open_findings\": [\"a.md:3 stale pointer\"]}}" \
+  '{"qa": {"cycle": 2, "ceiling": 3}}' \
+  "{\"qa\": {\"premise_ledger\": [$FAIL683, $FAIL683], \"open_findings\": []}}" \
+  '{"step": 5}' \
+  "{\"effect\": {\"kind\": \"push\", \"state\": \"intent\", \"key\": {\"sha\": \"$SHA683\"}}}" \
+  '{"effect": {"kind": "pr_create", "state": "intent", "key": {"branch": "fix/83-shapes"}}}' \
+  '{"pr": 84}' \
+  '{"effect": {"kind": "label_edit", "state": "intent", "key": {"label": "agent:working", "op": "remove"}}}' \
+  '{"step": "closing", "outcome": "success", "effect": {"kind": "run_log", "state": "intent", "key": {}}}')"
+[ "$RC1" = 0 ] && [ -z "$BAD" ]
+check "p683a-resolver-shapes: every step-0j patch, start to closing, exits 0 (start rc=$RC1)${BAD:+ —$BAD}" "$?"
+gp "$K" --read --skill issue-resolver --number 83
+[ "$(js 'd["record"]["plan"]["selected"]["summary"]')" = 'Nest the "plan" & qa shapes — naïve <b>' ] \
+  && [ "$(js 'd["record"]["plan"]["selected"]["files_to_create"][0]')" = "tests/b.sh" ] \
+  && [ "$(js 'd["record"]["plan"]["rejected"][0]["rejection_reason"]')" = "no test" ] \
+  && [ "$(js 'd["record"]["plan"]["criteria_covered"][1]')" = "AC2" ] \
+  && [ "$(js 'len(d["record"]["qa"]["premise_ledger"])')" = "2" ] \
+  && [ "$(js 'd["record"]["qa"]["open_findings"]')" = "[]" ] \
+  && [ "$(js 'd["record"]["qa"]["ceiling"]')" = "3" ] && [ "$(js 'd["record"]["qa"]["cycle"]')" = "2" ] \
+  && [ "$(js 'd["record"]["repro"]["status"]')" = "red" ] \
+  && [ "$(js 'd["record"]["pr"]')" = "84" ] && [ "$(js 'd["record"]["step"]')" = "closing" ]
+check "p683a-resolver-shapes: plan.selected, the plan-level keys and the qa lists read back as sent" "$?"
+
+# The flat shapes stay refused, each by the screen that names the misplaced key.
+put "$K" start issue-resolver 85 '{"step": 2}'
+BEFORE="$(cat "$K/.git/idd/progress/issue-resolver-85.json")"
+BADF=""
+while IFS='|' read -r patch want; do
+  put "$K" write issue-resolver 85 "$patch"
+  { [ "$RC" = 3 ] && grep -qF "$want" "$TMP/err" \
+    && [ "$(cat "$K/.git/idd/progress/issue-resolver-85.json")" = "$BEFORE" ]; } || BADF="$BADF $patch(rc=$RC)"
+done <<'EOF'
+{"step": 3, "plan": {"name": "x", "summary": "s"}}|plan.name is not a known key
+{"step": 3, "plan": {"number": 1, "name": "x"}}|plan.number is never recorded
+{"step": 3, "plan": {"selected": {"name": "x", "criteria_covered": ["AC1"]}}}|plan.selected.criteria_covered is not a known key
+{"open_findings": []}|open_findings is not a known issue-resolver key
+{"premise_ledger": []}|premise_ledger is not a known issue-resolver key
+EOF
+[ -z "$BADF" ]; check "p683b-flat-shapes-refused: a selected-option field at the plan level, criteria_covered under selected, and a qa list at the top level exit 3 and write nothing${BADF:+ (accepted:$BADF)}" "$?"
+
+put "$K" start issue-pr-review 86 '{"step": 1, "linked_issue": 83, "profile": "light", "caller_run_id": "run-683"}'; RC1=$RC
+BAD="$(walk issue-pr-review 86 \
+  '{"step": 2}' \
+  "{\"effect\": {\"kind\": \"push\", \"state\": \"intent\", \"key\": {\"sha\": \"$SHA683\"}}}" \
+  "{\"step\": 3, \"prepass_head\": \"$SHA683\", \"cycle\": 1}" \
+  '{"step": 4}' '{"step": 5}' '{"step": 6}' \
+  '{"effect": {"kind": "body_edit", "state": "intent", "key": {}}}' \
+  '{"findings": {"open": ["a.md:3 stale pointer"], "noted": [{"file": "b.sh", "line": 7, "text": "nit"}]}, "history": [["a.md:3 stale pointer"]]}' \
+  '{"step": 3, "cycle": 2}' \
+  '{"step": 4}' '{"step": 5}' '{"step": 6}' \
+  '{"findings": {"open": [], "noted": []}, "history": [["a.md:3 stale pointer"], []]}' \
+  '{"step": 7}' \
+  "{\"effect\": {\"kind\": \"merge\", \"state\": \"intent\", \"key\": {\"sha\": \"$SHA683\"}}}" \
+  '{"step": "closing", "outcome": "MERGED"}')"
+put "$K" start issue-pr-review 87 '{"step": 1, "linked_issue": null, "profile": "full"}'
+[ "$RC1" = 0 ] && [ "$RC" = 0 ] && [ -z "$BAD" ]
+check "p683c-reviewer-shapes: every progress-record-mechanics patch, start to closing, exits 0 (start rc=$RC1/$RC)${BAD:+ —$BAD}" "$?"
+gp "$K" --read --skill issue-pr-review --number 86
+[ "$(js 'd["record"]["cycle"]')" = "2" ] && [ "$(js 'd["record"]["prepass_head"]')" = "$SHA683" ] \
+  && [ "$(js 'len(d["record"]["history"])')" = "2" ] && [ "$(js 'd["record"]["outcome"]')" = "MERGED" ]
+check "p683c-reviewer-shapes: cycle, prepass_head, history and the outcome read back as sent" "$?"
+
 # ─── S5: clear, usage and degrade exits; text stays data ─────────────────────
 gp "$C" --clear --skill issue-resolver --number 23
 FIRST="$(js 'd["cleared"]')"
@@ -763,6 +844,25 @@ PY
 check "p17-research-pin-post-normalize: the research write carries issue_updated_at after 0d (${P17:-no region})" "$?"
 anchor_check_flat "$RS" rs-0j-writes 'same patch.*0d.s re-fetch' \
   "p17-research-pin-post-normalize: the value is 0d's re-fetch, sent in the same patch as research"
+
+# p683: the plan paragraph and the Step 4 row show the nesting the script takes.
+anchor_check_flat "$RS" rs-0j-writes '`plan\.selected` carries the selected option.s `number`, `name`, `summary`[^.]*`files_to_modify`[^.]*`files_to_create`[^.]*`test_strategy`, `complexity` and `risk`\.' \
+  "p683d-doc-nesting: the selected option's fields are members of plan.selected"
+anchor_check_flat "$RS" rs-0j-writes '`risk`\. At the `plan` level: [^.]*`rejected`[^.]*`overall_complexity`[^.]*`overall_risk`[^.]*`sensitive`[^.]*`criteria_covered`[^.]*`criteria` list' \
+  "p683d-doc-nesting: rejected, the overall fields, sensitive and both criteria fields sit at the plan level"
+P683="$(python3 - "$TMP/writes-region.txt" <<'PY'
+import re, sys
+rows = [l for l in open(sys.argv[1], encoding="utf-8").read().splitlines() if l.startswith("|")]
+cells = [c for r in rows for c in r.split("|") if "premise_ledger" in c or "open_findings" in c]
+if len(cells) != 1:
+    print(f"{len(cells)} cells name the qa lists"); sys.exit()
+if not re.search(r'`\{"qa": \{[^`]*"premise_ledger": \[\{"kind": "failure"[^`]*"open_findings"[^`]*\}\}`', cells[0]):
+    print("premise_ledger and open_findings are not inside one qa object"); sys.exit()
+print("ok")
+PY
+)"
+[ "$P683" = "ok" ]
+check "p683e-doc-nesting: the Step 4 row shows premise_ledger and open_findings inside qa (${P683:-no region})" "$?"
 
 # p18: a k = 4 resume skips Step 3, the only producer of the provenance records.
 anchor_check_flat "$RS" rs-0j-gates '.k. = 4.*no \*Test Integrity\* record.*commit messages' \
