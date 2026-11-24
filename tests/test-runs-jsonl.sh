@@ -785,6 +785,79 @@ grep -qx '## Correction-to-enforcement' "$REPO_ROOT/skills/auto-pilot/references
   && pass "T16f: auto-pilot bundles the Correction-to-enforcement section the summary cites" \
   || fail "T16f: the cited Correction-to-enforcement section is not in auto-pilot's bundle"
 
+# --- T17: which review rules fired (issue #670) ------------------------------
+# AC1: the run log records the IDs of the rules that produced findings. `[]`
+# is a review with no rule hit and is kept; absent means no review ran.
+rh_rec() { # $1 = raw JSON value for rules_hit
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":670,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":9,"verification":"full","duration_s":5,"rules_hit":%s}' "$1"
+}
+rc=0; out="$(rh_rec '[]' | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" = 0 ] && printf '%s' "$out" | grep -qF '"verification":"full","rules_hit":[],"duration_s":5'; then
+  pass "T17a: an empty rules_hit is kept, right after verification"
+else
+  fail "T17a: empty rules_hit dropped or out of canonical order (exit $rc): $out"
+fi
+rc=0; out="$(rh_rec '["T1","C2","T1","SEC-2"]' | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" = 0 ] && printf '%s' "$out" | grep -qF '"rules_hit":["C2","SEC-2","T1"]'; then
+  pass "T17b: rules_hit is sorted and deduplicated; a non-pack ID shape passes"
+else
+  fail "T17b: rules_hit not normalized (exit $rc): $out"
+fi
+max64="$(python3 -c 'import json; print(json.dumps(["T%d" % i for i in range(64)]))')"
+rc=0; rh_rec "$max64" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+if [ "$rc" = 0 ]; then
+  pass "T17c: 64 entries are accepted"
+else
+  fail "T17c: 64 entries rejected (exit $rc)"
+fi
+over64="$(python3 -c 'import json; print(json.dumps(["T%d" % i for i in range(65)]))')"
+for bad in '["t1"]' '"T1"' '[1]' '[true]' '{"T1":1}' '["T1\n"]' '[""]' '["1T"]' \
+  '["A123456789012345678901234567890123"]' "$over64"; do
+  rc=0; rh_rec "$bad" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" = 3 ]; then
+    pass "T17d: gi-runlog rejects rules_hit=${bad:0:40} with exit 3"
+  else
+    fail "T17d: rules_hit=${bad:0:40} returned exit $rc, expected 3"
+  fi
+done
+for absent in null none; do
+  if [ "$absent" = null ]; then rec="$(rh_rec null)"; else
+    rec='{"ts":"2026-01-01T00:00:00Z","issue":670,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":9}'; fi
+  rc=0; out="$(printf '%s' "$rec" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+  if [ "$rc" = 0 ] && ! printf '%s' "$out" | grep -qF rules_hit; then
+    pass "T17e: a $absent rules_hit stays absent"
+  else
+    fail "T17e: a $absent rules_hit was written or rejected (exit $rc): $out"
+  fi
+done
+has "$RUNLOG" '| `rules_hit` | array of strings | no |' "T17f: run-log schema documents rules_hit"
+has "$RUNLOG" '`effort`, `rules_hit` — and the orchestrator' "T17f: schema lists rules_hit in the returned telemetry"
+has "$REPO_ROOT/src/skills/issue-resolver/references/steps/step-4-qa.md" \
+  'Add the leading `^[A-Z]+[0-9]+\b` token of each returned issue'"'"'s `description` to the run'"'"'s rule set, carried to Deliver as `rules_hit`.' \
+  "T17g: resolver Step 4 gathers the rule ID of each review issue"
+has "$RESOLVER_RUNLOG" '`[]` when QA ran and no issue carried a rule ID; omitted when Step 4 never ran.' \
+  "T17g: resolver derives rules_hit: [] with no hit, omitted without QA"
+has "$RESOLVER_RUNLOG" 'by the same rules, and `rules_hit`' "T17g: resolver returns rules_hit under --no-run-log"
+for t17 in "$REPO_ROOT/src/skills/auto-pilot" "$REPO_ROOT/skills/auto-pilot"; do
+  t17l="${t17#$REPO_ROOT/}"
+  has "$t17/references/prompts/reviewer.md" '- rules_hit: the leading `^[A-Z]+[0-9]+\b` token of every issue description' \
+    "T17h: $t17l reviewer reports the rule IDs of its findings"
+  flat "$t17/references/phases/phase-3-4-review.md" | grep -qF '`rules_hit` (missing reads `[]`; for the run-log line only)' \
+    && pass "T17i: $t17l Step 3.2 extracts rules_hit, missing reads []" \
+    || fail "T17i: $t17l Step 3.2 does not extract rules_hit"
+  flat "$t17/references/run-log.md" | grep -qF "**\`rules_hit\`** is the union of the resolver's returned list and *Step 3.2*'s: \`[]\` when either review ran with none; omitted when neither ran. Batch: primary line only." \
+    && pass "T17j: $t17l run-log folds the resolver's and the review's rules_hit" \
+    || fail "T17j: $t17l run-log lacks the rules_hit fold rule"
+  has "$t17/references/explicit-list-mode.md" "primary issue's criteria; \`rules_hit\` likewise." \
+    "T17k: $t17l batch writes rules_hit on the primary line only"
+done
+if [ "$(grep -cF -e '- rules_hit: your run-log rules_hit' "$SUBAGENT")" = "2" ]; then
+  pass "T17l: both the Resolver and the Batch Resolver return rules_hit"
+else
+  fail "T17l: rules_hit is not in both resolver report-back lists"
+fi
+has "$AUTOPILOT" "merges the resolver's \`rules_hit\` with the review's" "T17m: auto-pilot run-log entry names rules_hit"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

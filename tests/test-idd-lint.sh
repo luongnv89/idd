@@ -957,6 +957,69 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T33: which review rules fired — pruning candidates (#670)
+# ───────────────────────────────────────────────────────────
+# A row with `rules_hit` is a reviewed run, `[]` included; a row without it is
+# not in the denominator. Zero-hit IDs are the practice-pack rules beside the
+# script with no hit; a hit ID no pack defines is listed apart.
+RH="$TMP/rule-hits"
+mkdir -p "$RH/.idd"
+git -C "$RH" init -q
+git -C "$RH" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "chore: init"
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":1,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1}' \
+  '{"ts":"2026-07-09T00:01:00Z","issue":2,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"rules_hit":[]}' \
+  '{"ts":"2026-07-09T00:02:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"rules_hit":["T1","C2"]}' \
+  '{"ts":"2026-07-09T00:03:00Z","issue":4,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":4,"rules_hit":["T1","ZZ9"]}' \
+  '{"ts":"2026-07-09T00:04:00Z","issue":5,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":5,"rules_hit":"T1"}' \
+  > "$RH/.idd/runs.jsonl"
+KNOWN="$(grep -hoE '^- \*\*[A-Z]+[0-9]+ ' "$REPO_ROOT"/src/shared/references/practice-*.md | sed -E 's/^- \*\*//; s/ $//' | sort)"
+RH_OUT="$(cd "$RH" && python3 "$LINT" stats --no-github 2>&1)" && RH_EXIT=0 || RH_EXIT=$?
+if [ "$RH_EXIT" -eq 0 ] \
+   && printf '%s' "$RH_OUT" | grep -qE '^  Rule hits — 3 reviewed runs$' \
+   && printf '%s' "$RH_OUT" | grep -qE '^ +hits +C2 1 · T1 2 · ZZ9 1$' \
+   && printf '%s' "$RH_OUT" | grep -qE '^ +outside packs +ZZ9$'; then
+  pass "T33a: stats counts reviewed runs, hits per rule and IDs outside the packs"
+else
+  fail "T33a: Rule hits section missing or wrong (exit $RH_EXIT)"
+fi
+if (cd "$RH" && python3 "$LINT" stats --no-github --json) | KNOWN="$KNOWN" python3 -c "
+import json, os, sys
+d = json.load(sys.stdin)
+rh = d['rule_hits']
+known = set(os.environ['KNOWN'].split())
+assert len(known) >= 40 and {'T1', 'C2'} <= known, sorted(known)
+assert rh['reviewed'] == 3, rh
+assert rh['hits'] == {'C2': 1, 'T1': 2, 'ZZ9': 1}, rh['hits']
+assert set(rh['zero_hit']) == known - {'T1', 'C2'}, rh['zero_hit']
+assert rh['unknown'] == ['ZZ9'], rh['unknown']
+assert 'rule_hits' not in d['runs'], 'rule_hits must stay out of runs'
+" 2>/dev/null; then
+  pass "T33b: stats --json rule_hits: zero-hit IDs are every pack rule with no hit"
+else
+  fail "T33b: stats --json rule_hits aggregate is wrong"
+fi
+mkdir -p "$TMP/lone/scripts" && cp "$LINT" "$TMP/lone/scripts/idd-lint.py"
+LONE_OUT="$(cd "$RH" && python3 "$TMP/lone/scripts/idd-lint.py" stats --no-github 2>&1)" || true
+LONE_JSON="$(cd "$RH" && python3 "$TMP/lone/scripts/idd-lint.py" stats --no-github --json 2>/dev/null)" || true
+if printf '%s' "$LONE_OUT" | grep -qF 'zero hits — skipped: no practice pack found' \
+   && printf '%s' "$LONE_JSON" | python3 -c "
+import json, sys
+rh = json.load(sys.stdin)['rule_hits']
+assert rh['zero_hit'] is None and rh['unknown'] == [] and rh['reviewed'] == 3, rh
+" 2>/dev/null; then
+  pass "T33c: with no practice pack beside the script the zero-hit list is skipped"
+else
+  fail "T33c: a lone idd-lint.py must skip the zero-hit list"
+fi
+head -1 "$RH/.idd/runs.jsonl" > "$RH/.idd/runs.jsonl.old" && mv "$RH/.idd/runs.jsonl.old" "$RH/.idd/runs.jsonl"
+if (cd "$RH" && python3 "$LINT" stats --no-github 2>&1) | grep -qF 'rule hits — skipped: no run-log row records rules_hit'; then
+  pass "T33d: a log with no rules_hit row reports the section skipped"
+else
+  fail "T33d: a log with no rules_hit row must skip the Rule hits section"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
