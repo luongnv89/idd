@@ -39,8 +39,10 @@
 #   S11 skills/README.md is byte-identical to src/plugin/README.md and has the
 #       40 words outside code blocks the Claude plugin directory requires
 #
-# Host checks (need the `claude` CLI; each call runs with a throwaway HOME
-# and CLAUDE_CONFIG_DIR, so the user's real plugin config is never touched):
+# Host checks (need the `claude` CLI). Each call unsets every inherited
+# CLAUDE* variable, so a run from inside a Claude Code session does not hand
+# the child CLI that session's config, then sets a throwaway HOME and
+# CLAUDE_CONFIG_DIR:
 #   C1  `claude plugin validate --json` on skills/.claude-plugin/plugin.json:
 #       success, no errors and no warnings
 #   C2  `claude plugin validate --strict` on marketplace.json exits 0
@@ -52,11 +54,18 @@
 #       marketplace entry (only its url swapped to file://); the plugin cache
 #       holds the skills, the manifest and the plugin README, none of the
 #       decoys, and the
-#       installed plugin lists every skill
+#       installed plugin lists every skill. Isolation guard: the install runs
+#       only once `marketplace add` has registered `idd` in the throwaway
+#       plugins/known_marketplaces.json. A CLI that ignored the throwaway
+#       config dir has written that registration to whatever config it used
+#       instead, and the test never cleans it up; C4 then skips with a ○
+#       reason, or fails under IDD_PLUGIN_REQUIRE_CLI=1. A registration that
+#       did land but left no plugin cache after the install still fails.
 #
 # Usage: bash tests/test-plugin-manifest-469.sh
 # Without `claude` on PATH the host checks are skipped with a ○ line. Set
-# IDD_PLUGIN_REQUIRE_CLI=1 (CI does) to turn that skip into a failure.
+# IDD_PLUGIN_REQUIRE_CLI=1 (CI does) to turn that skip, and C4's isolation
+# skip, into a failure.
 # Returns: exit 0 if all tests pass, exit 1 otherwise.
 
 set -uo pipefail
@@ -261,8 +270,16 @@ else
 fi
 
 # ── C1–C4: host validation through the claude CLI ────────────────────────────
+# A run from inside a Claude Code session inherits that session's CLAUDE*
+# variables, which can send the child CLI back to the session's own config.
+# Every CLI call unsets them all, then sets only the throwaway config.
+claude_unset=()
+while IFS= read -r name; do
+  claude_unset+=(-u "$name")
+done < <(compgen -e | grep '^CLAUDE' || true)
 run_claude() {
-  HOME="$TMP/home" CLAUDE_CONFIG_DIR="$TMP/home/.claude" DISABLE_AUTOUPDATER=1 \
+  env ${claude_unset[@]+"${claude_unset[@]}"} \
+    HOME="$TMP/home" CLAUDE_CONFIG_DIR="$TMP/home/.claude" DISABLE_AUTOUPDATER=1 \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude "$@"
 }
 
@@ -406,11 +423,36 @@ PY
     fail "C4: could not write the throwaway marketplace"
   else
     run_c4() {
-      HOME="$C4/home" CLAUDE_CONFIG_DIR="$C4/home/.claude" DISABLE_AUTOUPDATER=1 \
+      env ${claude_unset[@]+"${claude_unset[@]}"} \
+        HOME="$C4/home" CLAUDE_CONFIG_DIR="$C4/home/.claude" DISABLE_AUTOUPDATER=1 \
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude "$@"
     }
-    if run_c4 plugin marketplace add "$C4/market" >"$TMP/c4.log" 2>&1 &&
-       run_c4 plugin install idd@idd >>"$TMP/c4.log" 2>&1; then
+    # Isolation guard: install only after the marketplace registration shows
+    # up under the throwaway config dir. A CLI that registered it elsewhere
+    # would install there too, outside the cache checked below.
+    c4_escaped="C4: the local claude CLI did not use the throwaway config dir, so the install cannot populate the test cache"
+    if ! run_c4 plugin marketplace add "$C4/market" >"$TMP/c4.log" 2>&1; then
+      fail "C4: claude plugin marketplace add from the throwaway release failed"
+      sed -n '1,20p' "$TMP/c4.log" | sed 's/^/      /'
+    elif ! python3 - "$C4/home/.claude/plugins/known_marketplaces.json" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        known = json.load(f)
+except (OSError, ValueError):
+    sys.exit(1)
+sys.exit(0 if isinstance(known, dict) and "idd" in known else 1)
+PY
+    then
+      if [ "${IDD_PLUGIN_REQUIRE_CLI:-}" = "1" ]; then
+        fail "$c4_escaped (IDD_PLUGIN_REQUIRE_CLI=1)"
+      else
+        skip "$c4_escaped (set IDD_PLUGIN_REQUIRE_CLI=1 to require it)"
+      fi
+    elif ! run_c4 plugin install idd@idd >>"$TMP/c4.log" 2>&1; then
+      fail "C4: claude plugin install from the throwaway release failed"
+      sed -n '1,20p' "$TMP/c4.log" | sed 's/^/      /'
+    else
       run_c4 plugin details idd@idd >"$TMP/c4-details.log" 2>&1 || true
       c4="$(python3 - "$C4/home/.claude/plugins/cache/idd/idd/$c4_version" "$PLUGIN_JSON" "$EXPECTED_SKILLS" "$TMP/c4-details.log" <<'PY'
 import filecmp, os, re, sys
@@ -451,9 +493,6 @@ PY
         [ -n "$verdict" ] || continue
         if [ "$verdict" = "PASS" ]; then pass "$msg"; else fail "$msg"; fi
       done <<< "$c4"
-    else
-      fail "C4: claude plugin marketplace add / install from the throwaway release failed"
-      sed -n '1,20p' "$TMP/c4.log" | sed 's/^/      /'
     fi
   fi
 fi
