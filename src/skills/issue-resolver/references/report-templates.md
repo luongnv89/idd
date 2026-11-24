@@ -32,6 +32,7 @@ Closes #{issue_number}
 - **Design sketches:** {only when they ran — "compared {k} designs; Option {n} rejects {transitions} ({checker}); verdict {proceed | switch from Option {r}: {reason} | unproven (needs review): {problems}}"; when skipped on the full profile — "skipped ({reason})"; omit on the light profile}
 - **Verification recipe:** {only when `.idd-recipe.json` (or legacy `.gitissue-recipe.json`) exists at the base ref — "drove {k}/{n} capabilities ({names}), {pass | fail}; evidence `{evidence_dir}`" when it ran, else "skipped ({reason})"; omit when the base ref has no recipe}
 - **Premise reset:** {only when it blocked — "premise {premise_id} failed in cycles {cycles}; {lifted by revision {new_id} ({diagnostic commands}) | not lifted — no further fix}"; omit otherwise}
+- **Flaky tests:** {only when Step 4 found one — `<test>`: root-caused | deleted: <reason> | follow-up #<n> | open; omit otherwise}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 - **Produced by:** model {model, per `references/run-log-fields.md`, else unknown} · effort {effort, same rule} · skill issue-resolver@{skill_version} · locally modified {yes if Self-Improve edited this skill this session, else unknown}
 
