@@ -43,7 +43,9 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
    and the commit they ran on: the settings source (`origin/{base} @
    {base_sha7}` or `built-in defaults`), test count and `headRefOid` short SHA,
    the `gi-ci-wait` verdict and `ci_status`, the `gi-secscan` exit and
-   `policy_source`, the PR-body re-read after a `Closes` edit, the *Bug proof*. Print `✓ pass` only
+   `policy_source`, the PR-body re-read after a `Closes` edit, the *Bug proof*. Each class in
+   the *Merge floor* classify's `observed` list prints as `{class} change ({paths})`; it never
+   changes the floor. Print `✓ pass` only
    for a check that ran and passed; print `○ skipped ({reason})` for one that did
    not run. Each remaining finding keeps its `[dimension]` tag and `file:line`.
    A resumed review adds `resumed from step {k}/7, cycle {c}`.
@@ -112,7 +114,7 @@ report-level finding, non-blocking, outside the soft-pass and strict note count:
   Pre-existing:      ○ {n} not caused by this PR (not blocking)
     ● [{category}] {description} ({file}:{line})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}
+  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}; {class} change ({paths})
   Uncertainty:       {inherited/skipped/model-judged items, or "none"}
   Decision:          No approval needed.
   Next action:       {check the gap named on Result:, then} merge PR #{pr_number} (this run does not merge)
@@ -166,7 +168,7 @@ commit it is inherited from, never `✓ pass`:
     Standards axis:
       ● [traceability] PR body missing Closes #{N}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}; {max} cycles run
+  Evidence:          settings origin/{base} @ {base_sha7}; tests {count} passed @ {sha7}; CI {ci_status}; {max} cycles run; {class} change ({paths})
   Uncertainty:       {unverified criteria, model-judged findings, skipped legs}
   Decision:          No approval needed.
   Next action:       fix the Remaining findings, then re-run /issue-pr-review {pr_number}

@@ -198,7 +198,7 @@ printf '%s' '{"labels":[],"files":[]}' | run "$SCRIPTS/gi-sensitive.py" --classi
 printf '%s' '{"labels":[],"paths":[],"path":[]}' | run "$SCRIPTS/gi-sensitive.py" --classify
 # #569: the new path classes, the `diff` range (an empty range in this checkout,
 # a malformed range → 3, an unknown ref → 4) and a refused Effort key.
-printf '%s' '{"labels":[],"paths":["package.json","app.gemspec","requirements-dev.txt","Dockerfile.prod","compose.yml","main.tf","infra/x.go","db/migrate/1.rb","README.md"]}' | \
+printf '%s' '{"labels":[],"paths":["package.json","app.gemspec","requirements-dev.txt","Dockerfile.prod","compose.yml","main.tf","infra/x.go","db/migrate/1.rb",".coveragerc","tsconfig.build.json","README.md"]}' | \
   run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":[],"paths":[],"diff":"HEAD...HEAD"}' | run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":[],"paths":[],"diff":"-p...HEAD"}' | run "$SCRIPTS/gi-sensitive.py" --classify
