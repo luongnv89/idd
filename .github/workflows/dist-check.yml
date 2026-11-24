@@ -539,3 +539,6 @@ jobs:
 
       - name: test-review-config-base-ref-659
         run: bash tests/test-review-config-base-ref-659.sh
+
+      - name: test-static-checks-664
+        run: bash tests/test-static-checks-664.sh

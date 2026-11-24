@@ -40,6 +40,7 @@ check() { if [ "$2" = "0" ]; then pass "$1"; else fail "$1"; fi; }
 STATE="$REPO_ROOT/src/shared/scripts/gi-state.py"
 PREPASS="$REPO_ROOT/src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 PR_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+STATIC_CHECKS="$REPO_ROOT/src/shared/references/static-checks.md"
 PHASE0="$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-0-lock-resume.md"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -439,17 +440,23 @@ check "P1: an untracked file stays untracked" "$?"
 check "P1: formatter spill-over is reported and left unstaged" "$?"
 
 # ── P2: the prose ────────────────────────────────────────────
-python3 - "$PREPASS" <<'PY'
+python3 - "$PREPASS" "$STATIC_CHECKS" <<'PY'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 section = text.split("## Step 2 — Script Pre-pass detection", 1)[1].split("## Step 4", 1)[0]
+# The tool rows live in the shared table the pre-pass reads; scan them too.
+shared = open(sys.argv[2], encoding="utf-8").read()
 blocks = "\n".join(re.findall(r"^```bash\n(.*?)^```", section, flags=re.S | re.M))
 bad = [p for p in (r"git add -A", r"git add \.", r"git commit -a\b") if re.search(p, blocks)]
-table = [l for l in section.splitlines() if l.startswith("| ") and "`" in l]
-tree = [l for l in table if re.search(r"(fix|write|black|isort|-w|format) \.`|cargo fmt|find \. ", l)]
-sys.exit(1 if bad or tree else 0)
+table = [l for l in (section + "\n" + shared).splitlines() if l.startswith("| ") and "`" in l]
+tree = [l for l in table if re.search(r"(fix|write|black|isort|-w|format|eslint|check|-l|-i) \.`|cargo fmt|find \. |\./\.\.\.", l)]
+sys.exit(1 if bad or tree or len(table) < 8 else 0)
 PY
 check "P2: no pre-pass block stages tree-wide and no formatter runs on the whole tree" "$?"
+grep -qF '"$scope/approved-args" | xargs -0 -r <Fix command>' "$PREPASS"
+check "P2: every Fix command runs through the approved-paths pipe" "$?"
+grep -qF 'A lint or format row never runs without a file list' "$STATIC_CHECKS"
+check "P2: the shared table's rows never run without a file list" "$?"
 grep -q 'gi-secscan.py --staged --policy-ref' "$PREPASS" && ! grep -q 'gi-secscan.py --working-tree' "$PREPASS"
 check "P2: the auto-fix scan reads the staged set" "$?"
 grep -q 'gi-secscan.py --staged --policy-ref' "$PR_SKILL" && grep -q 'Never `git add -A`' "$PR_SKILL"

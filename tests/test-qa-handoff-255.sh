@@ -562,7 +562,7 @@ for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
 done
 
 # Step 2 is where the missed trigger bit: it commits and pushes its lint/format
-# auto-fix (the resolver runs no formatter, so this is the likely path), moving
+# auto-fix (the resolver only checks; it never runs a formatter's fix), moving
 # head off the marker before Step 3 or Step 4 ever consult the verdict.
 REEVAL_BLOCK="$(anchor_span "$SRC_PR_PKG" rvm-reeval-push rvm-never-gated || true)"
 check_block_has "$REEVAL_BLOCK" "Step 2's lint/format auto-fix commit" \
