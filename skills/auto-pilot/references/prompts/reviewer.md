@@ -70,4 +70,6 @@ When done, report back ONLY these fields:
   this review made, as an array ([] if none)
 - pre_existing: the final review cycle's pre-existing findings, one
   `file:line — description` each ([] if none); they never change `result`
+- rules_hit: the leading `^[A-Z]+[0-9]+\b` token of every issue description
+  across all review cycles, unique ([] if none)
 ```

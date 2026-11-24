@@ -30,6 +30,7 @@ Full field set; *Always present* is the required minimum:
 | `ceiling` | integer | no | Class QA-cycle policy ceiling: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full`+`high`, else 2. Omit unless recorded; a recorded value must be a positive integer and overrides the computed one. |
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
 | `verification` | string | no | `disabled` if config turned a check off, else `partial` if any criterion or dimension is not `pass` — a deferred row excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*; on `Closes #N` it is `unverified`) — else `full`. Auto-pilot: from the PR review; missing counts are `partial`, never `full`. Resolver: from its PR's AC table, `partial` for an issue not ready. Omitted when nothing was reviewed. |
+| `rules_hit` | array of strings | no | IDs of the review rules that produced findings, sorted and unique: ≤64 of `[A-Z][A-Z0-9_-]`, ≤32 chars. `[]` when a review ran and none fired; omitted when no review ran. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
 | `tokens` | integer | no | Tokens the run consumed, ≥ 1: the count its Run Stats Footer printed. Omitted when the host reported none; never derived, estimated or `0`. |
@@ -99,7 +100,7 @@ subagent; both appending would double-count every issue in `/idd-doctor`'s
 metrics. So it passes the resolver `--no-run-log`, which **returns** its
 telemetry — run `status` (the `outcome`),
 `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `agent_overrides`,
-`duration_s`, `phases`, `tokens`, `agents`, `model`, `effort` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
+`duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `rules_hit` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
 `--auto`/`IDD_AUTO_MODE`**: a standalone `/issue-resolver <N> --auto` still logs.
 The rule: the outermost skill is the single writer; an inner resolver stays silent.
 

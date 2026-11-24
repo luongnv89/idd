@@ -9,7 +9,7 @@ actually writing the line.
 
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `skill_version`, and `skipped_reason` —
+`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `rules_hit`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `skill_version`, and `skipped_reason` —
 following the schema in `docs/run-log-schema.md` rather than re-deriving fields
 here.
 
@@ -44,6 +44,8 @@ These derivations are the resolver's own:
   applied to the PR's AC table: any row not `pass` → `partial`, deferred rows
   excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
   so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
+- **`rules_hit`** — the rule set Step 4 gathered over every review cycle;
+  `[]` when QA ran and no issue carried a rule ID; omitted when Step 4 never ran.
 
 - **`tokens`, `agents`, `duration_s`** — the row and the *Run Stats Footer*
   (`references/run-stats.md`) agree. `tokens` is the count the footer prints:
@@ -68,7 +70,7 @@ subagent and writes the **single** run-log line per issue itself — appending h
 too would write the issue twice and double-count it in `/auto-pilot --stats`. Instead **return** the
 telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `agent_overrides`, `duration_s`, `phases`) in the
 subagent result so the orchestrator folds it into its own line — with `tokens`,
-`agents`, `model` and `effort` by the same rules (`skill_version` is the
+`agents`, `model` and `effort` by the same rules, and `rules_hit` (`skill_version` is the
 writer's, so it is not returned).
 
 The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`

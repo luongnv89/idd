@@ -14,7 +14,8 @@ Validates Issue-Driven Development artifacts against the IDD Spec
   idd-lint stats  [--branch REF] [--since DATE] [--no-github] [--json]
                                         evidence report: trace-completeness,
                                         Decision-Record coverage, run outcomes,
-                                        slowest recorded run phase
+                                        slowest recorded run phase, review
+                                        rules that never fired
   idd-lint corrections [--record] [--approve KEY | --reject KEY | --landed KEY]
                                         recurring corrections → deduplicated,
                                         approval-gated improvement proposals
@@ -969,6 +970,55 @@ def collect_run_stats(rows: list[dict] | None) -> dict | None:
     }
 
 
+# Practice-pack rule IDs, read from the packs beside this script's checkout.
+PRACTICE_DIR = Path(__file__).resolve().parent.parent / "src" / "shared" / "references"
+PRACTICE_RULE_RE = re.compile(r"^- \*\*([A-Z]+[0-9]+) [^*]+\.\*\*", re.MULTILINE)
+
+
+def _rule_sort_key(rule: str) -> tuple:
+    match = re.fullmatch(r"([A-Z]+)([0-9]+)", rule)
+    return (match.group(1), int(match.group(2)), "") if match else (rule, -1, rule)
+
+
+def practice_rule_ids() -> set[str] | None:
+    """Every rule ID the practice packs define; None when no pack is readable."""
+    ids: set[str] = set()
+    found = False
+    for pack in sorted(PRACTICE_DIR.glob("practice-*.md")):
+        try:
+            ids.update(PRACTICE_RULE_RE.findall(pack.read_text(encoding="utf-8")))
+            found = True
+        except (OSError, UnicodeDecodeError):
+            continue
+    return ids if found else None
+
+
+def collect_rule_hits(rows: list[dict] | None, known: set[str] | None) -> dict | None:
+    """Review rule IDs that produced findings, over rows that record `rules_hit`.
+
+    A row without the field ran no recorded review and is left out of the
+    denominator. `zero_hit` is None when no practice pack could be read, and
+    `unknown` lists hit IDs no pack defines. A malformed value is skipped.
+    """
+    if not rows:
+        return None
+    reviewed = 0
+    hits: dict[str, int] = {}
+    for row in rows:
+        rules = row.get("rules_hit")
+        if not isinstance(rules, list):
+            continue
+        reviewed += 1
+        for rule in {r for r in rules if isinstance(r, str) and r}:
+            hits[rule] = hits.get(rule, 0) + 1
+    return {
+        "reviewed": reviewed,
+        "hits": {rule: hits[rule] for rule in sorted(hits, key=_rule_sort_key)},
+        "zero_hit": None if known is None else sorted(known - set(hits), key=_rule_sort_key),
+        "unknown": [] if known is None else sorted(set(hits) - known, key=_rule_sort_key),
+    }
+
+
 def classify_merge_commits(oids: list[str | None]) -> list[str]:
     """Classify all landing commits with one soft `git log --stdin` probe.
 
@@ -1811,6 +1861,24 @@ def _render_run_log_stats(run_s: dict | None) -> list[str]:
     return lines
 
 
+def _render_rule_hits(rh: dict | None) -> list[str]:
+    if rh is None:
+        return []
+    if not rh["reviewed"]:
+        return [_c("  ○ rule hits — skipped: no run-log row records rules_hit", "dim")]
+    n = rh["reviewed"]
+    lines = [_section("Rule hits", f"{n} reviewed run{'s' if n != 1 else ''}")]
+    hits = " · ".join(f"{rule} {count}" for rule, count in rh["hits"].items())
+    lines.append(_info_row("hits", hits or "none"))
+    if rh["zero_hit"] is None:
+        lines.append(_c("      zero hits — skipped: no practice pack found", "dim"))
+    else:
+        lines.append(_info_row("zero hits", " · ".join(rh["zero_hit"]) or "none"))
+    if rh["unknown"]:
+        lines.append(_info_row("outside packs", " · ".join(rh["unknown"])))
+    return lines
+
+
 def _render_github_stats(gh_s: dict | None, skipped: str | None) -> list[str]:
     if gh_s is None:
         return [_c(
@@ -1935,12 +2003,15 @@ def render_stats(
     project: dict | None = None,
     window: SinceWindow | None = None,
     lookback: dict | None = None,
+    rule_hits: dict | None = None,
 ) -> None:
     out = _render_stats_header(project)
     out.extend(_render_window_warning(window))
     out.extend(_render_git_history_stats(commit_s))
     out.append("")
     out.extend(_render_run_log_stats(run_s))
+    if rule_hits is not None:
+        out.extend(("", *_render_rule_hits(rule_hits)))
     out.append("")
     out.extend(_render_github_stats(gh_s, gh_skipped))
     out.extend(_render_lookback_stats(lookback, gh_skipped))
@@ -1971,6 +2042,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
     # section and, via collect_github_stats, the normalization-tier join.
     run_rows = load_run_rows(runs_path)
     run_s = collect_run_stats(run_rows)
+    rule_hits = collect_rule_hits(run_rows, practice_rule_ids())
     gh_s, gh_skipped = None, None
     pages: dict = {}
     if args.no_github:
@@ -1998,12 +2070,13 @@ def cmd_stats(args: argparse.Namespace) -> int:
             {
                 "spec_version": SPEC_VERSION, "project": project, "git": commit_s,
                 "runs": run_s, "github": gh_s, "lookback": lookback,
+                "rule_hits": rule_hits,
             },
             indent=2, sort_keys=True,
         ))
         return 1 if unexplained else 0
 
-    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window, lookback)
+    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window, lookback, rule_hits)
     return 1 if unexplained else 0
 
 

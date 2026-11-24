@@ -90,6 +90,8 @@ When done, report back ONLY these fields:
   n/a. Primary issue's line only
 - model, effort: your session's model and reasoning effort, only when the host
   states them; shared on every fanned-out line
+- rules_hit: your run-log rules_hit (see docs/run-log-schema.md): [] when QA
+  ran with none; omit when QA never ran. Primary issue's line only
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)
