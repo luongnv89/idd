@@ -350,7 +350,7 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 **Review-only mode (`--review-only`) — authoritative definition.**
 
 - Steps 1-5 **once**, skip Step 6 — never loop, fix, merge, edit, commit, or push (skip *Commit auto-fixes*).
-- Step 2 runs lint/format in check mode: each detected lint/format row's Check command from `references/static-checks.md`, through the same `$scope/approved-args` pipe as the Fix command — no `--fix`, `--write`, or other mutating flags.
+- Step 2 runs lint/format in check mode: each detected lint/format row's Check command from `references/static-checks.md`, through the Fix command's `$scope/approved-args` pipe (*Approved paths*, built first) — no `--fix`, `--write`, or other mutating flags. No list built or readable: the check did not run (`references/report-templates.md` *Evidence*), never clean.
 
 ---
 
