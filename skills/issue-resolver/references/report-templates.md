@@ -50,6 +50,7 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 - Integration tests: {count} passed (or skipped)
 - E2e tests: {count} passed (or skipped)
 - Build: passed
+- Static checks: {passed | failed: {tool}, {what remains} | not run: {tool}, {reason} | none detected}
 - QA cycles: {count}
 - Test integrity: {pinned: `<tests>` green before and after, unedited — behavior-preserving plans only}; {removed or weakened: `<test>` — <criterion or plan item>, or "none"}
 

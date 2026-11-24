@@ -120,6 +120,7 @@ references/bug-verification.md
 references/skill-index.md
 references/error-messages.md
 references/self-improve.md
+references/static-checks.md
 references/docs/sync-conventions.md
 references/docs/naming-conventions.md
 references/docs/pre-commit-security.md
@@ -310,7 +311,7 @@ Then spawn the implementer (`references/agents/implementer.md`) with the plan, b
 
 ## Step 4 — QA
 
-Loop: review → test → fix until clean or the cycle cap — light=1 (profile table in *Step 0g*); full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`. **Premise reset:** two failed fixes sharing a premise block the next fix — cap and interactive continue included — until rerunnable diagnostics support a revised premise; `references/scripts/gi-premise.py` decides (*Step 4 — QA → Premise reset*).
+Loop: review → test → static checks → fix until clean or the cycle cap — light=1 (profile table in *Step 0g*); full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`. **Premise reset:** two failed fixes sharing a premise block the next fix — cap and interactive continue included — until rerunnable diagnostics support a revised premise; `references/scripts/gi-premise.py` decides (*Step 4 — QA → Premise reset*).
 
 ### Spawning the code reviewer
 

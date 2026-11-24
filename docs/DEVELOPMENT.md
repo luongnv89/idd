@@ -233,7 +233,7 @@ Skills live in `src/skills/<name>/SKILL.source.md` (internal-only skills under `
 
 ### Shared references
 
-A reference that every skill ships unchanged is authored once at `src/shared/references/<name>.md`. Today these are `run-stats.md` and `self-improve.md`, which every skill ships, and `practice-packs.md` with the eight `practice-*.md` checklists, which issue-resolver and issue-pr-review ship.
+A reference that every skill ships unchanged is authored once at `src/shared/references/<name>.md`. Today these are `run-stats.md` and `self-improve.md`, which every skill ships, and `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md`, which issue-resolver and issue-pr-review ship.
 
 - **Edit** the one source, then rebuild. Every citing skill gets the new bytes.
 - **Add** one by dropping a flat, lowercase-hyphen `.md` file there, citing it as `references/<name>.md` from each skill that needs it, and adding that path to the skill's *Bundled dependency precheck* list. No build change is needed.

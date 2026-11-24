@@ -27,7 +27,7 @@ Main Agent (orchestrator)
 ├── Step 4: QA (main agent orchestrates review-fix loop)
 │   Spawns Code Reviewer subagent per cycle
 │   Spawns/reuses Fixer subagent for blocking findings
-│   Runs tests/build between cycles
+│   Runs tests/build and static checks each cycle
 │   Policy ceiling by class (≤ resolve.qa_max_cycles)
 │
 └── Step 5: Deliver (main agent — push + create PR + report)

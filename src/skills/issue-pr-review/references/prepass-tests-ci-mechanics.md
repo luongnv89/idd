@@ -8,7 +8,7 @@ Detect available lint/format/test tools from the project.
 
 **When `--review-only` is set:** run the detection-only variant of this step — see *Review-only mode* in SKILL.md for the exact contract.
 
-**Default (fix loop):** scope the auto-fix to the approved paths first (below), then run each auto-fix command in the table over that list only. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
+**Default (fix loop):** scope the auto-fix to the approved paths first (below), then run each Fix command over that list only. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
 
 ### Approved paths — scope before any formatter runs <!-- a:rv-prepass-scope -->
 
@@ -40,22 +40,7 @@ PY
 
 `--cached` catches a staged change whose working copy matches `HEAD`, which `git add` would overwrite. `approved` holds repo-relative paths for git; `approved-args` holds the same paths prefixed `./`, so a file named `-x.js` reaches a formatter as a path, never as an option. A symlink is never approved: a formatter would rewrite its target, which can sit outside the PR. An empty `approved` means there is nothing to format: skip the formatters and the commit. If this block cannot run (no `python3`, a failed `gh` read), **skip the auto-fix and its commit** with `⚠ pre-pass: auto-fix skipped — approved paths unavailable`. Never fall back to a tree-wide formatter or `git add -A`.
 
-| Tool type | Detection | Auto-fix command (approved paths only) |
-|-----------|-----------|-----------------|
-| ESLint | `.eslintrc*` or `eslint` in package.json | `grep -z -E '\.[cm]?[jt]sx?$' "$scope/approved-args" \| xargs -0 -r npx eslint --fix` |
-| Prettier | `.prettierrc*` or `prettier` in package.json | `xargs -0 -r npx prettier --write --ignore-unknown < "$scope/approved-args"` |
-| Black | `pyproject.toml` with `[tool.black]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python3 -m black` |
-| Ruff | `pyproject.toml` with `[tool.ruff]` or `ruff.toml` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r ruff check --fix`, then the same pipe into `xargs -0 -r ruff format` |
-| isort | `pyproject.toml` with `[tool.isort]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python3 -m isort` |
-| gofmt | `go.mod` | `grep -z -E '\.go$' "$scope/approved-args" \| xargs -0 -r gofmt -w` |
-| rustfmt | `Cargo.toml` | `grep -z -E '\.rs$' "$scope/approved-args" \| xargs -0 -r rustfmt` |
-| clang-format | `.clang-format` | `grep -z -E '\.[ch]$' "$scope/approved-args" \| xargs -0 -r clang-format -i` |
-
-```bash
-# Example for a Node.js project:
-grep -z -E '\.[cm]?[jt]sx?$' "$scope/approved-args" | xargs -0 -r npx eslint --fix 2>&1
-xargs -0 -r npx prettier --write --ignore-unknown < "$scope/approved-args" 2>&1
-```
+Run each detected lint/format row of `references/static-checks.md` (never its `tsc` row: Step 4's build runs that) as `grep -z -E '<Files>' "$scope/approved-args" | xargs -0 -r <Fix command>`.
 
 `rustfmt` follows out-of-line `mod` declarations into other files. Such a spill-over lands outside `approved`, so the staging step below reports it and never stages it.
 

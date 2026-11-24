@@ -66,6 +66,7 @@ src/
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
 │       ├── practice-packs.md      # Practice-pack selection (issue-resolver, issue-pr-review)
 │       ├── practice-*.md          # Eight per-domain practice checklists
+│       ├── static-checks.md       # Lint/format/type-check table (issue-resolver, issue-pr-review)
 │       ├── run-stats.md           # Run-cost footer contract
 │       └── self-improve.md        # Rules behind every skill's Self-Improve section
 │
@@ -173,7 +174,7 @@ Code `1` is reserved for a **script-specific verdict** — an answer the script 
 
 A reference file that more than one skill needs unchanged has one authored source (issue #560):
 
-- **Source** lives at `src/shared/references/<name>.md` — flat, lowercase-hyphen names, `.md` only. Today: `run-stats.md` and `self-improve.md` (every skill), and `practice-packs.md` with the eight `practice-*.md` checklists (issue-resolver, issue-pr-review).
+- **Source** lives at `src/shared/references/<name>.md` — flat, lowercase-hyphen names, `.md` only. Today: `run-stats.md` and `self-improve.md` (every skill), and `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md` (issue-resolver, issue-pr-review).
 - **Discovery is the citation.** A skill gets the file when any of its authored files cites `references/<name>.md`; no other token exists. Add that path to the skill's *Bundled dependency precheck* list.
 - **Emitted** byte-identical to `references/<name>.md` in each citing skill, with no banner and no rewrite.
 - **Closure leaf.** The file is never scanned, so it must carry no rewritable token (a runtime-doc, shared-agent, shared-script or skill token); the build aborts on one.
