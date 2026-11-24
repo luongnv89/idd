@@ -10,6 +10,12 @@ prints one JSON verdict, so the skills never improvise a launch or a kill.
 Trust boundary
   The recipe is read from `--ref` (the base branch), never from the working
   tree: a branch under review must not supply the recipe it is verified by.
+  `--ref` is `HEAD` or exactly one ref `git for-each-ref` lists: a `refs/...`
+  name listed as itself, or a short name matching one of git's lookup forms —
+  and, when it contains `/`, matching `refs/remotes/<ref>`, so a local branch
+  named `origin/main` never stands in for the remote one. Revision syntax
+  (`~`, `^`, `:`, `@{...}`) is refused. The recipe is read through that ref's
+  commit id, never through the name, which git would look up again.
   The recipe's commands run in the working tree — the code under test.
   In auto mode (`--auto`, or `IDD_AUTO_MODE=1`) nothing runs unless the
   base-ref recipe's `auto` list names `--consumer`.
@@ -73,9 +79,9 @@ Exit codes
   2  usage error
   3  invalid input — the base-ref recipe is not valid JSON of the shape above,
      or its app_url is not loopback. Nothing was launched. Stop and fix it.
-  4  cannot complete — git missing, the ref does not resolve, no process
-     groups on this platform, the launch failed or never became ready, or the
-     run was interrupted. stdout still carries the verdict (`unavailable`)
+  4  cannot complete — git missing, the ref is not exactly one listed ref, no
+     process groups on this platform, the launch failed or never became
+     ready, or the run was interrupted. stdout still carries the verdict (`unavailable`)
      when a launch was attempted, with the owned group torn down. Degrade.
 
 Authored at src/shared/scripts/gi-recipe.py — do not edit installed copies;
@@ -128,8 +134,12 @@ class Interrupted(Exception):
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
+    # `--no-replace-objects` is a top-level option: a `refs/replace` entry
+    # could otherwise swap the commit or blob a base-ref read reports.
     try:
-        return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+        return subprocess.run(
+            ["git", "--no-replace-objects", *args], capture_output=True, text=True, check=False
+        )
     except OSError as exc:
         raise CannotComplete(f"git unavailable: {exc}") from exc
 
@@ -240,22 +250,120 @@ def validate(obj: object) -> dict:
     }
 
 
-def load_recipe(ref: str) -> tuple[dict, str] | None:
-    """(validated recipe, path loaded) at `ref`, or None when it carries none."""
-    if _git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
+# git's lookup order for a short `<refname>`, minus rule 1
+# (`$GIT_DIR/<refname>`): `for-each-ref` never lists that file, and it is kept
+# out by reading through the listed ref's object id rather than by name. Copied
+# from gi-secscan.py, which resolves `--policy-ref` the same way; scripts ship
+# standalone, so it is copied rather than imported.
+_REF_LOOKUP_RULES = (
+    "refs/{ref}",
+    "refs/tags/{ref}",
+    "refs/heads/{ref}",
+    "refs/remotes/{ref}",
+    "refs/remotes/{ref}/HEAD",
+)
+
+
+def _commit_of(spec: str) -> str | None:
+    """The commit id `spec` peels to, or None when it names no commit."""
+    proc = _git("rev-parse", "--verify", "--quiet", "--end-of-options", f"{spec}^{{commit}}")
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def resolve_ref(ref: str) -> str:
+    """The commit id `ref` names as exactly one listed ref — else exit 4.
+
+    A ref name is a search to git, and a checked-out branch under review can
+    write a ref that wins it: a local branch `origin/main` (tried before
+    `refs/remotes/origin/main`), a local `refs/heads/refs/remotes/origin/main`
+    (tried when the remote ref is missing), a revision suffix that git looks up
+    again, or a `$GIT_DIR/origin/main` file (tried first). Any of them would
+    supply the recipe the branch is verified by. So the name is checked against
+    what `git for-each-ref` lists, and the object id that listing carries is
+    the answer — the name is never resolved by git:
+
+      1. `HEAD` is the commit checked out.
+      2. Anything else must pass `git check-ref-format --allow-onelevel`.
+      3. A `refs/...` name must be listed exactly as itself. A short name must
+         match exactly one of git's five lookup forms; two is ambiguous. A
+         short name containing `/` must match `refs/remotes/<ref>` — a local
+         branch or tag of that name is refused even when it is the only match.
+    """
+    if ref == "HEAD":
+        oid = _commit_of(ref)
+        if oid is None:
+            raise CannotComplete("ref does not resolve to a commit: HEAD")
+        return oid
+    if _git("check-ref-format", "--allow-onelevel", ref).returncode != 0:
+        raise CannotComplete(
+            f"--ref {ref} is not a ref name — revision syntax such as ~, ^, : or "
+            "@{...} is looked up by git again and could reach a branch the code "
+            "under test wrote; pass the ref itself"
+        )
+    if ref.startswith("refs/"):
+        candidates = [ref]
+    else:
+        candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
+    # Bytes, decoded with os.fsdecode: a listed ref name need not be UTF-8.
+    try:
+        listed = subprocess.run(
+            ["git", "--no-replace-objects", "for-each-ref",
+             "--format=%(refname)%00%(objectname)", "--", *candidates],
+            capture_output=True, check=False,
+        )
+    except OSError as exc:
+        raise CannotComplete(f"git unavailable: {exc}") from exc
+    if listed.returncode != 0:
+        raise CannotComplete(f"cannot list refs to check --ref {ref}")
+    # Exact membership: a for-each-ref pattern also matches anything below
+    # it, which is not a ref this lookup would reach.
+    rows = {}
+    for line in os.fsdecode(listed.stdout).split("\n"):
+        name, sep, oid = line.partition("\0")
+        if sep and name in candidates:
+            rows[name] = oid
+    found = [name for name in candidates if name in rows]
+    if len(found) > 1:
+        raise CannotComplete(
+            f"--ref {ref} is ambiguous — it names "
+            + ", ".join(sorted(found))
+            + "; pass the fully-qualified name of the one you mean"
+        )
+    if not found:
+        raise CannotComplete(
+            f"--ref {ref} is not an existing ref — pass a ref `git for-each-ref` lists"
+        )
+    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":
+        raise CannotComplete(
+            f"--ref {ref} names {found[0]}, not refs/remotes/{ref} — a short "
+            "name containing / must be a remote-tracking ref; pass the "
+            "fully-qualified name to use any other"
+        )
+    oid = _commit_of(rows[found[0]])
+    if oid is None:
         raise CannotComplete(f"ref does not resolve to a commit: {ref}")
+    return oid
+
+
+def load_recipe(ref: str) -> tuple[dict, str] | None:
+    """(validated recipe, path loaded) at `ref`, or None when it carries none.
+
+    Every read goes through the commit id `resolve_ref` returns, never the
+    name, which git would look up again.
+    """
+    oid = resolve_ref(ref)
     path = RECIPE_PATH
-    if _git("cat-file", "-e", f"{ref}:{RECIPE_PATH}").returncode != 0:
+    if _git("cat-file", "-e", f"{oid}:{RECIPE_PATH}").returncode != 0:
         # Absence alone falls back to the legacy name; a present new recipe is
         # validated below and an invalid one stops at exit 3.
-        if _git("cat-file", "-e", f"{ref}:{LEGACY_RECIPE_PATH}").returncode != 0:
+        if _git("cat-file", "-e", f"{oid}:{LEGACY_RECIPE_PATH}").returncode != 0:
             return None
         path = LEGACY_RECIPE_PATH
         print(
             f"⚠ legacy {LEGACY_RECIPE_PATH} found at {ref} — rename to {RECIPE_PATH}",
             file=sys.stderr,
         )
-    text = _git_out("show", f"{ref}:{path}")
+    text = _git_out("show", f"{oid}:{path}")
     try:
         obj = json.loads(text)
     except ValueError as exc:
@@ -483,12 +591,26 @@ def main(argv: list[str] | None = None) -> int:
             "--ref \"origin/${base}\" --consumer resolve --changed -"
         ),
     )
-    parser.add_argument("--ref", required=True, help="base ref the recipe is read from (never the branch under test)")
+    parser.add_argument(
+        "--ref",
+        required=True,
+        help=(
+            "base ref the recipe is read from (never the branch under test): HEAD, "
+            "an existing refs/... name, or a short name naming exactly one ref "
+            "(with a /, the remote-tracking one); no revision syntax"
+        ),
+    )
     parser.add_argument("--consumer", required=True, choices=CONSUMERS, help="calling skill scope")
     parser.add_argument("--changed", required=True, help="file of changed paths, one per line; - for stdin")
     parser.add_argument("--auto", action="store_true", help="auto mode (also implied by IDD_AUTO_MODE=1)")
     parser.add_argument("--plan", action="store_true", help="report mapped capabilities without launching")
     args = parser.parse_args(argv)
+    # Usage errors (exit 2) before any ref check (exit 4): an empty or
+    # option-shaped value is a malformed invocation, not a ref that failed.
+    if not args.ref:
+        parser.error("--ref value must not be empty")
+    if args.ref.startswith("-"):
+        parser.error(f"--ref value must be a revision, not an option: {args.ref!r}")
     auto = args.auto or os.environ.get("IDD_AUTO_MODE") == "1"
     verdict: dict = {
         "status": "absent", "reason": None, "recipe": None, "ref": args.ref,

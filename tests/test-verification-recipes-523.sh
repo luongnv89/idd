@@ -30,6 +30,11 @@
 #   V11  the starter recipe gi-stack-detect drafts for /init-idd (#668) — with a
 #        server and CLI-only — passes this script's own validate(), with one
 #        capability per detected entry point and auto left empty.
+#   V12  --ref is exactly one listed ref: a local origin/main, a missing remote
+#        ref falling through to refs/heads/refs/remotes/..., a revision suffix,
+#        a branch and tag of one name, and a $GIT_DIR/origin/main file never
+#        supply the recipe, nor does a refs/replace entry; the legitimate forms
+#        still resolve; an empty or option-shaped --ref is exit 2. Each guard has a reverse-applied mutant.
 #
 # Usage: bash tests/test-verification-recipes-523.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -148,6 +153,140 @@ PY
   rc=$?  # before the label's command substitution resets $?
   check "V11: the ${dir##*/} starter validates, one capability per entry point, auto empty" "$rc"
 done
+
+# ── V12: a look-alike ref never supplies the recipe (needs no curl) ──
+# main carries a recipe whose one capability is `real`; the checked-out branch
+# `feat` — the code under review — carries one named `evil`. Every cell runs
+# --plan, so nothing launches and the capability names show which recipe loaded.
+cap_recipe() { printf '{"version":1,"launch":{"command":["true"],"ready":{"url":"/"}},"capabilities":[{"name":"%s","drive":["true"]}]}' "$1"; }
+# look_alike <dir> <kind> — kinds:
+#   plain   the real refs/remotes/origin/main and nothing else
+#   shadow  plus a local branch origin/main at feat (what `gh pr checkout` makes)
+#   nested  refs/remotes/origin/main deleted; a local branch named
+#           refs/remotes/origin/main at feat
+#   lone    refs/remotes/origin/main deleted; a local branch origin/main at feat
+#   gitdir  plus a file $GIT_DIR/origin/main holding feat's commit id, which git
+#           reads first for `origin/main` and `for-each-ref` never lists
+#   tag     a branch `base` at main and a tag `base` at feat
+look_alike() {
+  local d="$1" kind="$2"
+  new_repo "$d"; cap_recipe real | commit_recipe "$d"
+  (cd "$d" && git update-ref refs/remotes/origin/main HEAD && git checkout -qb feat)
+  cap_recipe evil | commit_recipe "$d"
+  (
+    cd "$d" || exit 1
+    case "$kind" in
+      shadow) git branch origin/main feat ;;
+      nested) git update-ref -d refs/remotes/origin/main && git update-ref refs/heads/refs/remotes/origin/main feat ;;
+      lone) git update-ref -d refs/remotes/origin/main && git branch origin/main feat ;;
+      gitdir) mkdir -p .git/origin && git rev-parse feat > .git/origin/main ;;
+      tag) git branch base main && git tag base feat ;;
+    esac
+  )
+}
+# plan_caps <dir> <ref> [script] — sets EC, CAPS (loaded capability names), ERR.
+plan_caps() {
+  local out
+  out="$(cd "$1" && printf 'landing.html' | env -u IDD_AUTO_MODE python3 "${3:-$SCRIPT}" --ref "$2" --consumer resolve --changed - --plan 2>"$TMP/stderr")"
+  EC=$?
+  CAPS="$(jget "$out" '[c["name"] for c in v["capabilities"]]')"
+  ERR="$(cat "$TMP/stderr")"
+}
+# The negative cells: name, kind, ref, required stderr reason ('' = any).
+V12_CELLS="shadow|origin/main|
+nested|refs/remotes/origin/main|
+lone|origin/main|
+tag|base|
+shadow|origin/main~0|is not a ref name
+shadow|origin/main^0|is not a ref name
+shadow|origin/main@{0}|is not a ref name
+shadow|origin/main^{commit}|is not a ref name"
+V12_N=0  # a fresh fixture directory per call
+# refused <kind> <ref> <reason> [script] — exit 0 when the recipe is refused (exit 4).
+refused() {
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-$1-$V12_N"
+  look_alike "$d" "$1"; plan_caps "$d" "$2" "${4:-}"
+  [ "$EC" = 4 ] && [ -z "$CAPS" ] && { [ -z "$3" ] || printf '%s' "$ERR" | grep -qF "$3"; }
+}
+while IFS='|' read -r kind ref reason; do
+  refused "$kind" "$ref" "$reason"
+  check "V12: --ref $ref with a look-alike ($kind) is refused, exit 4${reason:+, as revision syntax} (exit $EC, loaded ${CAPS:-nothing})" "$?"
+done <<EOF
+$V12_CELLS
+EOF
+# Every read goes through the listed ref's object id, never the name.
+pinned() {
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-gitdir-$V12_N"
+  look_alike "$d" gitdir
+  [ "$(cd "$d" && git rev-parse origin/main)" = "$(cd "$d" && git rev-parse feat)" ] || return 1
+  plan_caps "$d" origin/main "${1:-}"
+  [ "$EC" = 0 ] && [ "$CAPS" = "['real']" ]
+}
+pinned; check "V12: --ref origin/main loads the listed ref's recipe, not git's own lookup of the name (exit $EC, loaded ${CAPS:-nothing})" "$?"
+R="$TMP/v12-plain"; look_alike "$R" plain
+for good in origin/main refs/remotes/origin/main main refs/heads/main; do
+  plan_caps "$R" "$good"
+  [ "$EC" = 0 ] && [ "$CAPS" = "['real']" ]; check "V12: --ref $good resolves and loads the base recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+done
+plan_caps "$R" HEAD
+[ "$EC" = 0 ] && [ "$CAPS" = "['evil']" ]; check "V12: --ref HEAD resolves to the checked-out commit's recipe (exit $EC)" "$?"
+# A refs/replace entry swapping main's commit for feat's must not change what
+# the base ref supplies.
+replaced() { # [script] — exit 0 when the base recipe still loads
+  V12_N=$((V12_N + 1)); local d="$TMP/v12-replace-$V12_N"
+  look_alike "$d" plain
+  (cd "$d" && git replace "$(git rev-parse main)" "$(git rev-parse feat)")
+  plan_caps "$d" main "${1:-}"
+  [ "$EC" = 0 ] && [ "$CAPS" = "['real']" ]
+}
+replaced; check "V12: a refs/replace entry cannot swap the base-ref recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+usage_errors() { # [script] — exit 0 when both malformed values are exit 2
+  local s="${1:-$SCRIPT}" bad
+  for bad in "" "-x"; do
+    (cd "$R" && printf 'x' | python3 "$s" --ref="$bad" --consumer resolve --changed - >/dev/null 2>&1)
+    [ "$?" = 2 ] || return 1
+  done
+}
+usage_errors; check "V12: --ref='' and --ref=-x are usage errors (exit 2), before any ref check" "$?"
+
+# V12-M: reverse-apply each guard in a scratch copy; its cell must then fail.
+M="$TMP/mutants"; mkdir -p "$M"
+# mutate <out> <anchor> <replacement> [<anchor> <replacement>...] — 1 if an anchor drifted.
+mutate() {
+  python3 - "$SCRIPT" "$@" <<'PY'
+import sys
+src, out, *pairs = sys.argv[1:]
+text = open(src, encoding="utf-8").read()
+for anchor, replacement in zip(pairs[::2], pairs[1::2]):
+    if anchor not in text:
+        sys.exit(1)
+    text = text.replace(anchor, replacement, 1)
+open(out, "w", encoding="utf-8").write(text)
+PY
+}
+AMBIGUOUS=$'    if len(found) > 1:\n'
+REMOTE_RULE=$'    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":\n'
+OFF=$'    if False:\n'
+# Two guards each stop the shadow cell, so its mutant drops both.
+mutate "$M/shadow.py" "$AMBIGUOUS" "$OFF" "$REMOTE_RULE" "$OFF"; check "V12-M: the ambiguity check and remote-tracking rule are present to reverse-apply" "$?"
+! refused shadow origin/main '' "$M/shadow.py"; check "V12-M: without them a local origin/main shadowing the remote supplies the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/nested.py" $'    if not found:\n        raise CannotComplete(\n' $'    if not found:\n        return _commit_of(ref)\n        raise CannotComplete(\n'
+check "V12-M: the unlisted-name refusal is present to reverse-apply" "$?"
+! refused nested refs/remotes/origin/main '' "$M/nested.py"; check "V12-M: resolving an unlisted refs/ name by git's own lookup reaches refs/heads/refs/remotes/origin/main (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/lone.py" "$REMOTE_RULE" "$OFF"; check "V12-M: the remote-tracking rule is present to reverse-apply" "$?"
+! refused lone origin/main '' "$M/lone.py"; check "V12-M: without it a lone local origin/main supplies the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/tag.py" "$AMBIGUOUS" "$OFF"; check "V12-M: the ambiguity check is present to reverse-apply" "$?"
+! refused tag base '' "$M/tag.py"; check "V12-M: without it the tag of the same name supplies the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/format.py" $'    if _git("check-ref-format", "--allow-onelevel", ref).returncode != 0:\n' "$OFF"
+check "V12-M: the check-ref-format guard is present to reverse-apply" "$?"
+! refused shadow 'origin/main~0' 'is not a ref name' "$M/format.py"; check "V12-M: without it origin/main~0 is no longer refused as revision syntax" "$?"
+mutate "$M/pin.py" $'    oid = _commit_of(rows[found[0]])\n' $'    oid = _commit_of(ref)\n'; check "V12-M: the read through the listed object id is present to reverse-apply" "$?"
+! pinned "$M/pin.py"; check "V12-M: resolving the name instead lets \$GIT_DIR/origin/main supply the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/replace.py" '["git", "--no-replace-objects", *args], capture_output=True' '["git", *args], capture_output=True'
+check "V12-M: --no-replace-objects is present to reverse-apply" "$?"
+! replaced "$M/replace.py"; check "V12-M: without it the refs/replace entry supplies the recipe (exit $EC, loaded ${CAPS:-nothing})" "$?"
+mutate "$M/usage.py" $'    if not args.ref:\n' "$OFF" $'    if args.ref.startswith("-"):\n' "$OFF"; check "V12-M: the usage guards are present to reverse-apply" "$?"
+! usage_errors "$M/usage.py"; check "V12-M: without them an empty or option-shaped --ref is not a usage error" "$?"
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "  ○ curl not found — the behavioural legs need it to drive the pilot"

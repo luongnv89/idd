@@ -19,6 +19,11 @@
 #   P9    an unreadable compare side is a finding, never a failure
 #   P10   a local branch named `origin/main` cannot shadow the base
 #   P11   a missing remote ref cannot fall through to `refs/heads/refs/...`
+#   P12   a lone local `origin/main` is not the remote-tracking ref
+#   P13   a revision suffix (`~0`, `^0`, `@{0}`, `^{commit}`) is refused
+#   P14   a short name naming a branch and a tag is ambiguous
+#   P15   reads go through the listed object id, not a `$GIT_DIR/<name>` file;
+#         the legitimate forms still resolve
 #   P16   the Step 2 pointer and the comparison run in --review-only too
 #   P17   the compare call is paired with its "could not be compared" form
 #   P18   the shipped resolution block fails closed to the defaults
@@ -150,12 +155,19 @@ os.makedirs(MUTANTS)
 
 
 def mutant(source_path, anchor, replacement, name):
-    """A scratch copy with one guard reverse-applied, or None if the anchor drifted."""
+    """A scratch copy with one guard reverse-applied, or None if the anchor drifted.
+
+    `anchor` and `replacement` may be equal-length tuples when one guard is
+    written in more than one place.
+    """
     text = open(source_path, encoding="utf-8").read()
-    if anchor not in text:
-        return None
+    pairs = zip(anchor, replacement) if isinstance(anchor, tuple) else [(anchor, replacement)]
+    for one_anchor, one_replacement in pairs:
+        if one_anchor not in text:
+            return None
+        text = text.replace(one_anchor, one_replacement, 1)
     path = os.path.join(MUTANTS, name)
-    write(path, text.replace(anchor, replacement, 1))
+    write(path, text)
     return path
 
 
@@ -402,12 +414,17 @@ def cell_p10(script):
 
 ok, detail = cell_p10(SRC)
 emit(ok, f"P10: the fully-qualified remote ref returns the base values; the ambiguous short name exits 4 ({detail})")
+# Two guards each stop this cell — the ambiguity check, and the rule that a
+# short name with `/` is the remote-tracking ref — so the mutant drops both.
 check_mutant(
     cell_p10,
-    "P10-M: drop the short-name ambiguity check",
+    "P10-M: drop the short-name ambiguity check and the remote-tracking rule",
     SRC,
-    "        if len(found) > 1:\n",
-    "        if False:\n",
+    (
+        "    if len(found) > 1:\n",
+        '    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":\n',
+    ),
+    ("    if False:\n", "    if False:\n"),
 )
 
 # ── Shims for running the shipped shell blocks ────────────────────────────────
@@ -560,10 +577,10 @@ ok, detail = cell_p11(SRC)
 emit(ok, f"P11: --ref refs/remotes/origin/main with only a local refs/heads/refs/remotes/origin/main exits 4 ({detail})")
 check_mutant(
     cell_p11,
-    "P11-M: drop the exact for-each-ref check",
+    "P11-M: resolve a refs/... name no ref lists by git's own lookup",
     SRC,
-    "        if listed.returncode != 0 or names.count(ref) != 1:\n",
-    "        if False:\n",
+    "    if not found:\n        raise Unavailable(\n",
+    "    if not found:\n        return _commit_of(ref)\n        raise Unavailable(\n",
 )
 repo, _ = p11_repo("p11-block")
 out, calls = run_block(RESOLUTION, repo, mode="nofetch")
@@ -580,6 +597,126 @@ emit(
     DEFAULTS_LINE not in out and '"review.max_cycles": 99' in out,
     "P11-M: without the show-ref check the block resolves the local refs/heads/refs/remotes/origin/main and uses its values",
 )
+
+# ── P12–P15: look-alike refs never stand in for the base ─────────────────────
+
+
+def look_alike_repo(label, kind):
+    """`pr_repo` plus one ref the PR can write that looks like the base.
+
+      plain   nothing more: the control.
+      lone    refs/remotes/origin/main is deleted and a local branch
+              `origin/main` points at the PR — the short name's only hit.
+      suffix  the real remote ref plus a local branch `origin/main` at the PR;
+              a revision suffix makes git look the name up again by itself.
+      gitdir  the real remote ref, plus a file `$GIT_DIR/origin/main` holding
+              the PR's commit id: git reads that file first for `origin/main`,
+              and `for-each-ref` never lists it.
+      tag     a branch `base` at the base and a tag `base` at the PR.
+    """
+    repo, base_oid = pr_repo(label)
+    hostile = git(["rev-parse", "fix/1-pr"], repo)
+    if kind == "lone":
+        git(["update-ref", "-d", "refs/remotes/origin/main"], repo)
+        git(["branch", "origin/main", "fix/1-pr"], repo)
+    elif kind == "suffix":
+        git(["branch", "origin/main", "fix/1-pr"], repo)
+    elif kind == "gitdir":
+        write(os.path.join(repo, ".git", "origin", "main"), hostile + "\n")
+    elif kind == "tag":
+        git(["branch", "base", "main"], repo)
+        git(["tag", "base", "fix/1-pr"], repo)
+    return repo, base_oid, hostile
+
+
+LABELS = iter(range(10**6))
+
+
+def refused(script, kind, ref, reason=None):
+    repo, _, _ = look_alike_repo(f"p12-{kind}-{next(LABELS)}", kind)
+    code, payload, err = run_cfg(["--ref", ref], repo, script)
+    value = payload["config"].get("review.max_cycles") if payload else None
+    ok = code == 4 and payload is None and (reason is None or reason in err)
+    return ok, f"exit {code}, max_cycles={value}, stderr {err.strip()[:100]!r}"
+
+
+def cell_p12(script):
+    return refused(script, "lone", "origin/main")
+
+
+def cell_p13(script):
+    results = [refused(script, "suffix", s, "is not a ref name") for s in SUFFIXES]
+    repo, base_oid, _ = look_alike_repo(f"p13-compare-{next(LABELS)}", "suffix")
+    code, payload, _ = run_cfg(["--ref", base_oid, "--compare-ref", "origin/main~0"], repo, script)
+    compare_ok = (
+        code == 0 and payload is not None and payload.get("changed_keys") is None
+        and "is not a ref name" in (payload.get("compare_error") or "")
+    )
+    detail = "; ".join(f"{s}: {d}" for s, (_, d) in zip(SUFFIXES, results))
+    return all(ok for ok, _ in results) and compare_ok, f"{detail}; --compare-ref origin/main~0 exit {code}, compare_error={payload and payload.get('compare_error')!r}"
+
+
+def cell_p14(script):
+    return refused(script, "tag", "base")
+
+
+def cell_p15(script):
+    repo, _, hostile = look_alike_repo(f"p15-{next(LABELS)}", "gitdir")
+    shadowed = git(["rev-parse", "origin/main"], repo) == hostile
+    code, payload, _ = run_cfg(["--ref", "origin/main"], repo, script)
+    value = payload["config"].get("review.max_cycles") if payload else None
+    ok = shadowed and code == 0 and value == 4 and payload.get("config_source") == "ref:origin/main"
+    return ok, f"raw rev-parse shadowed {shadowed}, exit {code}, max_cycles={value}"
+
+
+SUFFIXES = ("origin/main~0", "origin/main^0", "origin/main@{0}", "origin/main^{commit}")
+
+ok, detail = cell_p12(SRC)
+emit(ok, f"P12: with the remote ref deleted, a lone local branch origin/main is refused ({detail})")
+check_mutant(
+    cell_p12,
+    "P12-M: drop the remote-tracking rule for a short name with /",
+    SRC,
+    '    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":\n',
+    "    if False:\n",
+)
+ok, detail = cell_p13(SRC)
+emit(ok, f"P13: --ref and --compare-ref with a revision suffix next to a local origin/main are refused as revision syntax ({detail})")
+check_mutant(
+    cell_p13,
+    "P13-M: drop the check-ref-format guard",
+    SRC,
+    "    if not _is_ref_name(ref):\n",
+    "    if False:\n",
+)
+ok, detail = cell_p14(SRC)
+emit(ok, f"P14: a short name naming a branch and a tag is refused as ambiguous ({detail})")
+check_mutant(
+    cell_p14,
+    "P14-M: drop the ambiguity check",
+    SRC,
+    "    if len(found) > 1:\n",
+    "    if False:\n",
+)
+ok, detail = cell_p15(SRC)
+emit(ok, f"P15: --ref origin/main reads the listed ref's commit, not git's own lookup of the name ({detail})")
+check_mutant(
+    cell_p15,
+    "P15-M: resolve the ref name instead of the listed object id",
+    SRC,
+    "    oid = _commit_of(rows[found[0]])\n",
+    "    oid = _commit_of(ref)\n",
+)
+
+# The legitimate forms still resolve to the base and read its values.
+repo, base_oid, _ = look_alike_repo("p15-good", "plain")
+for good in ("origin/main", "refs/remotes/origin/main", "main", "refs/heads/main", base_oid):
+    code, payload, err = run_cfg(["--ref", good], repo)
+    value = payload["config"].get("review.max_cycles") if payload else None
+    emit(code == 0 and value == 4, f"P15: --ref {good} resolves and reads the base config (exit {code}, max_cycles={value}; {err.strip()[:80]!r})")
+code, payload, _ = run_cfg(["--ref", "HEAD"], repo)
+value = payload["config"].get("review.max_cycles") if payload else None
+emit(code == 0 and value == 99, f"P15: --ref HEAD resolves and reads the checked-out commit's config (exit {code}, max_cycles={value})")
 
 # ── P20: the comparison starts at the merge base ─────────────────────────────
 

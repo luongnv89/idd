@@ -27,7 +27,10 @@
 #      attacker-chosen head-ref name as a local branch. A11 builds that
 #      collision, so a PR branch literally named `origin/main` cannot re-supply
 #      its own policy while `policy_source` still reports the ref the caller
-#      asked for.
+#      asked for. A12–A16 cover the other look-alikes — a missing remote ref
+#      falling through to `refs/heads/refs/remotes/...`, a lone local
+#      `origin/main`, a revision suffix, a branch and tag of one name, and a
+#      `$GIT_DIR/origin/main` file — and A17 the forms that must still resolve.
 #
 # Phase B covers the related `refs/replace` defect: `--no-replace-objects` is a
 # git TOP-LEVEL option. Written the way the issue's AC #3 literally spells it —
@@ -307,6 +310,147 @@ emit(
 shutil.rmtree(repo, ignore_errors=True)
 
 
+def run_err(args, cwd, script=SCRIPT):
+    """Run the scan; return (exit code, verdict or None, stderr text)."""
+    proc = subprocess.run(
+        [sys.executable, script, *args, "--quiet"],
+        cwd=cwd,
+        capture_output=True,
+        check=False,
+    )
+    try:
+        verdict = json.loads(proc.stdout.decode())
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        verdict = None
+    return proc.returncode, verdict, proc.stderr.decode("utf-8", errors="replace")
+
+
+def rev(repo, spec):
+    return subprocess.run(
+        ["git", "rev-parse", spec], cwd=repo, capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def build_look_alike_repo(kind):
+    """A repo where a ref the PR can write looks like the trusted policy ref.
+
+    `main` is the trusted side (no config: built-in defaults, so the secret
+    blocks); `feature` carries the narrow allow_pattern naming the secret.
+
+      nested  refs/remotes/origin/main is deleted and a local branch named
+              `refs/remotes/origin/main` points at the PR — git's lookup for
+              the fully-qualified name falls through to it.
+      lone    refs/remotes/origin/main is deleted and a local branch
+              `origin/main` points at the PR — the only hit of the short name.
+      suffix  the real remote ref plus a local branch `origin/main` at the PR;
+              a revision suffix makes git look the name up again by itself.
+      gitdir  the real remote ref, plus a file `$GIT_DIR/origin/main` holding
+              the PR's commit id. git reads that file first for `origin/main`,
+              and `for-each-ref` never lists it, so only a read through the
+              listed ref's object id avoids it.
+      legacy  as gitdir, but the file names a commit off main that carries the
+              narrow pattern only as the legacy `.gitissue.yml`.
+      tag     a branch `base` at main and a tag `base` at the PR: two refs of
+              one short name with no `/`.
+    """
+    repo = build_repo(r"^leak\\.txt$")
+    trusted, hostile = rev(repo, "main"), rev(repo, "feature")
+    if kind == "legacy":
+        git(["checkout", "-q", "-b", "legacy", "main"], repo)
+        with open(os.path.join(repo, ".gitissue.yml"), "w", encoding="utf-8") as handle:
+            handle.write('security:\n  allow_pattern: "^leak\\\\.txt$"\n')
+        git(["add", ".gitissue.yml"], repo)
+        git(["commit", "-qm", "legacy policy"], repo)
+        git(["checkout", "-q", "feature"], repo)
+        hostile = rev(repo, "legacy")
+        kind = "gitdir"
+    if kind in ("suffix", "gitdir"):
+        git(["update-ref", "refs/remotes/origin/main", trusted], repo)
+    if kind == "nested":
+        git(["update-ref", "refs/heads/refs/remotes/origin/main", hostile], repo)
+    elif kind in ("lone", "suffix"):
+        git(["branch", "origin/main", "feature"], repo)
+    elif kind == "gitdir":
+        os.makedirs(os.path.join(repo, ".git", "origin"))
+        with open(os.path.join(repo, ".git", "origin", "main"), "w") as handle:
+            handle.write(hostile + "\n")
+    elif kind == "tag":
+        git(["branch", "base", "main"], repo)
+        git(["tag", "base", "feature"], repo)
+    return repo, hostile
+
+
+def look_alike_cell(kind, policy_ref, script=SCRIPT, reason=None):
+    """The scan must refuse (exit 4) — never scan under the PR's own policy."""
+    repo, _ = build_look_alike_repo(kind)
+    code, verdict, err = run_err(["--range", "main", "--policy-ref", policy_ref], repo, script)
+    shutil.rmtree(repo, ignore_errors=True)
+    ok = code == 4 and verdict is None and (reason is None or reason in err)
+    got = verdict.get("verdict") if verdict else None
+    return ok, f"exit {code}, verdict {got}, stderr {err.strip()[:120]!r}"
+
+
+def pin_cell(script=SCRIPT, kind="gitdir"):
+    """`$GIT_DIR/origin/main` names the PR; the listed ref names the base."""
+    repo, hostile = build_look_alike_repo(kind)
+    shadowed = rev(repo, "origin/main") == hostile
+    code, verdict, _ = run_err(["--range", "main", "--policy-ref", "origin/main"], repo, script)
+    shutil.rmtree(repo, ignore_errors=True)
+    named = verdict.get("policy_source") if verdict else None
+    ok = shadowed and code == 1 and named == "ref:origin/main"
+    return ok, f"raw rev-parse shadowed {shadowed}, exit {code}, policy_source {named}"
+
+
+# A12: a fully-qualified name is a search too. With the remote ref deleted, git
+# resolves `refs/remotes/origin/main` to `refs/heads/refs/remotes/origin/main`,
+# a branch `gh pr checkout` creates from the PR's head-ref name.
+ok, detail = look_alike_cell("nested", "refs/remotes/origin/main")
+emit(ok, f"A12: a missing refs/remotes/origin/main never falls through to a local refs/heads/refs/remotes/origin/main ({detail})")
+
+# A13: the short name's only hit is a local branch — no ambiguity to detect, so
+# a short name containing `/` must be the remote-tracking ref itself.
+ok, detail = look_alike_cell("lone", "origin/main")
+emit(ok, f"A13: a lone local branch origin/main is refused, not read as the trusted ref ({detail})")
+
+# A14: a revision suffix sends the name through git's own lookup, past the
+# five-form check, to the local branch. It is refused as revision syntax.
+SUFFIXES = ("origin/main~0", "origin/main^0", "origin/main@{0}", "origin/main^{commit}")
+for suffixed in SUFFIXES:
+    ok, detail = look_alike_cell("suffix", suffixed, reason="is not a ref name")
+    emit(ok, f"A14: --policy-ref {suffixed} next to a local origin/main is refused as revision syntax ({detail})")
+
+# A15: a short name with no `/` that names a branch and a tag is ambiguous.
+ok, detail = look_alike_cell("tag", "base")
+emit(ok, f"A15: a short name naming a branch and a tag is refused as ambiguous ({detail})")
+
+# A16: every read goes through the object id the listed ref carries, never the
+# name — otherwise `$GIT_DIR/origin/main` re-supplies the PR's policy.
+ok, detail = pin_cell()
+emit(ok, f"A16: the policy is read from the listed ref's commit, not git's own lookup of the name ({detail})")
+ok, detail = pin_cell(kind="legacy")
+emit(ok, f"A16: the legacy .gitissue.yml is read from the listed ref's commit too ({detail})")
+
+# A17: the legitimate forms still resolve and read their own policy.
+repo, _ = build_look_alike_repo("gitdir")
+os.remove(os.path.join(repo, ".git", "origin", "main"))
+for good, want in (
+    ("origin/main", 1),
+    ("refs/remotes/origin/main", 1),
+    ("main", 1),
+    ("refs/heads/main", 1),
+    ("HEAD", 0),
+):
+    code, verdict, err = run_err(["--range", "main", "--policy-ref", good], repo)
+    named = verdict.get("policy_source") if verdict else None
+    emit(
+        code == want and named == f"ref:{good}",
+        f"A17: --policy-ref {good} resolves and reads its own policy (exit {code}, "
+        f"expected {want}; policy_source {named}; {err.strip()[:80]!r})",
+    )
+shutil.rmtree(repo, ignore_errors=True)
+
+
 # ── Phase B: refs/replace must not redirect the bytes the gate reads ─────────
 
 
@@ -470,17 +614,18 @@ emit(
 )
 shutil.rmtree(repo, ignore_errors=True)
 
-# C4: drop the ambiguity check. A11 must then go clean/exit 0 — the shadowing
-# local branch wins the short-ref lookup again and re-supplies its own narrow
-# allow_pattern, with `policy_source` still naming the ref the caller asked for.
-AMBIGUITY_ANCHOR = "    _reject_ambiguous_ref(ref)\n"
+# C4: drop the ref resolution, so the name itself is read. A11 must then go
+# clean/exit 0 — the shadowing local branch wins the short-ref lookup again and
+# re-supplies its own narrow allow_pattern, with `policy_source` still naming
+# the ref the caller asked for.
+AMBIGUITY_ANCHOR = "    oid = _resolve_policy_ref(ref)\n"
 emit(
     AMBIGUITY_ANCHOR in source,
-    "C4: the policy-ref ambiguity check is present to reverse-apply",
+    "C4: the policy-ref resolution is present to reverse-apply",
 )
 reverted = os.path.join(SCRATCH, "policy_ambiguous.py")
 with open(reverted, "w", encoding="utf-8") as handle:
-    handle.write(source.replace(AMBIGUITY_ANCHOR, "", 1))
+    handle.write(source.replace(AMBIGUITY_ANCHOR, "    oid = ref\n", 1))
 repo = build_shadow_repo()
 code, verdict = run(
     ["--range", "refs/remotes/origin/main", "--policy-ref", "origin/main"],
@@ -492,10 +637,63 @@ emit(
     and verdict is not None
     and verdict["verdict"] == "clean"
     and verdict.get("policy_source") == "ref:origin/main",
-    "C4: reverse-applying the ambiguity check makes A11 fail — the PR's own "
+    "C4: reverse-applying the ref resolution makes A11 fail — the PR's own "
     f"branch shadows the trusted remote ref and governs its review (exit {code})",
 )
 shutil.rmtree(repo, ignore_errors=True)
+
+
+def reverse_apply(label, pairs, cell):
+    """Each guard of the resolver, reverse-applied alone: its cell must fail."""
+    text = source
+    for anchor, replacement in pairs:
+        emit(anchor in text, f"{label}: the guard is present to reverse-apply")
+        text = text.replace(anchor, replacement, 1)
+    path = os.path.join(SCRATCH, label.split(":")[0] + ".py")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    ok, detail = cell(path)
+    emit(not ok, f"{label}: reverse-applying it makes the cell fail ({detail})")
+
+
+# C5: without the revision-syntax check a suffixed name is no longer refused
+# for being revision syntax — A14's stated reason is gone.
+reverse_apply(
+    "C5: drop the check-ref-format guard (A14)",
+    [("    if not _is_ref_name(ref):\n", "    if False:\n")],
+    lambda script: look_alike_cell("suffix", "origin/main~0", script, "is not a ref name"),
+)
+# C6: a name no ref lists falls through to git's own lookup of it — A12's
+# local refs/heads/refs/remotes/origin/main supplies the policy.
+reverse_apply(
+    "C6: resolve an unlisted name by git's own lookup (A12)",
+    [("    if not found:\n        raise Unavailable(\n", "    if not found:\n        return ref\n        raise Unavailable(\n")],
+    lambda script: look_alike_cell("nested", "refs/remotes/origin/main", script),
+)
+# C7: a short name with `/` may be a local branch — A13's lone origin/main wins.
+reverse_apply(
+    "C7: drop the remote-tracking rule for a short name with / (A13)",
+    [('    if "/" in ref and not ref.startswith("refs/") and found[0] != f"refs/remotes/{ref}":\n', "    if False:\n")],
+    lambda script: look_alike_cell("lone", "origin/main", script),
+)
+# C8: two refs of one name — git's first form, the tag, wins in A15.
+reverse_apply(
+    "C8: drop the ambiguity check (A15)",
+    [("    if len(found) > 1:\n", "    if False:\n")],
+    lambda script: look_alike_cell("tag", "base", script),
+)
+# C9: read by the name again — `$GIT_DIR/origin/main` supplies the policy in
+# A16. Each read is reverted on its own, against the fixture where it matters.
+reverse_apply(
+    "C9: read .idd.yml by the ref name instead of the resolved commit (A16)",
+    [("_read_ref_config(oid, CONFIG_NAME)", "_read_ref_config(ref, CONFIG_NAME)")],
+    pin_cell,
+)
+reverse_apply(
+    "C9b: read the legacy .gitissue.yml by the ref name instead of the resolved commit (A16 legacy)",
+    [("_read_ref_config(oid, LEGACY_CONFIG_NAME)", "_read_ref_config(ref, LEGACY_CONFIG_NAME)")],
+    lambda script: pin_cell(script, kind="legacy"),
+)
 shutil.rmtree(SCRATCH, ignore_errors=True)
 
 
