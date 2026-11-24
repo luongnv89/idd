@@ -28,8 +28,9 @@
 #       later one with no change on its code path as flaky, never as evidence,
 #       sends it to the fixer, holds the clean exit until it ends (both
 #       statements of that exit say so), and gives it three endings, the
-#       follow-up one opened by the main agent; the Decision Record says
-#       which, or `open`; a flaky record is the one other reason to delete a
+#       follow-up one opened by the main agent with acceptance criteria;
+#       the Decision Record says which, or `open`; a flaky record is the
+#       one other reason to delete a
 #       test, and justifies a deletion only. The reviewer's ban spares a skip
 #       a criterion or plan item asks for. Source, built copies, and a
 #       targeted mutation per pin.
@@ -134,7 +135,7 @@ flaky_rule_ok() {
     has "$r" 'failed in an earlier cycle and passes now with no change on its code path is \*\*flaky\*\*: never evidence for a criterion' &&
     has "$r" 'and a finding for the fixer' &&
     has "$r" 'that keeps the cycle from clean until it ends root-caused' &&
-    has "$r" 'root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue the main agent opens\.' &&
+    has "$r" 'root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue the main agent opens with acceptance criteria\.' &&
     has "$r" 'The Decision Record.s \*Flaky tests\* line says which'
 }
 
@@ -304,9 +305,12 @@ check "B8: a clean-exit bullet that ignores an open flaky test turns the Step 4 
 mutate "$STEP4" step4-loop-exit.md 'tests pass AND no static check failed AND no flaky test is open' 'tests pass AND no static check failed' \
   && ! flaky_exit_ok "$TMP/step4-loop-exit.md"
 check "B8: an Exit on clean that ignores an open flaky test turns the Loop controls check red" "$?"
-mutate "$STEP4" step4-no-actor.md 'tracked in a follow-up issue the main agent opens.' 'tracked in a follow-up issue.' \
+mutate "$STEP4" step4-no-actor.md 'tracked in a follow-up issue the main agent opens with' 'tracked in a follow-up issue with' \
   && ! flaky_rule_ok "$TMP/step4-no-actor.md"
 check "B8: a follow-up issue with no one to open it turns the Step 4 check red" "$?"
+mutate "$STEP4" step4-no-criteria.md ' the main agent opens with acceptance criteria.' ' the main agent opens.' \
+  && ! flaky_rule_ok "$TMP/step4-no-criteria.md"
+check "B8: a follow-up issue opened without acceptance criteria turns the Step 4 check red" "$?"
 mutate "$STEP4" step4-no-record.md " The Decision Record's *Flaky tests* line says which." '' \
   && ! flaky_rule_ok "$TMP/step4-no-record.md"
 check "B8: dropping the Decision Record pointer turns the Step 4 check red" "$?"
