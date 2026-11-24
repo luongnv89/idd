@@ -41,9 +41,9 @@ Each cycle:
 
    Delete any file a check created (a cache directory), then `$checks`. Carry each check's last outcome to Deliver for the PR body's `Static checks:` bullet (`references/report-templates.md`).
 4. **Evaluate results:** <!-- a:rs-qa-evaluate -->
-   - Reviewer returns `PASS` AND all tests pass AND build succeeds AND no static check failed → exit loop, QA passed.
+   - Reviewer returns `PASS` AND all tests pass AND build succeeds AND no static check failed AND no flaky test is open → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-   - A test that failed in an earlier cycle and passes now with no change on its code path is **flaky**: never evidence for a criterion, and a finding for the fixer that keeps the cycle from clean until it ends root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue. The Decision Record's *Flaky tests* line says which.
+   - A test that failed in an earlier cycle and passes now with no change on its code path is **flaky**: never evidence for a criterion, and a finding for the fixer that keeps the cycle from clean until it ends root-caused, deleted with the reason written down, or — only when it covers no criterion — tracked in a follow-up issue the main agent opens. The Decision Record's *Flaky tests* line says which.
 5. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings, failing test/build/static-check output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available. **Before every fix request after the second** (spawn or re-message), run the *Premise reset* check below; its block holds the request.
 
 **Profile carry.** The pipeline profile *Step 0g* selected — `light` or `full` —
@@ -145,7 +145,7 @@ The contract, opt-in, lifecycle and verdict handling live in `references/docs/ui
   (review is reduced in depth, never skipped). A profile upgraded to `full` in
   Step 1 uses the matching class ceiling. Record `ceiling` and, if `qa_cycles`
   exceeds it, a `breach_reason` on the run-log line.
-- **Exit on clean:** stop as soon as review passes AND tests pass AND no static check failed
+- **Exit on clean:** stop as soon as review passes AND tests pass AND no static check failed AND no flaky test is open
 - **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
 - **Premise reset:** two failed fixes sharing a premise block the next fix until
   rerunnable diagnostics support a revised one (*Premise reset* below) — it

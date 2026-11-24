@@ -256,7 +256,7 @@ check "an unreadable base writes no file list, so nothing reads as 'no files cha
 
 echo "AC2 — a failure is a finding, and the PR body states the outcome"
 has "$STEP4" '**failed** — a fixable finding. The fixer gets the tool'"'"'s output, and the cycle is not clean.' "a failed check is a fixable finding"
-has "$STEP4" 'Reviewer returns `PASS` AND all tests pass AND build succeeds AND no static check failed → exit loop' "the clean exit needs no failed check"
+has "$STEP4" 'Reviewer returns `PASS` AND all tests pass AND build succeeds AND no static check failed AND no flaky test is open → exit loop' "the clean exit needs no failed check"
 has "$STEP4" 'failing test/build/static-check output' "the fixer receives the check output"
 has "$STEP4" 'It is never a pass and never goes to the fixer, and it does not block the clean exit.' "a check that did not run is never a pass and never blocks"
 has "$STEP4" '`xargs` exit 126 or 127' "the not-run signal is named"
