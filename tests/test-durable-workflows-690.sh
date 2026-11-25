@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # test-durable-workflows-690.sh — a cut-off run resumes instead of starting over (issue #690).
 #
-# Every skill was reviewed for cut-off resume. Five gained rules; the pins below
+# Every skill was reviewed for cut-off resume. Eight gained rules; the pins below
 # hold each rule to the built skill that ships it.
 #
 #   T1  each resume rule is in its built skill, located by anchor;
 #   T2  the two shared references are bundled byte-identical into exactly the
 #       skills that cite them, each listed in that skill's precheck, and the
-#       three unchanged long-running skills carry neither;
+#       three long-running skills, which resume from gi-progress.py and
+#       gi-state.py, carry neither;
 #   T3  the shared references stay closure leaves with no tracker call and no
 #       gate heading;
-#   T4  the ADR amendment names all nine skills and the decisions kept;
+#   T4  the ADR amendment names all nine skills and the reversed decisions;
 #   T5  mutation: the T1 pins fail when an anchor's region is emptied in a copy
 #       of the built skills, once per anchor, and when a shared reference is gone;
 #   T6  a stage file under <git common dir>/idd/stage/ is invisible to
@@ -45,7 +46,7 @@ for f in "$ADR" "$WORKFLOW" "$SHARED/resume-cut-off.md" "$SHARED/stage-file.md";
 done
 
 RESUME_SKILLS="issue-analysis issue-triage issue-creator plan-to-issues"
-STAGE_SKILLS="issue-analysis issue-triage"
+STAGE_SKILLS="issue-analysis issue-triage issue-creator plan-to-issues"
 ALL_SHIPPED="auto-pilot init-idd issue-analysis issue-creator issue-pr-review issue-resolver issue-triage plan-to-issues"
 
 # One row per pinned rule: skill|anchor|ERE matched against the flattened region.
@@ -64,7 +65,21 @@ issue-triage|tr-resume|written, remove the stage file
 issue-creator|ic-normalize-tail|Only when .issue\.normalize_comment. is true.*viewerDidAuthor.*no later comment
 issue-creator|ic-normalize-tail|--json state,comments.*When the issue is open, the latest comment.*created in the last 24 hours.*no later comment
 issue-creator|ic-normalize-tail|closed issue or an older backup is a finished normalization.*never post it there
-issue-creator|ic-normalize-tail|are not recovered: they are the one step lost
+issue-creator|ic-normalize-tail|Staged labels.*under 24 hours old, apply its labels.*only names that the live .gh label list --json name --limit 200. holds and the live issue lacks.*never the stage.s
+issue-creator|ic-create-stage|.git hash-object. of the user.s input text.*never passed on a command line
+issue-creator|ic-create-stage|first read this login.s newest issues live.*remove the stage and stop
+issue-creator|ic-create-stage|Step 3.s duplicate check and Step 5.s preview run live
+issue-creator|ic-create-stage|--body-file., never pasted into .--body.
+issue-analysis|ia-inline-stage|A step is finished only once its .\[k/8\]. line has printed.*A partial .inline_steps. is never .findings.
+issue-analysis|ia-resume|an inline run also reuses each step in .inline_steps.
+plan-to-issues|pti-staged-draft|.created_at. under 24 hours old.*hashes to.*.draft_sha.
+plan-to-issues|pti-staged-draft|Phase 3.s epic identity still runs live.*never created twice
+issue-resolver|rs-0j-resume-entry|Without it, resume only when the record is the owner.s and idle.*age_s. is over 600.*Otherwise the record is ignored
+issue-resolver|rs-0j-resume-entry|--no-resume.:\*\* never resume
+issue-pr-review|rvm-progress-resume|Without it, resume only when the record is the owner.s and idle.*age_s. is over 600
+issue-pr-review|rvm-progress-review-only|--mode review-only.*never reads, replaces or clears a fix-mode record.*never edits, commits, pushes or merges
+auto-pilot|ap-implicit-resume|would_reclaim. with .stale: true.*would_reacquire.*equals the .run_id. the first printed.*no lock at all
+auto-pilot|ap-step10-skill-resume|whose .mode. is not .review-only.
 issue-creator|ic-backup-reuse|--json body,comments.*only when a backup comment with .viewerDidAuthor. true already contains that body byte for byte.*Any difference posts a new backup
 issue-creator|ic-batch-recover|never the backlog snapshot
 issue-creator|ic-batch-recover|gh issue list --author @me --state all --limit 200 --json number,title,createdAt,body,state
@@ -102,12 +117,13 @@ EOF
   for skill in $STAGE_SKILLS; do
     name="$root/$skill/references/stage-file.md"
     if grep -qF 'git rev-parse --git-common-dir)/idd/stage/' "$name" 2>/dev/null \
+      && grep -q 'A dry run writes none' "$name" \
       && grep -q 'Never write through a symlinked' "$name" \
       && grep -q 'atomic rename' "$name" \
       && grep -q 'Untrusted data' "$name" \
       && grep -q 'put no value from it on a command line' "$name" \
       && grep -q 'delete it, run the steps again' "$name" \
-      && grep -q "At the skill's terminal persist" "$name"; then
+      && grep -q 'once its results are durable elsewhere, else at the terminal persist' "$name"; then
       pass "T1: $skill ships the stage-file contract"
     else
       fail "T1: $skill ships the stage-file contract"
@@ -129,8 +145,8 @@ bundled() { # bundled <leaf> — the shipped skills that carry it, space-joined
 [ "$(bundled resume-cut-off.md)" = "issue-analysis issue-creator issue-triage plan-to-issues" ] \
   && pass "T2: resume-cut-off.md is bundled into exactly its four citing skills" \
   || fail "T2: resume-cut-off.md is bundled into: $(bundled resume-cut-off.md)"
-[ "$(bundled stage-file.md)" = "issue-analysis issue-triage" ] \
-  && pass "T2: stage-file.md is bundled into exactly the two skills that write a stage" \
+[ "$(bundled stage-file.md)" = "issue-analysis issue-creator issue-triage plan-to-issues" ] \
+  && pass "T2: stage-file.md is bundled into exactly the four skills that write a stage" \
   || fail "T2: stage-file.md is bundled into: $(bundled stage-file.md)"
 for s in $RESUME_SKILLS; do
   cmp -s "$SHARED/resume-cut-off.md" "$SKILLS/$s/references/resume-cut-off.md" \
@@ -187,15 +203,23 @@ ROWS="$(printf '%s\n' "$AMEND" | grep -cE '^\| ./[a-z-]+. \| (Reviewed|Changed)'
 [ "$ROWS" = "9" ] && pass "T4: the review table has nine skill rows" \
   || fail "T4: the review table has $ROWS skill rows, not nine"
 FLAT_AMEND="$(printf '%s\n' "$AMEND" | tr '\n' ' ')"
-printf '%s\n' "$FLAT_AMEND" | grep -qE 're-run without .--resume. starts over' \
-  && pass "T4: the auto-mode --resume decision is recorded" \
-  || fail "T4: the auto-mode --resume decision is recorded"
-printf '%s\n' "$FLAT_AMEND" | grep -qE '.--review-only. reads and writes no record' \
-  && pass "T4: the --review-only decision is recorded" \
-  || fail "T4: the --review-only decision is recorded"
-printf '%s\n' "$FLAT_AMEND" | grep -qE 'between the draft +confirm and the epic create call' \
+printf '%s\n' "$FLAT_AMEND" | grep -qE 'Decision reversed \(maintainer, 2026-11-25\):\*\* an auto run without .--resume. resumes by default' \
+  && pass "T4: the reversed auto-mode --resume decision is recorded" \
+  || fail "T4: the reversed auto-mode --resume decision is recorded"
+printf '%s\n' "$FLAT_AMEND" | grep -qE '.--review-only. keeps a record of its own' \
+  && pass "T4: the reversed --review-only decision is recorded" \
+  || fail "T4: the reversed --review-only decision is recorded"
+printf '%s\n' "$FLAT_AMEND" | grep -qE 'a bare run first runs two read-only probes' \
+  && pass "T4: the reversed auto-pilot bare-run decision is recorded" \
+  || fail "T4: the reversed auto-pilot bare-run decision is recorded"
+printf '%s\n' "$FLAT_AMEND" | grep -qE 'A staged draft older than +24 hours is dropped' \
   && pass "T4: the conversation-path residual loss is recorded" \
   || fail "T4: the conversation-path residual loss is recorded"
+if printf '%s\n' "$FLAT_AMEND" | grep -qE 'inline path \(no Agent tool\) writes no stage|keeps no record of the answers|are not recovered: they are the one step lost'; then
+  fail "T4: the still-lost list drops the losses this change closed"
+else
+  pass "T4: the still-lost list drops the losses this change closed"
+fi
 
 # ── T5: mutation — the pins have teeth ───────────────────────────
 # pins_ok <skills-root> — exit 0 only when every T1 pin passes there.
@@ -205,7 +229,7 @@ MUT="$TMP/skills"
 fresh_copy() {
   rm -rf "$MUT"; mkdir -p "$MUT"
   local s
-  for s in init-idd $RESUME_SKILLS; do cp -R "$SKILLS/$s" "$MUT/$s"; done
+  for s in init-idd $RESUME_SKILLS auto-pilot issue-resolver issue-pr-review; do cp -R "$SKILLS/$s" "$MUT/$s"; done
 }
 fresh_copy
 pins_ok "$MUT" && pass "T5: the pins pass on an unmodified copy" \
@@ -235,7 +259,7 @@ done <<EOF
 $ANCHORS
 EOF
 
-for pair in "issue-creator/references/resume-cut-off.md" "issue-triage/references/stage-file.md"; do
+for pair in "issue-creator/references/resume-cut-off.md" "issue-triage/references/stage-file.md" "plan-to-issues/references/stage-file.md"; do
   fresh_copy
   rm -f "$MUT/$pair"
   if pins_ok "$MUT"; then
@@ -279,6 +303,36 @@ done
 [ -z "$(cd "$REPO" && git stash list)" ] && [ -f "$STAGE_MAIN/analysis-7.json" ] \
   && pass "T6: git stash -u takes nothing and leaves the stage file" \
   || fail "T6: git stash -u takes nothing and leaves the stage file"
+
+# ── T8: the auto-pilot implicit-resume probes, run for real ──────
+# A bare /auto-pilot resumes only when the dry-run lock probe would reclaim a
+# stale lock (or re-acquire its own) whose run_id is the recorded state's. A
+# finished run releases its lock, so its leftover state must read as no resume.
+ST="$ROOT/src/shared/scripts/gi-state.py"
+PD="$TMP/ap/.idd"; mkdir -p "$PD"
+sh -c 'exit 0' & DEADPID=$!; wait "$DEADPID" || true
+python3 "$ST" --lock --pid "$DEADPID" --dir "$PD" >/dev/null 2>&1
+echo '{}' | python3 "$ST" --init --dir "$PD" >/dev/null 2>&1
+probe() { # probe — prints "<status> <stale> <lock run_id> <state run_id>"
+  local st lk
+  st="$(python3 "$ST" --read --dry-run --dir "$PD" 2>/dev/null)"
+  lk="$(python3 "$ST" --lock --resume --dry-run --pid $$ --dir "$PD" 2>/dev/null)"
+  python3 -c 'import json,sys; s=json.loads(sys.argv[1] or "{}"); l=json.loads(sys.argv[2]); h=l.get("holder") or l.get("lock") or {}; print(l.get("status"), l.get("stale"), h.get("run_id"), s.get("run_id"))' "$st" "$lk"
+}
+LOCK_BEFORE="$(cat "$PD/run.lock" 2>/dev/null)"; STATE_BEFORE="$(cat "$PD/run-state.json" 2>/dev/null)"
+read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
+[ "$P_STATUS" = would_reclaim ] && [ "$P_STALE" = True ] && [ -n "$P_STATE" ] && [ "$P_LOCK" = "$P_STATE" ] \
+  && pass "T8: a dead-pid lock naming the recorded run reads as an implicit resume" \
+  || fail "T8: a dead-pid lock naming the recorded run reads as an implicit resume ($P_STATUS $P_STALE $P_LOCK $P_STATE)"
+[ -n "$LOCK_BEFORE" ] && [ "$(cat "$PD/run.lock")" = "$LOCK_BEFORE" ] && [ "$(cat "$PD/run-state.json")" = "$STATE_BEFORE" ] \
+  && pass "T8: the probes write nothing" || fail "T8: the probes write nothing"
+python3 "$ST" --unlock --force --dir "$PD" >/dev/null 2>&1
+read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
+[ "$P_STATUS" = would_acquire ] && [ -n "$P_STATE" ] \
+  && pass "T8: no lock with a leftover state is no implicit resume (would_acquire)" \
+  || fail "T8: no lock with a leftover state is no implicit resume ($P_STATUS)"
+grep -qF 'no lock at all (a finished run releases its lock' "$SKILLS/auto-pilot/references/preflight.md" \
+  && pass "T8: preflight.md names the released-lock case" || fail "T8: preflight.md names the released-lock case"
 
 # ── T7: CI wiring ────────────────────────────────────────────────
 STEP="$(grep -A1 -- '- name: test-durable-workflows-690$' "$WORKFLOW" | tail -1 | sed 's/^ *//' || true)"
