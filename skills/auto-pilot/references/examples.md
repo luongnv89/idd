@@ -413,6 +413,10 @@ $ /auto-pilot --resume
 The dead run's lock was reclaimed, the checkpoint supplied the branch and PR,
 and GitHub confirmed them: the state file is a hint; GitHub is the authority.
 The first issue is in `processed[]`, so it gets no second `runs.jsonl` line.
+A bare `/auto-pilot` on the same machine takes the same path: its probes find the
+dead lock naming the recorded run, it prints
+`○ Resuming cut-off run 20260810T0914Z-4471 — pass --no-resume to start fresh`
+before it takes the lock, and the rest matches the block above.
 
 ### PR blocked by an unmerged dependency
 

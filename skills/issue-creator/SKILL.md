@@ -129,7 +129,8 @@ Each is named again at the step that reads it:
   `references/image-upload.md`, `references/confidence-scoring.md`,
   `references/clarify-intent.md`, `references/dup-score-fallback.md`,
   `references/error-messages.md`, `references/examples.md`,
-  `references/run-stats.md`, `references/self-improve.md`
+  `references/run-stats.md`, `references/self-improve.md`,
+  `references/resume-cut-off.md`, `references/stage-file.md`
 - `references/docs/naming-conventions.md`,
   `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
   `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,
@@ -161,6 +162,12 @@ Auto-enriched fields — type, acceptance criteria, and tool-suggested Metadata 
 Extract from the description:
 - Keywords: error messages, component names, file paths, function names
 - Implied type: bug, feature, or improvement
+
+### Cut-off resume <!-- a:ic-create-stage -->
+
+A single Create keeps its finished steps in `create-<key>.json` in the stage directory (`references/stage-file.md`). `<key>` is `git hash-object` of the user's input text, written to a file with the Write tool first, never passed on a command line. Write the stage after Step 3.5 (`clarify`: each question and answer), after Step 4 (`draft`: title, body, labels) and after each image upload (`images`: each image's `git hash-object` and its URL), always with `created_at` from the first write. Remove it once `gh issue create` returned the new issue's URL.
+
+On a re-run, read the stage for this input before Step 2. Its pin: `created_at` under 24 hours old. On its pin, first read this login's newest issues live (`gh issue list --author @me --state all --json number,title,createdAt --limit 20`): one titled as `draft.title` and created after `created_at` means the earlier run created it, so print the recovery block of `references/resume-cut-off.md` naming that issue, remove the stage and stop. Otherwise print the recovery block and reuse `clarify`, `draft` and `images` in place of Steps 3.5 and 4 and their uploads; Step 3's duplicate check and Step 5's preview run live. A reused body is written with the Write tool to `.idd/cache/issue-body.md` and created with `--body-file`, never pasted into `--body`.
 
 ### Step 2 — Classify Type and Title
 

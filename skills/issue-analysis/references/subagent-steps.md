@@ -35,9 +35,9 @@ Before emitting Steps 2-5 progress or spawning the synthesizer, copy the explore
 
 Copy `scan_stats` unchanged into persisted JSON, including `scan_stats.scan_timed_out`. When it is true, emit the *Scan timeout* warning from `references/error-messages.md` and mark the final analysis `PARTIAL` even if synthesis completed.
 
-Map explorer `complexity` (`trivial` / `low` / `medium` / `high` / `complex`) to the synthesizer's `XS` / `S` / `M` / `L` / `XL` tier using `references/docs/agent-model-effort.md`; record the selected tier in the step log and pass that tier intent to the synthesizer.
+**Stage the return.** <!-- a:ia-stage-write --> Once the explorer's return passes these checks, write `{"issue": N, "commit_sha": <git rev-parse HEAD>, "updatedAt": <Step 1's raw value>, "findings": <the return>}` to `analysis-<N>.json` in the stage directory (`references/stage-file.md`); add the synthesizer's validated return as `synthesis`. A resumed run reads both in place of the spawns.
 
-It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
+Map explorer `complexity` (`trivial` / `low` / `medium` / `high` / `complex`) to the synthesizer's `XS` / `S` / `M` / `L` / `XL` tier using `references/docs/agent-model-effort.md`; record the selected tier in the step log and pass that tier intent to the synthesizer.
 
 After the explorer returns, display progress lines for Steps 2-5 based on its results:
 
@@ -77,7 +77,7 @@ When the Agent tool is available, spawn the synthesizer subagent to handle Steps
 - Mode: `"auto"` when `IDD_AUTO_MODE=1` or invoked by `/auto-pilot`; otherwise `"interactive"`
 - Criteria: the numbered list above, when `gi-ready.py` produced one
 
-The synthesizer prompt is defined in `references/agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
+The synthesizer prompt is defined in `references/agents/synthesizer.md`.
 
 After the synthesizer returns, apply *Validate analysis data* in `references/output-and-persist.md` to its options and recommendation. If inconsistent, stop with the failed synthesis step; do not invent a selected option. Otherwise display progress lines:
 

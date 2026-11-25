@@ -173,7 +173,8 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 | `/issue-resolver <N>` | Interactive | Resolves issue #N, asks the user to pick an implementation plan, implements, tests, and opens a PR. |
 | `/issue-resolver <N> --auto` | Auto-pilot | Resolves issue #N autonomously with no user prompts. |
 | `/issue-resolver <N> --no-run-log` | Modifier | Suppresses the resolver's own `.idd/runs.jsonl` append and returns telemetry to the caller instead. Orthogonal to `--auto`; passed only by `/auto-pilot`, which is the single writer of the run-log line. |
-| `/issue-resolver <N> --resume` | Modifier | Resumes a killed run from its durable progress record under the git common dir, after validating it against live git and GitHub state. Every safety gate re-runs, and a stale record means the run starts over. `--auto` resumes only with this flag; interactive mode offers to resume whenever a record exists. |
+| `/issue-resolver <N> --resume` | Modifier | Resumes a killed run from its durable progress record under the git common dir, after validating it against live git and GitHub state. Every safety gate re-runs, and a stale record means the run starts over. Interactive mode offers to resume whenever a record exists. An `--auto` run without this flag resumes on its own only when the record is its owner's (the same `/auto-pilot` run id, or none for a standalone run) and was last written more than ten minutes ago; otherwise it starts over. |
+| `/issue-resolver <N> --no-resume` | Modifier | Never resumes: clears any progress record and runs fresh, with no prompt. Cannot combine with `--resume`. |
 
 ### Pipeline summary
 
@@ -208,7 +209,8 @@ Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, 
 | `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, and waits for CI with no prompts; with `review.auto_merge: true` it merges when clean, then cleans up the local checkout (merged branch, clean worktrees, switch to the updated base). |
 | `/issue-pr-review` | Detect PR | Auto-detects the PR for the current branch and runs the default fix loop. |
 | `/issue-pr-review --review-only` | Read-only | Runs one review/test/CI pass, reports findings, never fixes, loops, or merges. |
-| `/issue-pr-review <N> --resume` | Modifier | Resumes a killed review from its durable progress record. Step 1 and every safety gate re-run live. Combines with `--auto` and `--no-merge`, never with `--review-only`, which never reads or writes a record. |
+| `/issue-pr-review <N> --resume` | Modifier | Resumes a killed review from its durable progress record. Step 1 and every safety gate re-run live. Combines with `--auto`, `--no-merge` and `--review-only`; a `--review-only` run keeps a separate record that a fix-mode run never adopts, and it still never fixes, pushes or merges. An `--auto` run without this flag follows the resolver's owner-bound default. |
+| `/issue-pr-review <N> --no-resume` | Modifier | Never resumes: clears the progress record and reviews fresh. Cannot combine with `--resume`. |
 | `/issue-pr-review <M> --revert` | Revert | Reverts merged PR #M through a new PR from a `fix/` branch, never on the base branch, reopens its issue with a comment linking the revert, and logs a `revert_opened` run-log row. Never merges; combines with `--auto` only. |
 
 ### Fix-loop stop conditions
@@ -244,19 +246,20 @@ Runs the full IDD loop over the issue backlog: triage, pick, resolve, review, fi
 
 | Input | Behavior |
 |---|---|
-| `/auto-pilot` | Triage all open issues, pick the next issue, resolve, review, merge according to config, and continue. |
+| `/auto-pilot` | Triage all open issues, pick the next issue, resolve, review, merge according to config, and continue. When a run on this machine was cut off (its lock's owner is dead and the lock names the recorded run), continues that run as `--resume` would. |
 | `/auto-pilot --issues 5,10,12` | Process only issues #5, #10, and #12 in that exact order. Skips backlog triage ordering. |
 | `/auto-pilot --limit N` | Process at most N issues, then stop. |
 | `/auto-pilot --dry-run` | Run triage and show the execution plan without resolving anything. |
 | `/auto-pilot --skip N` | Skip issue #N for this session. |
 | `/auto-pilot --resume` | Resume the interrupted run in `.idd/run-state.json` at its recorded phase, and resume the in-flight resolver or reviewer it spawned from that skill's durable progress record. |
+| `/auto-pilot --no-resume` | Never resume a cut-off run: take a fresh lock and run id. |
 | `/auto-pilot --stats` | Report run outcomes and the post-merge look-back (reverts, reopened issues, follow-up bugs per release) from `.idd/runs.jsonl`. Read-only: no lock, no run state, no writes. Takes no other flag. |
 
 ### Flag combinations
 
 - `--issues` can combine with `--dry-run` and `--skip`.
 - `--issues` cannot combine with `--limit` because the explicit issue list is already the limit.
-- `--resume` cannot combine with `--dry-run` (a dry run changes nothing) or with `--fresh`.
+- `--resume` cannot combine with `--dry-run` (a dry run changes nothing), `--fresh` or `--no-resume`.
 - `--stats` takes no other flag.
 
 Example:

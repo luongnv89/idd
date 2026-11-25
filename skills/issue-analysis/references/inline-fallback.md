@@ -10,6 +10,17 @@ Without the Agent tool the orchestrator performs the same work itself. Execute
 the procedures below in order, producing the same structured outputs the
 subagents would have returned, then hand off to Step 8 as usual.
 
+**Stage each finished step.** <!-- a:ia-inline-stage --> After each of Steps 2-7,
+write that step's output to `analysis-<N>.json` in the stage directory
+(`references/stage-file.md`), with the same `issue`, `commit_sha` and
+`updatedAt` pin as the subagent path, under `inline_steps` keyed by the step
+number (`"2"` … `"7"`). A step is finished only once its `[k/8]` line has
+printed. Once Step 5 is staged, add the four as `findings`, in the explorer's
+return shape; once Step 7 is staged, add `synthesis`. A partial `inline_steps`
+is never `findings`. A resumed inline run whose pin holds reuses every staged
+step and continues from the first missing one; a resumed run with the Agent tool
+reads only `findings` and `synthesis`.
+
 ---
 
 ## Steps 2-5 — Explorer Phase (inline)

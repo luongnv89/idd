@@ -23,7 +23,8 @@ Apply in order; the first that resolves wins.
 2. **Explicit conversation flag** — `/plan-to-issues --from-conversation`. Wins over discovery.
    With `--epic <n>` this is a **resume**: bind `source.kind=conversation`, record the epic
    number, set `source.value` from the existing `<!-- plan-to-issues:conversation=<slug> -->`
-   marker (stop if missing or `plan=` present — `references/epic-identity.md` Step 0), and skip
+   marker (stop if missing or `plan=` present; an epic with neither marker takes *Unmarked epic* —
+   `references/epic-identity.md` Step 0), and skip
    the actionable-intent check on the current turns. Do not slug from `<n>` or current turns.
    Phase 1 then restores the worklist from that epic's `## Source` (below). Without `--epic`,
    the current turns must carry actionable intent as usual.
@@ -144,6 +145,26 @@ place of faithfulness, and the same worklist schema out.
    **Fence safety.** Write any draft line that, after up to three spaces, starts with three
    backticks, `~~~` or `<!--`, or that is exactly `## Source`, with four leading spaces instead.
    It then cannot close the fence or match a marker, sentinel or `## Source` check.
+5. **Stage the confirmed draft** before the epic create call, so a cut-off before the epic exists
+   keeps it (`references/stage-file.md`). Write `plan-draft.json` in the stage directory:
+   `{"title": <confirmed epic title>, "draft": <confirmed-draft.txt verbatim>, "draft_sha":
+   <git hash-object confirmed-draft.txt>, "created_at": <UTC YYYY-MM-DDTHH:MM:SSZ>}`. Hash the
+   file, never the text on a command line. Remove the stage once the created epic's body, read
+   back, holds the draft in its Reporter Context, which is then the durable copy
+   (`references/epic-identity.md`, *Step 2*).
+
+### Staged draft — a re-run after a cut-off <!-- a:pti-staged-draft -->
+
+A conversation-path run without `--epic` reads `plan-draft.json` before it drafts. Its pin:
+`created_at` under 24 hours old, and `draft` written to `confirmed-draft.txt` hashes to
+`draft_sha`. Off its pin, it is deleted and the run drafts as usual. On its pin with no user
+present (`IDD_AUTO_MODE=1`), never reuse it: nothing ties it to this conversation, and a reuse
+would skip the confirm gate. Leave it in place, print `○ Staged draft found — not reused without a
+user present`, and draft as usual; the confirm gate still applies. Otherwise print the recovery
+block of `references/resume-cut-off.md` (*Recovered:* the title and the task count, *Next:*
+Phase 2), then ask once: `Reuse the draft confirmed earlier? [Y/n]`. `n` deletes it and drafts
+afresh. A reused draft is the confirmed draft: the confirm gate is not asked again. Phase 3's epic identity still runs live, so an epic
+the earlier run created, marked or unmarked, is found and reused or adopted, never created twice.
 
 ### Drafting from a requirements document
 
@@ -181,7 +202,8 @@ This is the supported resume. It is still Create mode (it files remaining issues
    **unparseable**. The parse is **source-faithful**: copy stored fields, do not enrich, do
    not re-emit `(needs review)` criteria that were not stored.
 4. **Missing, empty, or unparseable `## Source` is a stop.** Print the *Cannot restore
-   worklist* block in `references/preflight.md`. Do not fall back to re-drafting from current
+   worklist* block in `references/preflight.md`. One exception: an epic with neither source
+   marker takes *Unmarked epic* (`references/epic-identity.md`) and restores from there. Do not fall back to re-drafting from current
    turns, and do not run `sync`.
 5. Continue Create mode as an **idempotent re-run**: Phase 3 binds to `#<n>` (skip slug
    search); Phase 4 files only tasks the epic does not already list.

@@ -60,6 +60,10 @@ For each image path provided:
    ![{original_filename}]({download_url})
    ```
 
+## Resumed run
+
+A single Create stages each uploaded image (*Cut-off resume* in SKILL.md). Before uploading, hash the file with `git hash-object "$image_path"`; when the stage lists that hash with a URL of the step 3 shape, `https://raw.githubusercontent.com/{owner}/{repo}/issue-assets/.github/issue-assets/` followed by a name of letters, digits, `.`, `_` and `-` only, embed that URL and skip the upload. Any other URL is stale: upload again. After each upload, add its hash and `download_url` to the stage before the next one.
+
 ## Placement in issue body
 
 Embed uploaded images in a **Screenshots** section placed between the Description and Acceptance Criteria sections:

@@ -542,3 +542,6 @@ jobs:
 
       - name: test-static-checks-664
         run: bash tests/test-static-checks-664.sh
+
+      - name: test-durable-workflows-690
+        run: bash tests/test-durable-workflows-690.sh

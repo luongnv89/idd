@@ -38,17 +38,18 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 
 | Invocation | What happens |
 |------------|--------------|
-| `/auto-pilot` | Start the loop |
+| `/auto-pilot` | Start the loop, or continue a run cut off on this machine (*Implicit resume* in `references/preflight.md`) |
 | `/auto-pilot --issues 5,10,12` | Process exactly these issues, in this order (no triage) |
 | `/auto-pilot --limit N` | Process at most N issues |
 | `/auto-pilot --dry-run` | Show the execution plan; resolve nothing |
 | `/auto-pilot --skip N` | Skip issue #N this session |
 | `/auto-pilot --resume` | Resume the run in `.idd/run-state.json` at its recorded phase, and the in-flight resolver or reviewer from that skill's progress record |
 | `/auto-pilot --fresh` | Ignore recorded run state (the default when none exists) |
+| `/auto-pilot --no-resume` | Never resume: take a fresh lock and run id, whatever the recorded state says |
 | `/auto-pilot --force-unlock` | Reclaim a lock whose run is dead, then start |
 | `/auto-pilot --stats` | Report run outcomes and post-merge rates from the local run log; read-only |
 
-**Combining flags:** `--stats` takes no other flag and runs only `references/stats.md`, opened before *Prerequisites*; nothing else here applies. `--issues` combines with `--dry-run` and `--skip`, not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a dry run mutates nothing) or with `--fresh`. The resume entry gate, the run lock, and the checkpoints live in `references/phases/phase-0-lock-resume.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
+**Combining flags:** `--stats` takes no other flag and runs only `references/stats.md`, opened before *Prerequisites*; nothing else here applies. `--issues` combines with `--dry-run` and `--skip`, not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a dry run mutates nothing), `--fresh` or `--no-resume`. The resume entry gate, the run lock, and the checkpoints live in `references/phases/phase-0-lock-resume.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
 
 ## Context re-entry <!-- a:ctx-reentry -->
 
@@ -156,7 +157,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 
 **Acquire the run lock before the first mutation** (owner-pid and TTL rules: `references/preflight.md` → *Run lock*):
 
-1. From the repo root, run `python3 shared/scripts/gi-state.py --lock --pid "$PPID"`. Add `--resume` under `/auto-pilot --resume`, and `--dry-run` under `--dry-run` (reports the holder, acquires nothing).
+1. From the repo root, run `python3 shared/scripts/gi-state.py --lock --pid "$PPID"`. Add `--resume` under `/auto-pilot --resume` or an *Implicit resume* (`references/preflight.md`), and `--dry-run` under `--dry-run` (reports the holder, acquires nothing).
 2. Exit 0 (`acquired`, `reclaimed`, `reacquired`): this run holds the lock — evidence about the lock, never the run state.
 3. Exit 3: another run holds it. Apply the stop rule with `✗ Another /auto-pilot run is in progress`.
 4. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and run the fallback in `references/preflight.md` → *Run lock*: an `.idd/run.lock` younger than an hour is a live holder, so apply the stop rule as in 3; otherwise continue unlocked and un-resumable.

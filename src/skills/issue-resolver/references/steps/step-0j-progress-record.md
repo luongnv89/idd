@@ -79,16 +79,24 @@ It never fails on content. `status: absent` runs fresh, silently; `corrupt` or
 live git (`binding`): `verdict: stale` is stale (name its `reasons`), and only
 `bound` may resume.
 
+The first rule that applies decides:
+
+- **`--no-resume`:** never resume. Run `--clear`, then a fresh run, with no
+  prompt. It never combines with `--resume`.
+- **Caller-managed lane (`IDD_CALLER_WORKTREE=1`):** resume only with
+  `IDD_RESUME_LANE=1` **and** `--resume`, `lane_match: true` and workspace
+  `here`, inside the validated `IDD_WORKTREE_PATH` — never `branch_only`, never
+  the ambient checkout. The auto default below never applies in a lane.
 - **Interactive:** print the *Progress record found* block and ask
   `Resume from step {k}/5? [Y/n]`. A record written in the last ten minutes
   adds `another session may still be running`. `--resume` answers yes in
   advance; a decline runs `--clear` and a fresh run.
-- **Auto (`--auto` / `IDD_AUTO_MODE=1`):** resume only with `--resume`, never
-  prompt. Without it the record is ignored, and this run's `--start` replaces it.
-- **Caller-managed lane (`IDD_CALLER_WORKTREE=1`):** resume only with
-  `IDD_RESUME_LANE=1` **and** `--resume`, `lane_match: true` and workspace
-  `here`, inside the validated `IDD_WORKTREE_PATH` — never `branch_only`, never
-  the ambient checkout.
+- **Auto (`--auto` / `IDD_AUTO_MODE=1`):** never prompt. `--resume` resumes.
+  Without it, resume only when the record is the owner's and idle: the
+  `caller_run_id` equals the spawn prompt's `run_id` under `/auto-pilot`, or
+  is null with no `run_id`; and `age_s` is over 600. A younger record prints
+  *Progress record may be live*. Otherwise the record is ignored, and this
+  run's `--start` replaces it.
 - `--resume` with an absent or stale record prints why and starts from Step 0;
   it is never an error.
 

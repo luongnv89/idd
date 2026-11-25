@@ -12,8 +12,8 @@ common dir — shared by every worktree, never committed, never sent anywhere �
 a fresh session resumes where the dead one stopped.
 
 **A record is a hint, never an authority.** It never satisfies or skips a gate,
-and any doubt is stale, which means starting from Step 1. `--review-only` never
-reads or writes a record.
+and any doubt is stale, which means starting from Step 1. A `--review-only` run
+keeps a record of its own (*Review-only record* below).
 
 ### Writing it <!-- a:rvm-progress-writes -->
 
@@ -53,11 +53,24 @@ Once Step 1 items 1-2 have fixed `N`, read the record:
 python3 references/scripts/gi-progress.py --read --skill issue-pr-review --number {N}
 ```
 
-The prompt and flag rules are the resolver's: interactive prints the *Progress
-record found* block and asks `Resume from step {k}/7? [Y/n]` (`--resume` answers
-yes); `--auto` resumes only with `--resume`, never prompting; `absent` runs
-fresh; `corrupt`, `expired` or `verdict: stale` prints *Progress record is
-stale*, runs `--clear`, and starts fresh.
+`absent` runs fresh, silently; `corrupt`, `expired` or `verdict: stale` prints
+*Progress record is stale*, runs `--clear`, and starts fresh. Only `ok` with
+`verdict: bound` may resume, and the first rule that applies decides:
+
+- **`--no-resume`:** never resume. Run `--clear`, then a fresh review, with no
+  prompt. It never combines with `--resume`.
+- **Interactive:** print the *Progress record found* block and ask
+  `Resume from step {k}/7? [Y/n]`; a record written in the last ten minutes adds
+  `another session may still be running`. `--resume` answers yes in advance;
+  a decline runs `--clear` and a fresh review.
+- **Auto (`--auto` / `IDD_AUTO_MODE=1`):** never prompt. `--resume` resumes.
+  Without it, resume only when the record is the owner's and idle: the
+  `caller_run_id` equals the spawn prompt's `run_id` under `/auto-pilot`, or
+  is null with no `run_id`; and `age_s` is over 600. A younger record prints
+  *Progress record may be live*. Otherwise the record is ignored, and this
+  review's `--start` replaces it.
+- `--resume` with an absent or stale record prints why and starts from Step 1;
+  it is never an error.
 
 **Step 1 always runs live, in full:** the checkout, the Depth gate, and the *QA
 handoff gate* with its receipt check — `qa_handoff` is never restored. Then:
@@ -121,9 +134,25 @@ cycle's Step 6 has started (the loop's 6 → 3 is a re-walk), so under a mark of
 | 7 | The fix-conditional *Confirmation pass* — a fresh reviewer, then Steps 4-5 — because soft-pass and the merge need this session's review, acceptance-criteria, traceability and CI legs. It consumes a cycle only when it finds fixable issues, so a run killed at a clean Step 7 at the cap can still finish. Then Step 7, with *Merge identity* live |
 | `closing` | Report from live state, then `--clear` |
 
+A `--review-only` record re-enters by the same rows: it never reaches 6, and a
+recorded 7 takes the 3-5 row, because there was no fix to confirm.
+
 Restored cycles count toward `review.max_cycles`, and the loop never restarts at
 cycle 1. Restored `history` only feeds the stagnation stop, which stops early and
 is fail-safe.
+
+### Review-only record <!-- a:rvm-progress-review-only -->
+
+Under `--review-only`, add `--mode review-only` to every `gi-progress.py`
+call in this file: `--start`, `--write`, `--read` and the *Terminal outcomes*
+`--clear`. That record is a
+separate file, so a review-only run never reads, replaces or clears a fix-mode
+record, and a fix-mode run never adopts a review-only one: a record of the other
+mode reads `absent`. Write it at each `[N/7]` start for Steps 1-5, with
+`findings` in the `[4/7]` patch once Step 3 returns, and `closing` before the
+report. It carries no `effect` and no step 6; the script refuses both. A
+resumed review-only run still never edits, commits, pushes or merges, and Step 1
+— the receipt check and the Depth gate — always runs live.
 
 ### Reconciling effects <!-- a:rvm-progress-reconcile -->
 
@@ -160,5 +189,6 @@ After the Step 7 report prints, at every Result — `PASS`, `MERGED`, `PARTIAL`,
 python3 references/scripts/gi-progress.py --clear --skill issue-pr-review --number {N}
 ```
 
-A killed run prints no report, so only an interrupted review leaves a record; the
+Under `--review-only` that line adds `--mode review-only`, so it never clears a
+fix-mode record. A killed run prints no report, so only an interrupted review leaves a record; the
 script also expires records after seven days.

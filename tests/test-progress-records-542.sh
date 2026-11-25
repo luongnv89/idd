@@ -633,6 +633,55 @@ gp "$K" --read --skill issue-pr-review --number 86
   && [ "$(js 'len(d["record"]["history"])')" = "2" ] && [ "$(js 'd["record"]["outcome"]')" = "MERGED" ]
 check "p683c-reviewer-shapes: cycle, prepass_head, history and the outcome read back as sent" "$?"
 
+# ─── p690: the reviewer's review-only record is its own, and never claims a fix ─
+# A --review-only run keeps a record in a separate file stamped mode
+# "review-only"; a fix-mode record is stamped "fix" (no key also means fix).
+# Neither mode reads, replaces or clears the other's record, and a review-only
+# patch that carries an effect or enters step 6 is refused.
+M="$TMP/modes"; new_repo "$M" feat/90-modes
+put "$M" start issue-pr-review 90 '{"step": 1, "profile": "full"}'; RCF=$RC
+put "$M" write issue-pr-review 90 '{"step": 3, "cycle": 2}'
+RO_START() { RC=0; OUT="$(cd "$M" && printf '%s' "$1" | python3 "$SCRIPT" --"${2:-start}" --skill issue-pr-review --number 90 --mode review-only 2>"$TMP/err")" || RC=$?; }
+RO_START '{"step": 1, "profile": "light"}'; RCR=$RC; RO_PATH="$(js 'd["path"]')"
+[ "$RCF" = 0 ] && [ "$RCR" = 0 ] && [ "${RO_PATH##*/}" = "issue-pr-review-90.review-only.json" ]
+check "p690a-separate-file: a review-only --start writes its own file (rc=$RCF/$RCR)" "$?"
+gp "$M" --read --skill issue-pr-review --number 90
+[ "$(js 'd["status"]')" = ok ] && [ "$(js 'd["record"]["mode"]')" = fix ] && [ "$(js 'd["record"]["cycle"]')" = 2 ]
+check "p690b-fix-kept: the fix-mode record survives a review-only --start" "$?"
+gp "$M" --read --skill issue-pr-review --number 90 --mode review-only
+[ "$(js 'd["record"]["mode"]')" = review-only ] && [ "$(js 'd["record"]["profile"]')" = light ]
+check "p690c-ro-read: --mode review-only reads only the review-only record" "$?"
+BEFORE="$(cat "$RO_PATH")"
+RO_START '{"effect": {"kind": "push", "state": "intent", "key": {"sha": "'"$(printf 'a%.0s' $(seq 40))"'"}}}' write; RCE=$RC
+RO_START '{"step": 6}' write; RCS=$RC
+[ "$RCE" = 3 ] && [ "$RCS" = 3 ] && [ "$(cat "$RO_PATH")" = "$BEFORE" ]
+check "p690d-ro-no-effect: a review-only effect or step 6 exits 3 and writes nothing (rc=$RCE/$RCS)" "$?"
+RO_START '{"step": 2}' write; RC2=$RC; RO_START '{"step": 3}' write; RC3=$RC
+RO_START '{"step": 4}' write; RC4=$RC; RO_START '{"step": 5}' write; RC5=$RC; RO_START '{"step": 7}' write; RC7=$RC
+[ "$RC2$RC3$RC4$RC5$RC7" = 00000 ]; check "p690e-ro-steps: a review-only record walks 1-5 and its report (rc=$RC2$RC3$RC4$RC5$RC7)" "$?"
+gp "$M" --list
+[ "$(js 'sorted((r["number"], r["mode"]) for r in d["records"])')" = "[(90, 'fix'), (90, 'review-only')]" ]
+check "p690f-list-mode: --list names each reviewer record's mode" "$?"
+gp "$M" --clear --skill issue-pr-review --number 90 --mode review-only
+gp "$M" --read --skill issue-pr-review --number 90
+[ ! -e "$RO_PATH" ] && [ "$(js 'd["status"]')" = ok ]
+check "p690g-clear-own: clearing the review-only record leaves the fix record" "$?"
+FIX_PATH="${RO_PATH%.review-only.json}.json"
+python3 - "$FIX_PATH" <<'PY'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p)); d.pop("mode"); json.dump(d, open(p, "w"))
+PY
+gp "$M" --read --skill issue-pr-review --number 90
+[ "$(js 'd["status"]')" = ok ]; check "p690h-no-key-is-fix: a record without mode reads as fix" "$?"
+python3 - "$FIX_PATH" <<'PY'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p)); d["mode"] = "review-only"; json.dump(d, open(p, "w"))
+PY
+gp "$M" --read --skill issue-pr-review --number 90
+[ "$(js 'd["status"]')" = absent ]; check "p690i-mismatch-absent: a record of the other mode reads absent" "$?"
+gp "$M" --read --skill issue-resolver --number 90 --mode fix
+[ "$RC" = 2 ]; check "p690j-mode-reviewer-only: --mode with the resolver is a usage error (rc=$RC)" "$?"
+
 # ─── S5: clear, usage and degrade exits; text stays data ─────────────────────
 gp "$C" --clear --skill issue-resolver --number 23
 FIRST="$(js 'd["cleared"]')"
@@ -910,8 +959,15 @@ check "p21-reviewer-resume-cap: steps 3-5 re-run the restored cycle, only step 6
 # The rest of the contract (AC1-AC5).
 anchor_check_flat "$RS" rs-progress '[Nn]ever satisfies or skips a safety gate' "S6a resolver SKILL: a record never satisfies or skips a safety gate"
 anchor_check_flat "$RV" rv-progress '[Nn]ever satisfies or skips a safety gate' "S6b reviewer SKILL: a record never satisfies or skips a safety gate"
-anchor_check_flat "$RV" rv-progress '--review-only' "S6c reviewer SKILL: --review-only never reads or writes a record"
-anchor_check_flat "$RV" rvm-progress 'never reads or writes a record' "S6c2 reviewer mechanics: the --review-only exclusion"
+anchor_check_flat "$RV" rv-progress '.--review-only. keeps a separate record of its own' "S6c reviewer SKILL: --review-only keeps a separate record"
+anchor_check_flat "$RV" rvm-progress 'A .--review-only. run keeps a record of its own' "S6c2 reviewer mechanics: the review-only record"
+anchor_check_flat "$RV" rvm-progress-review-only 'add .--mode review-only. to every .gi-progress\.py. call.*never reads, replaces or clears a fix-mode record.*never edits, commits, pushes or merges.*always runs live' "S6c3 reviewer mechanics: the review-only record's own file and limits"
+anchor_check_flat "$RS" rs-0j-resume-entry 'resume only when the record is the owner.s and idle.*equals the spawn prompt.s .run_id. under ./auto-pilot.,.*is null with no .run_id.; and .age_s. is over 600' "S6c4 resolver: the owner-bound auto default"
+anchor_check_flat "$RS" rs-0j-resume-entry '.--no-resume.:\*\* never resume. Run .--clear., then a fresh run' "S6c5 resolver: --no-resume"
+anchor_check_flat "$RS" rs-0j-resume-entry 'The auto default below never applies in a lane' "S6c6 resolver: a lane keeps its stricter rule"
+anchor_check_flat "$RV" rvm-progress-resume 'resume only when the record is the owner.s and idle.*age_s. is over 600.*Otherwise the record is ignored' "S6c7 reviewer: the owner-bound auto default"
+grep -qE '^\| `/issue-resolver <N> --no-resume` \|' "$RS/SKILL.md" && grep -qE '^\| `/issue-pr-review <N> --no-resume` \|' "$RV/SKILL.md"
+check "S6c8 both Invocation tables list --no-resume" "$?"
 anchor_check_flat "$RS" rs-0j-gates '.tests_state. \*\*is never restored\*\*' "S6d tests_state is never restored"
 anchor_check_flat "$RS" rs-0j-gates 'only when QA exited clean in this session' "S6e the marker and receipt only after a clean QA in this session"
 grep -qF '**only when QA exited clean** in this session' "$RS/SKILL.md"

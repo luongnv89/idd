@@ -258,7 +258,7 @@ Everything the skills write, where it lands, and how to turn it off. Nothing in 
 |------|---------------|-------------|---------|
 | Files in the worktree | Writes `.idd.yml` and adds one line, `.idd/cache/`, to `.gitignore` | `/init-idd` | Runs only when you call it; it asks before it overwrites a config |
 | Files in the worktree | Writes local state under `.idd/`: `triage.json`, `analysis-<N>.json`, `runs.jsonl`, `run-state.json`, `run.lock`, `last-run-report.md`, `cache/` | `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/issue-pr-review` (`--revert`), `/auto-pilot` | Local state, safe to delete |
-| Files outside the worktree | Stores review receipts and progress records under `<git common dir>/idd/`, and a model-data cache under `~/.cache/idd` | `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, `/issue-creator` | Safe to delete; `IDD_CACHE_DIR` moves the cache |
+| Files outside the worktree | Stores review receipts, progress records and stage files under `<git common dir>/idd/`, and a model-data cache under `~/.cache/idd` | `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, `/issue-creator`, `/issue-analysis`, `/issue-triage`, `/plan-to-issues` | Safe to delete; `IDD_CACHE_DIR` moves the cache |
 | Git | Creates one branch per issue, commits on it and pushes it. Never commits to the default branch and never force-pushes | `/issue-resolver`, `/issue-pr-review` (fix commits) | `resolve.branch_prefix`, `resolve.max_commits` |
 | Git | Commits each screenshot you attach to `.github/issue-assets/` on an `issue-assets` storage branch, through the GitHub API; the branch is created from the default branch tip on first use. Anyone who can read the repository can open the images | `/issue-creator` | Only when you attach an image |
 | Git | Stashes uncommitted work, runs `git pull --rebase`, then restores the stash, before it reads or changes code | every skill that syncs | Commit or stash first to skip the stash step |
@@ -543,9 +543,11 @@ Analyzes issue #N in depth without making code changes:
 
 `/issue-analysis N --plan` runs the same analysis, then posts its recommended option on the issue as a plan comment (files, tasks, the acceptance criterion each task covers, tests, risks) and adds the `planned` label, so `/issue-resolver` can build from an agreed plan. It is the one form that writes to GitHub, and it posts only on a normalized issue.
 
+If the session dies mid-analysis, running `/issue-analysis N` again continues from the research or synthesis already returned, as long as the checked-out commit and the issue have not changed since. `/issue-triage update` reuses finished scanner batches the same way, `/issue-creator` does not create a batch item twice, and `/plan-to-issues` reports what a cut-off run already filed.
+
 ### /issue-resolver N -- Resolve Issues
 
-Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a crash, a closed terminal, a host restart), `/issue-resolver N --resume` picks up at the recorded step instead of starting over; an interactive run offers this on its own. The progress record is first checked against live git and GitHub, and every safety gate runs again:
+Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a crash, a closed terminal, a host restart), `/issue-resolver N --resume` picks up at the recorded step instead of starting over; an interactive run offers this on its own, an `--auto` run resumes its own idle record without the flag, and `--no-resume` always starts over. The progress record is first checked against live git and GitHub, and every safety gate runs again:
 
 ```
 [0/5] Preflight    — Check issue status, verify not already resolved
@@ -574,6 +576,7 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot --limit 5                # cap to 5 iterations
 /auto-pilot --dry-run                # show plan without resolving
 /auto-pilot --resume                 # resume an interrupted run where it stopped
+/auto-pilot --no-resume              # start fresh even when a cut-off run is recorded
 /auto-pilot --stats                  # read-only: run outcomes and post-merge look-back
 ```
 

@@ -192,7 +192,8 @@ if [ -z "$slug" ]; then echo "✗ empty conversation slug — refusing to bind";
 from current turns. Fetch `#<n>` and set `source.value` / `$slug` from the existing
 `<!-- plan-to-issues:conversation=<slug> -->` marker, matched as a fixed string on its own line.
 **Stop** if that marker is missing or empty, or if the body carries `plan=`. Never append
-`conversation=<n>`.
+`conversation=<n>`. One exception: a body with **neither** source marker takes *Unmarked epic*
+below instead of this snippet.
 
 ```bash
 body="$(gh issue view "$n" --json body --jq '.body')"
@@ -201,6 +202,16 @@ if [ -z "$slug" ]; then echo "✗ epic #$n has no conversation= marker — canno
 printf '%s\n' "$body" | grep -q '^<!-- plan-to-issues:plan=' \
   && { echo "✗ epic #$n is bound to a plan — not a conversation resume"; exit 1; }
 ```
+
+**Unmarked epic on `--epic <n>` — adopt and restore.** <!-- a:pti-adopt-restore --> An open `#<n>`
+titled `Epic: …` that carries neither source marker is a run cut off between step 2 and step 4.
+Ask the adoption question once. On yes, restore the draft from the body's Reporter Context
+blockquote (strip each line's leading `> `) in place of `## Source`: it must parse as plan grammar
+with `^#{3,4} Task` headings, **otherwise** take the *Cannot restore worklist* stop
+(`references/preflight.md`) and file nothing. Slug the title after `Epic: `, bind with step 4 —
+marker, `## Source`, sentinels — and continue as the resume. A run cut off before the epic was
+created left its confirmed draft staged: *Staged draft* in `references/input-resolution.md`
+restores it.
 
 **Step 1 — discovery is advisory, not authoritative.** The marker is
 `<!-- plan-to-issues:conversation=<slug> -->`, matched as a fixed string on its own line, the same
@@ -230,8 +241,11 @@ not the slug, is the stable handle. `sync <epic#>` only re-renders the map; it c
 
 **Step 2 — create.** The file-path title and plan-header intent do **not** apply. Title:
 `Epic: <confirmed title>` — the title the user confirmed in Phase 1 (Expected Output:
-`Epic: Harden the ingest path`). Intent text is the confirmed draft only. Do **not** put the
-marker in the intent text. `--epic` skips this step: the epic already exists.
+`Epic: Harden the ingest path`). Intent text is the confirmed draft only: `confirmed-draft.txt`
+verbatim, which is what *Unmarked epic* restores from. Do **not** put the
+marker in the intent text. `--epic` skips this step: the epic already exists. Once the created
+epic's body, read back, holds the draft in its Reporter Context, remove the staged draft
+(*Staged draft* in `references/input-resolution.md`); a reused or adopted epic removes it too.
 
 **Step 4 — bind.** Append the conversation marker and, additionally, the `## Source` block holding
 `confirmed-draft.txt` verbatim. That file is **plan-grammar markdown** (`## Phase` / `### Task`),

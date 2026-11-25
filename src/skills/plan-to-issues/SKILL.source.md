@@ -167,7 +167,9 @@ partial backlog silently.
 
 **`conversation`** — draft from the user's turns, print compact rows plus the epic title, ask
 once: `[Y]es / [e]dit / [n]o`. **No auto-accept.** Persist the draft as plan-grammar markdown
-under `## Source`. `--epic <n>` restores that block via `plan-parsing.md`.
+under `## Source`. `--epic <n>` restores that block via `plan-parsing.md`. The confirmed draft is
+staged until the epic holds it, and a re-run with a user present can reuse it (*Staged draft* in
+`references/input-resolution.md`).
 
 *Completion criteria:* every task has an id, title, ≥ 1 criterion, `Dependencies`, and an effort;
 fresh: user confirmed. `--epic`: Source parsed, no confirm. Else do not file.
@@ -198,7 +200,9 @@ lacks. On the `conversation` path a hit is **never silently reused**: a slug is 
 identity, so print the epic and ask (default reuse); `--epic <n>` skips the search and Phase 1
 restores from `## Source`. Both fall back
 to **adoption** for an unmarked epic that looks like an interrupted run, and adoption always **asks
-once**.
+once**; on `--epic <n>` it restores the draft from the epic body (`references/epic-identity.md`,
+*Unmarked epic*). A reused or adopted epic is a cut-off run continuing: Phase 4 opens with the
+*Resume report* in `references/phase-contracts.md`.
 
 **Completion criteria:** the epic is `OPEN`, labelled `epic`, its number recorded for `--parent`,
 and its body holds exactly one source marker for this input and one sentinel pair.
@@ -297,6 +301,8 @@ the `✗ Missing bundled dependency` block from `references/error-messages.md` a
 - `references/acceptance-criteria.md` — unabridged run contract
 - `references/reporting.md` — step reports, review contract, closing summary
 - `references/run-stats.md` — run-stats footer contract
+- `references/resume-cut-off.md` — cut-off resume contract
+- `references/stage-file.md` — stage-file contract
 - `references/error-messages.md` — error catalog
 - `references/self-improve.md`
 - `references/docs/config-schema.md` — configuration schema (`platform`)

@@ -280,6 +280,7 @@ After Step 8, save the analysis to `.idd/analysis-<N>.json`.
 5. Apply *Validate analysis data* to the complete object. Write formatted JSON to a unique temporary file in `.idd/`, then parse it back and compare it with that object. If validation or writing fails, remove only this run's temporary file and retain the previous cache.
 6. Atomically replace `.idd/analysis-<N>.json` with the verified temporary file. Re-read the destination and compare the complete object before reporting success.
 7. Only after verification, print: `✓ Analysis saved to .idd/analysis-<N>.json`
+8. Remove the stage file (`references/stage-file.md`). Under `--plan`, set its `plan` to `"pending"` instead, and remove it once the plan post is verified.
 
 **These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha` and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible, and `issue.updatedAt` is the GitHub-clock value the resolver compares its own fresh fetch against. The top-level `timestamp` and `git_state.captured_at` record when the analysis was taken; they are the *local* clock and the gate never compares them against GitHub's. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
 

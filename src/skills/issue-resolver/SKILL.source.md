@@ -20,7 +20,8 @@ Issue → atomic PR in 6 steps.
 | `/issue-resolver <N>` | Interactive; user picks the plan |
 | `/issue-resolver <N> --auto` | No prompts; set by `/auto-pilot` |
 | `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.idd/runs.jsonl`, return telemetry (*Run-log entry*) |
-| `/issue-resolver <N> --resume` | Modifier: resume a killed run from its progress record (*Progress record*); the only way `--auto` resumes, while interactive also offers it whenever a record exists |
+| `/issue-resolver <N> --resume` | Modifier: resume a killed run from its progress record (*Progress record*) without asking; when `--auto` resumes without it is *Step 0j*'s rule |
+| `/issue-resolver <N> --no-resume` | Modifier: never resume; clear the record and run fresh. Not with `--resume` |
 
 ## Context re-entry <!-- a:ctx-reentry -->
 
@@ -159,7 +160,7 @@ The practice packs, checked the same way: `references/practice-packs.md`, `refer
 
 ## Progress record <!-- a:rs-progress -->
 
-A killed session can resume (`--resume`). Read the record after the precheck, before *0a*; from *0c* on, write it with `shared/scripts/gi-progress.py` at every `[N/5]` start, at each Step 4 cycle, and before every effect. It holds only what git and GitHub cannot reproduce: the step, the plan summary, cycle counts, the premise ledger, open findings, the last effect. **A record never satisfies or skips a safety gate:** every gate re-runs live, and any doubt is stale (start from Step 0). Write points and resume entry: `references/steps/step-0j-progress-record.md` (*Step 0j — Progress record*) — **read it now**; a resuming run then reads `references/steps/step-0j-resume.md`.
+A killed session can resume (`--resume`, or by the auto default; `--no-resume` never does). Read the record after the precheck, before *0a*; from *0c* on, write it with `shared/scripts/gi-progress.py` at every `[N/5]` start, at each Step 4 cycle, and before every effect. It holds only what git and GitHub cannot reproduce: the step, the plan summary, cycle counts, the premise ledger, open findings, the last effect. **A record never satisfies or skips a safety gate:** every gate re-runs live, and any doubt is stale (start from Step 0). Write points and resume entry: `references/steps/step-0j-progress-record.md` (*Step 0j — Progress record*) — **read it now**; a resuming run then reads `references/steps/step-0j-resume.md`.
 
 ---
 
