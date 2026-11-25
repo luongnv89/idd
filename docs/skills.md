@@ -11,7 +11,7 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 | `/plan-to-issues` | Turn a phased plan or a conversation into an epic plus one labelled issue per task | Plan file path, `--from-conversation`, `--dry-run`, `--phase`, `sync <epic#>` |
 | `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` or `--plan` |
 | `/issue-triage` | Prioritize and order the issue backlog | No args, `update`, `--limit N`, `--route [N…]` |
-| `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` or `--resume` |
+| `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto`, `--resume` or `--no-resume` |
 | `/issue-pr-review` | Review a PR, run tests/CI, fix issues in cycles | PR number or current branch PR, optional modes |
 | `/auto-pilot` | Fully autonomous backlog loop | Optional issue list, limit, dry-run, skip, resume |
 | `/idd-doctor` (repo-internal) | Read-only IDD repository health check | No arguments |

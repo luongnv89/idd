@@ -61,4 +61,12 @@ there are none.
 
 ## Releases
 
-Newest first. The first section is recorded at the next release.
+Newest first.
+
+## v0.29.0
+
+Reviewed runs: 0 (`idd-lint stats --no-github` on 2026-11-25)
+
+Zero hits: skipped (no run-log row records `rules_hit` yet)
+
+No candidates.

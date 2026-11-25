@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.28.0-blue.svg" alt="Version 0.28.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.29.0-blue.svg" alt="Version 0.29.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -205,7 +205,7 @@ python3 scripts/idd-lint.py corrections      # add --record to propose; see docs
 
 Checks are tagged with the spec section they enforce and mapped to the L1–L3 conformance levels (`--level L2` skips Decision-Record checks for repos not claiming L3). Exit code 0/1 makes it CI-native; `/idd-doctor` remains the deep, agent-powered health check.
 
-`stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, which pipeline phase is slowest across runs that recorded per-phase timing, and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
+`stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, which pipeline phase is slowest across runs that recorded per-phase timing, which review rules actually produce findings (so unused ones can be pruned), and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
 
 #### Run `idd-lint` from anywhere — shell shortcut
 
@@ -313,7 +313,7 @@ Don't have `asm`? `npm install -g agent-skill-manager`.
 
 #### Alternative — Claude Code plugin
 
-Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 3.6 MB at v0.28.0), not the rest of the repository:
+Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 3.8 MB at v0.29.0), not the rest of the repository:
 
 ```bash
 claude plugin marketplace add luongnv89/idd   # register the marketplace (once)
@@ -554,7 +554,7 @@ Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a cras
 [1/5] Research     — Scan codebase, trace dependencies
 [2/5] Plan         — Propose 3 approaches, pick one
 [3/5] Implement    — Write code + tests, atomic commits
-[4/5] QA           — Code review + test + build + fix loop
+[4/5] QA           — Code review + test + static checks + build + fix loop
 [5/5] Deliver      — Push branch, create PR with "Closes #N"
 ```
 

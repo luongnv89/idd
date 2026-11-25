@@ -195,7 +195,7 @@ packaging command; v0.25.0 is the first tag that contains Codex support.
 
 ### Claude Code plugin (issues #469, #492)
 
-The repo root is the marketplace; the plugin is the committed `skills/` tree. `.claude-plugin/marketplace.json` lists one plugin, `idd`, with a `git-subdir` source: this repo, `"path": "skills"`, at the release tag (`"ref": "vX.Y.Z"`). An install therefore fetches only the tagged release's `skills/` folder (about 3.6 MB at v0.28.0), never `src/`, `tests/`, `docs/`, the website or whatever `main` holds. Users install with `claude plugin marketplace add luongnv89/idd` and `claude plugin install idd@idd` (see [README → Install](../README.md#install)).
+The repo root is the marketplace; the plugin is the committed `skills/` tree. `.claude-plugin/marketplace.json` lists one plugin, `idd`, with a `git-subdir` source: this repo, `"path": "skills"`, at the release tag (`"ref": "vX.Y.Z"`). An install therefore fetches only the tagged release's `skills/` folder (about 3.8 MB at v0.29.0), never `src/`, `tests/`, `docs/`, the website or whatever `main` holds. Users install with `claude plugin marketplace add luongnv89/idd` and `claude plugin install idd@idd` (see [README → Install](../README.md#install)).
 
 - **One manifest, authored once.** The plugin manifest lives at `src/plugin/plugin.json`. The build copies it byte-identical to `skills/.claude-plugin/plugin.json`, the plugin root's manifest, with `"skills": "./"` so the skill folders at that root are the plugin's skills. Edit the source and rebuild; never hand-edit the emitted copy. The skill tree itself is still the one `skills/` build output — there is no second copy for the plugin.
 - **The marketplace entry also says `"skills": "./"`.** It lets a tag whose `skills/` has no manifest (v0.22.0 and earlier) load every skill, and it is harmless once the tag carries one. Never set `"strict": false`: with a manifest present, the plugin then fails to load.
@@ -233,7 +233,7 @@ Skills live in `src/skills/<name>/SKILL.source.md` (internal-only skills under `
 
 ### Shared references
 
-A reference that every skill ships unchanged is authored once at `src/shared/references/<name>.md`. Today these are `run-stats.md` and `self-improve.md`, which every skill ships, and `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md`, which issue-resolver and issue-pr-review ship.
+A reference that every skill ships unchanged is authored once at `src/shared/references/<name>.md`. Today these are `run-stats.md` and `self-improve.md`, which every skill ships, and `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md`, which issue-resolver and issue-pr-review ship, and `resume-cut-off.md` and `stage-file.md`, which issue-analysis, issue-triage, issue-creator and plan-to-issues ship.
 
 - **Edit** the one source, then rebuild. Every citing skill gets the new bytes.
 - **Add** one by dropping a flat, lowercase-hyphen `.md` file there, citing it as `references/<name>.md` from each skill that needs it, and adding that path to the skill's *Bundled dependency precheck* list. No build change is needed.

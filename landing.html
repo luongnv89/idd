@@ -968,7 +968,7 @@
           <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View the source on GitHub</a>
         </div>
         <div class="hero-trust">
-          <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.28.0</a></span>
+          <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.29.0</a></span>
           <span id="github-stars" hidden><span class="ok">★</span> <span id="github-stars-count"></span> GitHub stars</span>
           <span><span class="ok">✓</span> Zero config</span>
           <span><span class="ok">✓</span> Plain GitHub markdown, no lock-in</span>
@@ -1210,11 +1210,11 @@
         <div class="feat-card reveal"><span class="feat-cmd">/plan-to-issues</span><p style="margin-top:2px">Turn a plan file, or the conversation you just had, into a tracking epic with one labelled issue per task and <code>Depends on #N</code> markers <code>/auto-pilot</code> respects.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify, size (XS–XL), and write acceptance criteria. Also suggests a model and thinking level for the job, from CursorBench (a public coding-agent benchmark).</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity, and risk, saved to <code>.idd/</code>. Add <code>--plan</code> to post the recommended option on the issue as a plan comment.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">Preflight, research, plan, implement, and QA, then a PR with <code>Closes #N</code>. A killed run picks up where it stopped with <code>--resume</code>. It can wait for you to approve its plan, and an <code>agent:working</code> label marks the issue while it works.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">Preflight, research, plan, implement, and QA, then a PR with <code>Closes #N</code> that states how it was verified, after your own lint, format, and type checks pass. A killed run picks up where it stopped with <code>--resume</code>. It can wait for you to approve its plan, and an <code>agent:working</code> label marks the issue while it works.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale and already-fixed detection, priority, and an execution order. <code>--route</code> sorts each issue into agent-ready, needs a person, needs info, or duplicate.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint and test pre-pass, a check per acceptance criterion, five-dimension scoring, and fix cycles. Merges only when you turn on <code>review.auto_merge</code>, with your merge method. A killed review picks up where it stopped with <code>--resume</code>, and <code>--revert</code> undoes a merged PR.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint and test pre-pass, a check per acceptance criterion, five-dimension scoring, and fix cycles. Merges only when you turn on <code>review.auto_merge</code>, with your merge method. Its rules come from the default branch, so a PR cannot relax them. A killed review picks up where it stopped with <code>--resume</code>, and <code>--revert</code> undoes a merged PR.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage, resolve, review, and merge across the backlog in <code>conservative</code>, <code>balanced</code> (default), or <code>aggressive</code> mode. <code>--stats</code> shows how merged runs held up.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/init-idd</span><p style="margin-top:2px">Detect your language, framework, and test runner, and write a tuned <code>.idd.yml</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/init-idd</span><p style="margin-top:2px">Detect your language, framework, and test runner, write a tuned <code>.idd.yml</code>, and print a starter verification recipe.</p></div>
       </div>
 
       <p class="hood-note reveal">Under the hood, eight shared agents do the work: duplicate detector, codebase researcher, synthesizer, implementer, code reviewer, fixer, relationship scanner, and UI/UX reviewer. Set each one’s model and thinking effort in <code class="mono green">.idd.yml</code>, or keep the defaults.</p>
@@ -1224,7 +1224,7 @@
           <div class="section-tag" style="margin-bottom: 10px;">No agent required</div>
           <h3><code>idd-lint</code>: enforce the spec in CI</h3>
           <p><code>scripts/idd-lint.py</code> checks <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data: issues, PRs, commit messages, branches, or a whole repo. Every check cites the spec section it enforces and maps to an <code>L1–L3</code> level. Lint checks need <strong>no LLM, no network, and nothing beyond the Python standard library</strong>.</p>
-          <p>The <code>stats</code> mode adds an evidence report: trace completeness, Decision-Record coverage, and resolution outcomes by issue quality. Exit codes 0 and 1 drop straight into CI.</p>
+          <p>The <code>stats</code> mode adds an evidence report: trace completeness, Decision-Record coverage, resolution outcomes by issue quality, and which review rules actually find problems. Exit codes 0 and 1 drop straight into CI.</p>
           <div class="install-box lint-box">
             <div class="install-body">
               <div class="copy-row">

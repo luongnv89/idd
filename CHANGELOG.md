@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.29.0 — 2026-11-25
+
 ### Features
 - **issue-pr-review, config, shared scripts:** read the review gates from the default branch (#659). A PR can no longer set `review.run_tests`, `review.confidence_threshold`, `review.soft_pass`, `review.max_cycles` or any other gate key for its own review. `gi-config.py` gains `--ref REF`: it reads `.idd.yml` (else the legacy `.gitissue.yml`, only when `.idd.yml` is absent) from that git ref and never from the work tree, a ref with no config yields the built-in defaults, and the output adds `config_source: "ref:<REF>"`. A full 40- or 64-hex object id must name a commit, a `refs/…` name must match exactly one ref, and a short name that could resolve to more than one ref exits 4; under `--ref` the schema must be the bundled copy or an explicit `--schema`. `--compare-ref REF2` adds `changed_keys`, every key in any section that the second ref adds, removes or changes; a failure on that side keeps exit 0 with `changed_keys: null` and a `compare_error`. Without `--ref` the output is unchanged. `/issue-pr-review`'s *Configuration*, in every mode, binds the default branch from `gh repo view`, fetches it with an explicit refspec, verifies `refs/remotes/origin/<base>` with `git show-ref --verify`, resolves it once to a pattern-checked object id and loads the config from that id; the by-hand fallback reads `git show "<oid>:.idd.yml"`, and anything unreadable falls back to the built-in defaults, never the checked-out branch's file. The run prints where the settings came from (`○ Review settings: origin/<base> @ <oid> (.idd.yml)`), and the report's Evidence row repeats it. Step 2 compares the PR head with its merge base in every mode, `--review-only` included, and whenever the PR changes `.idd.yml` or `.gitissue.yml` the report carries a non-blocking report-level finding naming each changed key with the base value in force, or saying the keys could not be compared, with the by-hand diff; it never counts toward soft-pass or strict mode and is never a PARTIAL cause. New test `tests/test-review-config-base-ref-659.sh`. `scripts/surface-counts.json` records 299 more script lines (17,032); the new flags replace reading the reviewed branch's own `.idd.yml`. Budgets in `scripts/skill-budgets.json` grow: issue-pr-review by 2,706 bytes (SKILL.md by 877, always-read by 1,317), within the 2% release cap once the review-loop mechanics' duplicate passages on the `trusted` collapse, the post-push recompute and the CI-billing flag were condensed, and auto-pilot and init-idd by 151 bytes each for the bundled `config-schema.md` note.
 
@@ -34,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - **values checklist:** approve a growth-cap exemption for issue-pr-review against v0.28.0 (#660). The bundle is 6,759 bytes (+1.99%) above its size at that tag, 14 bytes under the 2% cap, and reading reviewer rules from the base branch adds about 384 bytes to `code-reviewer.md`. The new `docs/VALUES.md` *Change log* row names the skill and the tag, so `scripts/skill-budget.py` exempts issue-pr-review for this release; no other bundle is exempted.
+
+Contributions by @luongnv89.
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.28.0...v0.29.0
 
 ## v0.28.0 — 2026-11-21
 
