@@ -33,6 +33,8 @@
 | "/auto-pilot --limit 3" | Process at most 3 issues then stop |
 | "/auto-pilot --dry-run" | Show the execution plan without resolving anything |
 | "/auto-pilot --skip 7" | Skip issue #7 (exclude from processing) |
+| "/auto-pilot --resume" | Resume an interrupted run; a bare run also continues a run cut off on this machine |
+| "/auto-pilot --no-resume" | Start fresh even when a cut-off run is recorded |
 | "/auto-pilot --stats" | Report run outcomes and the post-merge look-back from the local run log; read-only |
 
 ## How It Works

@@ -145,6 +145,24 @@ place of faithfulness, and the same worklist schema out.
    **Fence safety.** Write any draft line that, after up to three spaces, starts with three
    backticks, `~~~` or `<!--`, or that is exactly `## Source`, with four leading spaces instead.
    It then cannot close the fence or match a marker, sentinel or `## Source` check.
+5. **Stage the confirmed draft** before the epic create call, so a cut-off before the epic exists
+   keeps it (`references/stage-file.md`). Write `plan-draft.json` in the stage directory:
+   `{"title": <confirmed epic title>, "draft": <confirmed-draft.txt verbatim>, "draft_sha":
+   <git hash-object confirmed-draft.txt>, "created_at": <UTC YYYY-MM-DDTHH:MM:SSZ>}`. Hash the
+   file, never the text on a command line. Remove the stage once the created epic's body, read
+   back, holds the draft in its Reporter Context, which is then the durable copy
+   (`references/epic-identity.md`, *Step 2*).
+
+### Staged draft — a re-run after a cut-off <!-- a:pti-staged-draft -->
+
+A conversation-path run without `--epic` reads `plan-draft.json` before it drafts. Its pin:
+`created_at` under 24 hours old, and `draft` written to `confirmed-draft.txt` hashes to
+`draft_sha`. Off its pin, it is deleted and the run drafts as usual. On its pin, print the
+recovery block of `references/resume-cut-off.md` (*Recovered:* the title and the task count,
+*Next:* Phase 2), then ask once: `Reuse the draft confirmed earlier? [Y/n]`; with no user present
+(`IDD_AUTO_MODE=1`) reuse it. `n` deletes it and drafts afresh. A reused draft is the confirmed
+draft: the confirm gate is not asked again. Phase 3's epic identity still runs live, so an epic
+the earlier run created, marked or unmarked, is found and reused or adopted, never created twice.
 
 ### Drafting from a requirements document
 

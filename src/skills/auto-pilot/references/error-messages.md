@@ -160,6 +160,15 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
 **Trigger:** `--lock` exits 3 — `.idd/run.lock` exists, is younger than the TTL (default 3600s), and either its `pid` is alive on this host, the lock was taken on another host (liveness cannot be checked), or its owner is unknown (`pid` 0 — the default when `--pid` is absent, which carries no liveness signal and is never read as dead).
 **Action:** Stop before any mutation. Exit 3 is a stop, never a degrade: starting anyway is the concurrent-mutation case the lock exists to prevent.
 
+### Conflicting resume flags
+```
+✗ --resume cannot combine with --no-resume
+
+  To fix:  /auto-pilot --resume     (continue the recorded run)
+           /auto-pilot --no-resume  (start a fresh run)
+```
+**Trigger:** both flags were passed. Stops before the lock.
+
 ### Resuming an interrupted run
 ```
 ○ Resuming run {run_id} — interrupted at phase {phase}
@@ -168,7 +177,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
   PR:      #{pr_number} ({pr_state})
   Done:    {processed_count} issue(s) already processed this run
 ```
-**Trigger:** `/auto-pilot --resume` and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head "{branch_name}"` confirms the recorded PR.
+**Trigger:** `/auto-pilot --resume`, or an *Implicit resume* (`references/preflight.md`), and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head "{branch_name}"` confirms the recorded PR.
 **Action:** Re-enter at the recorded phase on the recorded branch/PR — a recorded `merge` re-enters at review, which re-derives `merge_floor` (*Step 1.0*); never re-resolve the issue and never open a second PR.
 
 ### Recorded run state is stale

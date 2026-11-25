@@ -22,7 +22,8 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review and fix, never merge |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
-| `/issue-pr-review <N> --resume` | interactive or auto | Resume a killed review from its progress record (*Progress record*); combines with `--auto` and `--no-merge`, never with `--review-only` |
+| `/issue-pr-review <N> --resume` | interactive or auto | Resume a killed review from its progress record (*Progress record*) without asking; combines with `--auto`, `--no-merge` and `--review-only` |
+| `/issue-pr-review <N> --no-resume` | interactive or auto | Never resume: clear the record and review fresh. Not with `--resume` |
 | `/issue-pr-review <M> --revert` | revert | Revert merged PR M through a new PR and reopen its issue, instead of Steps 1-7; never merges (`references/revert-path.md`) |
 
 `--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`docs/pre-commit-security.md`). `--no-merge` suppresses the merge in any mode.
@@ -124,7 +125,7 @@ Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_
 
 ## Progress record <!-- a:rv-progress -->
 
-A killed review can resume (`--resume`). Except under `--review-only`, which never reads or writes one, write a record per PR with `shared/scripts/gi-progress.py` at every `[N/7]` start, at each cycle, and before every push, body edit or merge; read it once Step 1 has fixed `N`. It holds only the step, the cycle count, findings, the profile and the last effect. **A record never satisfies or skips a safety gate:** Step 1 always runs live, `qa_handoff` is never restored, and any doubt is stale (start from Step 1). Rules: `references/progress-record-mechanics.md` — **read it now**.
+A killed review can resume (`--resume`, or by the auto default; `--no-resume` never does). `--review-only` keeps a separate record of its own. Write a record per PR with `shared/scripts/gi-progress.py` at every `[N/7]` start, at each cycle, and before every push, body edit or merge; read it once Step 1 has fixed `N`. It holds only the step, the cycle count, findings, the profile and the last effect. **A record never satisfies or skips a safety gate:** Step 1 always runs live, `qa_handoff` is never restored, and any doubt is stale (start from Step 1). Rules: `references/progress-record-mechanics.md` — **read it now**.
 
 ---
 

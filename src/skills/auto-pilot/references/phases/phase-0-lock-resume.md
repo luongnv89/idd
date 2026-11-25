@@ -19,7 +19,7 @@ resume_state = resumable | stale | absent
 
 | Value | When | Effect |
 |-------|------|--------|
-| `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its singleton `current` **or every unfinished `lanes[]` record** still reconciles | Re-enter at `current.phase` for a serialized lane already draining, or reconcile the durable lane batch and resume its earliest safe phase; seed `processed[]` and `skip_list[]` so nothing is redone |
+| `resumable` | `--resume` was passed or an *Implicit resume* applied (`references/preflight.md`), the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its singleton `current` **or every unfinished `lanes[]` record** still reconciles | Re-enter at `current.phase` for a serialized lane already draining, or reconcile the durable lane batch and resume its earliest safe phase; seed `processed[]` and `skip_list[]` so nothing is redone |
 | `stale` | a state exists but does not reconcile — `--fresh` was passed, the read reported `corrupt`, the recorded phase is unknown, or GitHub disagrees with the recorded branch/PR | Print `⚠ Recorded run state is stale — starting fresh`, release any leftover borrows (*Leftover borrowed skills* below) **first**, then `--init` over it |
 | `absent` | the read printed `{}`, or **anything at all is in doubt** | Start a fresh run: `--init` and proceed to Phase 1 |
 
@@ -171,8 +171,8 @@ says, list the two skills' progress records:
 python3 shared/scripts/gi-progress.py --list
 ```
 
-Keep the `{skill, number}` pair of each row whose `status` is `ok` and whose
-`caller_run_id` equals the `run_id` this resume re-acquired with `--resume`. A
+Keep the `{skill, number}` pair of each row whose `status` is `ok`, whose `mode`
+is not `review-only`, and whose `caller_run_id` equals the `run_id` this resume re-acquired with `--resume`. A
 record with a null or different `caller_run_id` was written by a session this
 run did not spawn, and it stays unbound. Carry that set through the whole run,
 into Phase 2 and Phase 3; this run's own state clears never touch it. The

@@ -268,6 +268,24 @@ force-push to "clear" it.
 ```
 **Trigger:** interactive run; `gi-progress.py --read` returned `status: ok` with `verdict: bound` (`references/progress-record-mechanics.md`). `--resume` answers yes without the prompt; a decline clears the record and the review starts fresh.
 
+### Progress record may be live
+```
+⚠ Progress record for PR #N written {age_s}s ago — another session may still be running
+
+  Not resumed: this review starts fresh and replaces the record.
+  To fix:  wait ten minutes and re-run, or pass --resume to take it over
+```
+**Trigger:** an auto run without `--resume` found its owner's bound record with `age_s` 600 or less (`references/progress-record-mechanics.md`). Non-fatal.
+
+### Conflicting resume flags
+```
+✗ --resume and --no-resume cannot be combined
+
+  To fix:  /issue-pr-review N --resume     (continue the recorded review)
+           /issue-pr-review N --no-resume  (discard it and start over)
+```
+**Trigger:** both flags were passed. Stops before any read or write.
+
 ### Progress record is stale
 ```
 ⚠ Progress record is stale ({reason}) — starting from Step 1

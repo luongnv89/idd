@@ -308,6 +308,24 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** interactive run; `gi-progress.py --read` returned `status: ok` with `verdict: bound` (*Step 0j — Progress record*). `--resume` answers yes without the prompt. A decline clears the record and the run starts fresh.
 
+### Progress record may be live
+```
+⚠ Progress record for issue #N written {age_s}s ago — another session may still be running
+
+  Not resumed: this run starts fresh and replaces the record.
+  To fix:  wait ten minutes and re-run, or pass --resume to take it over
+```
+**Trigger:** an auto run without `--resume` found its owner's bound record with `age_s` 600 or less (*Step 0j — Progress record*). Non-fatal.
+
+### Conflicting resume flags
+```
+✗ --resume and --no-resume cannot be combined
+
+  To fix:  /issue-resolver N --resume     (continue the recorded run)
+           /issue-resolver N --no-resume  (discard it and start over)
+```
+**Trigger:** both flags were passed. Stops before any read or write.
+
 ### Progress record is stale
 ```
 ⚠ Progress record is stale ({reason}) — starting from Step 0

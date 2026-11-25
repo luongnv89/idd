@@ -70,6 +70,27 @@ unknown*, and is retired by the TTL (when the timestamp is readable) or
 `--force` only — slower to clear after a crash, but never self-reclaiming.
 With no readable timestamp *and* no known owner, only `--force` retires it.
 
+**Implicit resume.** <!-- a:ap-implicit-resume --> A run given none of `--resume`,
+`--no-resume`, `--fresh`, `--dry-run` and `--force-unlock` first asks whether
+a run on this machine was cut off. Before the lock call, run both read-only
+probes from the repo root:
+
+```bash
+python3 shared/scripts/gi-state.py --read --dry-run
+python3 shared/scripts/gi-state.py --lock --resume --dry-run --pid "$PPID"
+```
+
+It is an implicit resume only when the second prints `status` `would_reclaim`
+with `stale: true` (the lock's owner is dead or past its TTL) or
+`would_reacquire` (this process still owns it), **and** that lock's `run_id`
+equals the `run_id` the first printed, compared as data. Print
+`○ Resuming cut-off run {run_id} — pass --no-resume to start fresh` and treat
+the run as `/auto-pilot --resume` from here on: `--lock --resume`, *Step 1.0*'s
+gate and the in-flight resolver or reviewer resume. Anything else, a lock held
+by a live run, no lock at all (a finished run releases its lock, and its leftover
+state never lends its id) or a probe that cannot run, is no implicit resume:
+take the plain lock below.
+
 **When this run was invoked with `--resume`, add `--resume` to that call.** A
 plain `--lock` mints a fresh run id, so a state file left behind by a run that
 already finished cannot lend its id to an unrelated one — two runs sharing an id

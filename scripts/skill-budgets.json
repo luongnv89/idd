@@ -3,7 +3,7 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 47481,
+        "budget": 48605,
         "files": [
           "references/preflight.md",
           "references/run-log.md",
@@ -11,13 +11,13 @@
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 47481
+        "measured": 48605
       },
-      "budget": 455190,
-      "measured": 455190,
+      "budget": 457265,
+      "measured": 457265,
       "skill_md": {
-        "budget": 27693,
-        "measured": 27693
+        "budget": 27956,
+        "measured": 27956
       }
     },
     "init-idd": {
@@ -42,16 +42,16 @@
         ],
         "measured": 34498
       },
-      "budget": 183404,
-      "measured": 183402,
+      "budget": 184379,
+      "measured": 184379,
       "skill_md": {
-        "budget": 25625,
-        "measured": 25625
+        "budget": 25714,
+        "measured": 25714
       }
     },
     "issue-creator": {
       "always_read": {
-        "budget": 46394,
+        "budget": 47606,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,18 +60,18 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 46394
+        "measured": 47606
       },
-      "budget": 189937,
-      "measured": 189937,
+      "budget": 193377,
+      "measured": 193377,
       "skill_md": {
-        "budget": 26487,
-        "measured": 25575
+        "budget": 26965,
+        "measured": 26965
       }
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 127738,
+        "budget": 128538,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,30 +79,30 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 126840
+        "measured": 128538
       },
-      "budget": 345903,
-      "measured": 345781,
+      "budget": 348383,
+      "measured": 348383,
       "skill_md": {
-        "budget": 33813,
-        "measured": 33678
+        "budget": 33853,
+        "measured": 33853
       }
     },
     "issue-resolver": {
       "always_read": {
-        "budget": 11196,
+        "budget": 11634,
         "files": [
           "references/closing-summary.md",
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 11179
+        "measured": 11634
       },
-      "budget": 479395,
-      "measured": 479388,
+      "budget": 480700,
+      "measured": 480700,
       "skill_md": {
-        "budget": 35248,
-        "measured": 35248
+        "budget": 35393,
+        "measured": 35393
       }
     },
     "issue-triage": {
@@ -114,8 +114,8 @@
         ],
         "measured": 28301
       },
-      "budget": 152551,
-      "measured": 152549,
+      "budget": 152705,
+      "measured": 152705,
       "skill_md": {
         "budget": 26313,
         "measured": 26313
@@ -129,11 +129,11 @@
         ],
         "measured": 5381
       },
-      "budget": 177669,
-      "measured": 177669,
+      "budget": 180356,
+      "measured": 180356,
       "skill_md": {
         "budget": 25900,
-        "measured": 25348
+        "measured": 25533
       }
     }
   }

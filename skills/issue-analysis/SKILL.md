@@ -303,7 +303,7 @@ After fetch:
 
 ### Resume a cut-off analysis <!-- a:ia-resume -->
 
-After Step 1, read `analysis-<N>.json` in the stage directory (`references/stage-file.md`). Its pin: `issue` is N, `commit_sha` equals `git rev-parse HEAD`, `updatedAt` is Step 1's raw string. Pin holds: print the recovery block of `references/resume-cut-off.md`, then take `findings` for Steps 2-5 and `synthesis` for Steps 6-7; Steps 8-9 always run. Pin broken: print the stale notice and run every step. View mode never reads it; a finished analysis leaves none, so its re-run starts fresh.
+After Step 1, read `analysis-<N>.json` in the stage directory (`references/stage-file.md`). Its pin: `issue` is N, `commit_sha` equals `git rev-parse HEAD`, `updatedAt` is Step 1's raw string. Pin holds: print the recovery block of `references/resume-cut-off.md`, then take `findings` for Steps 2-5 and `synthesis` for Steps 6-7; an inline run also reuses each step in `inline_steps` (`references/inline-fallback.md`). Steps 8-9 always run. Pin broken: print the stale notice and run every step. View mode never reads it; a finished analysis leaves none, so its re-run starts fresh.
 
 ---
 

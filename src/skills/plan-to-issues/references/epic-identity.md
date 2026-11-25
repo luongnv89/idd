@@ -210,7 +210,8 @@ blockquote (strip each line's leading `> `) in place of `## Source`: it must par
 with `^#{3,4} Task` headings, **otherwise** take the *Cannot restore worklist* stop
 (`references/preflight.md`) and file nothing. Slug the title after `Epic: `, bind with step 4 —
 marker, `## Source`, sentinels — and continue as the resume. A run cut off before the epic was
-created left no record: that draft is drafted and confirmed again.
+created left its confirmed draft staged: *Staged draft* in `references/input-resolution.md`
+restores it.
 
 **Step 1 — discovery is advisory, not authoritative.** The marker is
 `<!-- plan-to-issues:conversation=<slug> -->`, matched as a fixed string on its own line, the same
@@ -242,7 +243,9 @@ not the slug, is the stable handle. `sync <epic#>` only re-renders the map; it c
 `Epic: <confirmed title>` — the title the user confirmed in Phase 1 (Expected Output:
 `Epic: Harden the ingest path`). Intent text is the confirmed draft only: `confirmed-draft.txt`
 verbatim, which is what *Unmarked epic* restores from. Do **not** put the
-marker in the intent text. `--epic` skips this step: the epic already exists.
+marker in the intent text. `--epic` skips this step: the epic already exists. Once the created
+epic's body, read back, holds the draft in its Reporter Context, remove the staged draft
+(*Staged draft* in `references/input-resolution.md`); a reused or adopted epic removes it too.
 
 **Step 4 — bind.** Append the conversation marker and, additionally, the `## Source` block holding
 `confirmed-draft.txt` verbatim. That file is **plan-grammar markdown** (`## Phase` / `### Task`),

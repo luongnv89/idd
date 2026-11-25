@@ -100,7 +100,7 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 | Step | Auto behavior |
 |------|---------------|
 | *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label, a `route:needs-human` label, a foreign claim or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `route_needs_human` / `claimed_elsewhere` / `needs_clarification`. The *Claim write* after *0f* takes the same No on a foreign claim. |
-| *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
+| *0j* — Progress record | Never prompt: `--resume`, or the owner-bound default for an idle record, resumes (*Resume entry* in the 0j file). |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |
 | *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
