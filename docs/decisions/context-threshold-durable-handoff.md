@@ -164,19 +164,19 @@ before the resolver delivers).
 Issue #690 asks that every skill's workflow survive a cut-off session: finished
 steps are kept, a new session on the same task continues from the first
 unfinished step, it says what it recovered, and it redoes whatever no longer
-matches the repo, issue or PR. All nine skills were reviewed against that. Four
-gained resume rules, one gained a report-only check, and four are recorded as
+matches the repo, issue or PR. All nine skills were reviewed against that. Seven
+gained resume rules, one gained a report-only check, and one is recorded as
 reviewed with no change.
 
 | Skill | Outcome | Mechanism, or the decision recorded |
 |---|---|---|
-| `/auto-pilot` | Reviewed, no change | `gi-state.py` run state, the run lock and the Step 1.0 resume gate already cover it. Resume needs the explicit `--resume`; a bare re-run takes the stale or fresh path. |
-| `/issue-resolver` | Reviewed, no change | The `gi-progress.py` record (#542). **Decision kept:** in auto mode a re-run without `--resume` starts over (`--start` replaces the record); an interactive run asks. |
-| `/issue-pr-review` | Reviewed, no change | The `gi-progress.py` record (#542). **Decisions kept:** the same auto-mode `--resume` rule, and `--review-only` reads and writes no record, so a cut-off review-only run starts over. |
-| `/issue-analysis` | Changed | A stage file keeps the explorer's and the synthesizer's validated returns, pinned to `HEAD` and the issue's `updatedAt`. A re-run with a holding pin skips Steps 2-7. Under `--plan` the stage outlives the persist until the plan post is verified, and a resumed run asks `gi-plan.py check` before posting again, whatever the pin says, because the post itself moves `updatedAt`. |
+| `/auto-pilot` | Changed | `gi-state.py` run state, the run lock and the Step 1.0 resume gate. **Decision reversed (maintainer, 2026-11-25):** a bare run first runs two read-only probes, `gi-state.py --read --dry-run` and `--lock --resume --dry-run`, and behaves as `--resume` only when the probe would reclaim a stale lock taken on this host (`same_host: true`; dead owner pid or past the TTL) whose `holder.run_id` equals the recorded state's `run_id`, or would re-acquire its own live lock whose `run_id` does. A bare run is one given none of `--issues`, `--resume`, `--no-resume`, `--fresh`, `--dry-run` and `--force-unlock`: an issue list is new work, so `/auto-pilot --issues …` after a crash starts fresh, and `--limit` or `--skip` keep the implicit resume. A finished run releases its lock, so its leftover state never lends its id; no lock, a live holder or a failed probe takes the plain lock. Re-acquiring its own live lock counts because that is the ordinary interruption: the loop stopped and the agent process holding the lock did not. Step 1.0 then lists progress records as before, skipping review-only rows. New `--no-resume` takes the plain lock; it cannot combine with `--resume`. |
+| `/issue-resolver` | Changed | The `gi-progress.py` record (#542). **Decision reversed (maintainer, 2026-11-25):** an auto run without `--resume` resumes by default when the record reads `ok` and `bound`, belongs to it (`caller_run_id` equals the spawn's `run_id` under `/auto-pilot`, or is null for a standalone run) and was last written more than ten minutes ago; a younger record prints a `⚠` that another session may still be running, and every other case starts over as `--start` replaces the record. A caller-managed lane keeps its stricter rule (`IDD_RESUME_LANE=1`, `--resume`, `lane_match`, workspace `here`). New `--no-resume` clears the record and runs fresh; it cannot combine with `--resume`. Every gate a resume runs still runs live. `gi-progress.py --read` already reported `age_s` and the record's `caller_run_id`, so the script needed no change for this. |
+| `/issue-pr-review` | Changed | The `gi-progress.py` record (#542). **Decisions reversed (maintainer, 2026-11-25):** the resolver's owner-bound auto default and `--no-resume`, and `--review-only` keeps a record of its own. `gi-progress.py --mode review-only` stores it in a separate file, `issue-pr-review-<N>.review-only.json`, stamped `mode: "review-only"` (a fix-mode record is stamped `mode: "fix"`; no key means fix), so neither mode reads, replaces or clears the other's record, and a record of the other mode reads `absent`. The script refuses an `effect` or step 6 in a review-only record. A review-only resume re-enters by the same table, never edits, commits, pushes or merges, and always runs Step 1 live. `--resume` now combines with `--review-only`. |
+| `/issue-analysis` | Changed | A stage file keeps the explorer's and the synthesizer's validated returns, pinned to `HEAD` and the issue's `updatedAt`. A re-run with a holding pin skips Steps 2-7. The inline path (no Agent tool) writes the same file after each finished step, under `inline_steps`, and fills `findings` and `synthesis` only once Steps 2-5 and 6-7 are all done, so a subagent run never takes a partial inline stage for a whole return. Under `--plan` the stage outlives the persist until the plan post is verified, and a resumed run asks `gi-plan.py check` before posting again, whatever the pin says, because the post itself moves `updatedAt`. |
 | `/issue-triage` | Changed | Each returned scanner batch is staged, pinned to `HEAD` and to each issue's number and `updatedAt`. A re-run reuses the batches whose pin holds and scans the rest. Auto mode follows the same pin. |
-| `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment, only on an open issue whose backup comment is under 24 hours old. Single Create keeps no record: its duplicate check flags the earlier create. |
-| `/plan-to-issues` | Changed | A reused or adopted epic prints what was filed and what comes next, and reports a filed task whose id left the worklist or whose title changed. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body's Reporter Context, which holds the confirmed draft verbatim. The dependency pass appends a marker only when it is absent. |
+| `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment, only on an open issue whose backup comment is under 24 hours old. Normalize stages its suggested labels (`normalize-<N>.json`) before the backup and applies them on any later marker hit under 24 hours, only names the live label list holds. Single Create stages the clarify answers, the composed draft and each uploaded image's URL in `create-<key>.json`, keyed by `git hash-object` of the input text; a re-run with the same input under 24 hours first reads this login's newest issues live and stops on one the earlier run created, else reuses the stage in place of Steps 3.5 and 4 and the uploads, and runs the duplicate check and the preview live. |
+| `/plan-to-issues` | Changed | The conversation path stages the confirmed draft (`plan-draft.json`: title, draft, `draft_sha` from `git hash-object`, `created_at`) before the epic create call and removes it once the epic body, read back, holds the draft; a conversation-path re-run finds a draft under 24 hours old, prints the recovery block, asks before reusing it (an unattended run reuses it) and does not ask the confirm gate again, while Phase 3's epic identity still runs live, so an epic the earlier run created is found, not created twice. A reused or adopted epic prints what was filed and what comes next, and reports a filed task whose id left the worklist or whose title changed. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body's Reporter Context, which holds the confirmed draft verbatim. The dependency pass appends a marker only when it is absent. |
 | `/init-idd` | Changed (report-only) | An existing `.idd.yml` is validated before the overwrite/merge/cancel choice and a failure prints one warning naming overwrite as the repair. Auto mode still takes cancel. |
 | `/idd-doctor` | Reviewed, no change | Read-only and one pass: a cut-off loses printed output only. |
 
@@ -185,54 +185,57 @@ bundled into the four changed skills that print a recovery block: saved
 progress is a hint and never an authority, an effect is read live before it is
 repeated, stale progress is named and redone, and the recovery block and stale
 notice have one shape. A second leaf, `src/shared/references/stage-file.md`,
-holds the stage-file contract for the two skills that write one.
+holds the stage-file contract for the four skills that write one.
 
 **Stage files** live in `<git common dir>/idd/stage/` (`analysis-<N>.json`,
-`triage.json`), beside the progress records and for the same reasons: no
+`triage.json`, `plan-draft.json`, `create-<key>.json`, `normalize-<N>.json`), beside the progress records and for the same reasons: no
 branch can commit them and no stash or clean-tree check sees them. They are
 written through a temp file and an atomic rename, refused through a symlinked
 directory, read as untrusted data that never reaches a command line, and
-removed at the skill's terminal persist. No script owns them and
-`gi-progress.py` is unchanged: it reads only `idd/progress/`.
+removed at the point each skill names (once the results are durable elsewhere, else at the
+terminal persist). No script owns them, and `gi-progress.py` reads only `idd/progress/`.
 
 **What is still lost** — each is at most the step in progress, or a recorded limit:
 
-- `/plan-to-issues`, conversation path: a session cut off between the draft
-  confirm and the epic create call has no durable record, so the draft is
-  drafted and confirmed again. An unmarked epic whose Reporter Context does
-  not parse as plan grammar takes the *Cannot restore worklist* stop instead of
-  a restore. A task whose body changed under the same id and
-  title is not detected; the stale notice never re-files, edits or closes a
-  filed child.
-- `/issue-creator`: single Create keeps no record of the answers given before
-  its create call, and an image uploaded by a run cut off before the create
-  stays on the storage branch unreferenced; neither got a rule. Normalize: labels suggested by a run cut off before its
-  label step are not recovered. A normalized issue has no normalization
-  comment by design when `/issue-resolver` normalized it inline (backup and
-  body edit only) or `issue.normalize_comment` was false at the time, so a
-  marker, a backup and no comment do not prove a cut-off. The tail recovery
-  therefore needs an open issue and a backup under 24 hours old: a cut-off
-  resumed later, or on a closed issue, keeps the *already normalized* stop and
-  never gets its comment, and an open issue the resolver normalized under 24
-  hours ago still gets one when `/issue-creator` is run on it. A batch item whose title was reworded between
-  runs is not recovered and falls to the duplicate flag.
-- `/issue-analysis`: the inline path (no Agent tool) writes no stage, and a
-  re-run of a *finished* analysis stays a fresh analysis.
+- `/plan-to-issues`: an unmarked epic whose Reporter Context does not parse as
+  plan grammar takes the *Cannot restore worklist* stop instead of a restore. A
+  task whose body changed under the same id and title is not detected; the stale
+  notice never re-files, edits or closes a filed child. A staged draft older than
+  24 hours is dropped, and the draft is drafted and confirmed again.
+- `/issue-creator`: a normalized issue has no normalization comment by design
+  when `/issue-resolver` normalized it inline (backup and body edit only) or
+  `issue.normalize_comment` was false at the time, so a marker, a backup and no
+  comment do not prove a cut-off. The comment recovery therefore needs an open
+  issue and a backup under 24 hours old: a cut-off resumed later, or on a closed
+  issue, keeps the *already normalized* stop and never gets its comment, and an
+  open issue the resolver normalized under 24 hours ago still gets one when
+  `/issue-creator` is run on it. A batch item whose title was reworded between
+  runs is not recovered and falls to the duplicate flag. A single Create re-run
+  with different input text, or after 24 hours, keys a different stage and
+  starts over; an earlier upload then stays on the storage branch unreferenced.
+- `/issue-analysis`: a re-run of a *finished* analysis stays a fresh analysis.
+  An inline step cut off before its `[k/8]` line is redone.
 - `/issue-triage`: a PR merged between the cut-off and the resume, with
   `HEAD` unmoved, is not seen by a reused batch; reused batches are named
   under *Uncertainty*.
 - `/init-idd`: the pre-choice check reports; it does not re-run the merge
   strategy check or the starter recipe of a run cut off after the write.
-- `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`: the three decisions
-  kept above. On those paths "continues instead of starting over" holds only
-  with `--resume` or the interactive prompt.
+- `/issue-resolver`, `/issue-pr-review`: an auto run that finds a record
+  written ten minutes ago or less, or one another `/auto-pilot` run owns,
+  starts over and replaces it, because that record may belong to a live
+  session; `--resume` takes it over.
+- `/auto-pilot`: a run cut off on another host, or whose lock is still held
+  by a live process, is not resumed by a bare run, and a run given `--issues`
+  never resumes without `--resume`.
 
-Rejected for #690: a new `--resume` flag or config key on the five changed
-skills (the surface counts stay where they were), a stage store under
-`.idd/cache/` (an untracked file there can reach a stash or fail a clean-tree
-check), a stage file for `/plan-to-issues` (it writes to the tracker only),
-and editing the resolver, reviewer or auto-pilot, whose bundles sit at or over
-the release growth cap.
+Rejected for #690: a new config key on the changed skills, and a stage store
+under `.idd/cache/` (an untracked file there can reach a stash or fail a
+clean-tree check). The first review also rejected a stage file for
+`/plan-to-issues` and any edit to the resolver, reviewer or auto-pilot, whose
+bundles sat at or over the release growth cap; the maintainer reversed both on
+2026-11-25 and approved their growth-cap exemptions in `docs/VALUES.md`. The
+only new flag is `--no-resume` on `/issue-resolver`, `/issue-pr-review` and
+`/auto-pilot`, and the only script change is `gi-progress.py --mode`.
 
 ## Sources
 
