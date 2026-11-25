@@ -28,7 +28,7 @@ If not found:
 
 Look for `<!-- idd:normalized v1 -->` (or legacy `<!-- gitissue:normalized v1 -->`) as a standalone HTML comment in the issue body.
 
-If found:
+If found, first finish a cut-off run's tail. <!-- a:ic-normalize-tail --> Only when `issue.normalize_comment` is true, read `gh issue view {N} --json comments` live. When a comment with `viewerDidAuthor` true holds Step 8's backup summary line and no later comment opens with Step 10's `Normalized by IDD Stack` line, post Step 10's comment, print the recovery block of `references/resume-cut-off.md` with `✓ Issue #42: recovered — normalization comment posted`, and stop. Labels the cut-off run suggested are not recovered: they are the one step lost. Every other marker hit prints:
 ```
 ✓ Issue #42 is already normalized (v1, 2026-03-20). No changes needed.
 ```
@@ -112,6 +112,8 @@ Stop.
 ### Step 8 — Backup Original Body
 
 Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
+
+**Reuse a cut-off run's backup.** <!-- a:ic-backup-reuse --> First read `gh issue view {N} --json comments`: only when a backup comment with `viewerDidAuthor` true already contains the live body byte for byte, skip the post, print `○ recovered — backup comment already posted`, and go to Step 9. Any difference posts a new backup:
 
 ```bash
 gh issue comment {N} --body "<details><summary>Original issue body (backup by IDD Stack)</summary>
@@ -266,7 +268,7 @@ Flag duplicates found by the subagent (or fallback). Both `existing_issue` and `
 ⚠ Item 3 overlaps with Item 1 — both address auth session handling
 ```
 
-Duplicates are flagged but not removed. In interactive runs the user decides in the approval step; in auto mode the approval step auto-approves the full set (see Step 4), so flagged duplicates are **created, not dropped** — the `⚠` lines above are the audit trail.
+Duplicates are flagged but not removed. In interactive runs the user decides in the approval step; in auto mode the approval step auto-approves the full set (see Step 4), so flagged duplicates are **created, not dropped** — the `⚠` lines above are the audit trail. An item Step 5 recovers is this batch's own earlier create, not a duplicate, and is never created twice.
 
 ### Step 4 — Approval
 
@@ -316,6 +318,14 @@ When `parent` is bound, it flows into Step 5 (child marker) and Step 5.5 (parent
 
 Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`, snapshot `--invalidate`). Each issue gets the full template treatment — `<!-- idd:normalized v1 -->` marker, all sections populated.
 
+**Recover a cut-off batch.** <!-- a:ic-batch-recover --> Once, before the first create, read this login's newest issues live — never the backlog snapshot:
+
+```bash
+gh issue list --author @me --state all --limit 200 --json number,title,createdAt,body,state
+```
+
+An approved item is already created when one of them has its exact title and, with a parent bound, a `Part of #{parent}` line (any state); with no parent it must be open and created in the last 24 hours (`date -u` gives now). Never create it again: print `○ Item 2 recovered — already created as #43`, pass it to Step 5.5 with the created children, and count it as recovered in Step 6. A reworded title is not recovered; it falls to Step 3's duplicate flag. A failed read prints a `⚠` line and recovers nothing.
+
 **Child hierarchy marker (only when a parent is bound in Step 4.5).** When — and only when — a `parent` is bound, append the hierarchy marker to **each child body** before `gh issue create`, on its own line at the very end of the body (after the Metadata section), mirroring how the children of an existing epic place it:
 
 ```
@@ -351,7 +361,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
    ```bash
    gh issue view {parent} --json number,body --jq '.body'
    ```
-2. **Modify** in memory: append (or, if an IDD Stack checklist block already exists, extend) a checklist block listing only the children that were actually created (skip any that failed in Step 5). Use the exact em-dash format from SPEC §2.1 — `- [ ] #N — <title>` (that is a Unicode em-dash `—`, not a hyphen):
+2. **Modify** in memory: append (or, if an IDD Stack checklist block already exists, extend) a checklist block listing only the children that were actually created or recovered (skip any that failed in Step 5). Use the exact em-dash format from SPEC §2.1 — `- [ ] #N — <title>` (that is a Unicode em-dash `—`, not a hyphen):
    ```
    ## Children
 
@@ -419,6 +429,8 @@ Apply references/examples.md (Review contract) before printing the summary. Popu
 ```
 
 The retry hint shows the single-create invocation for each failed item, so the user can easily pick up where the batch left off.
+
+**Recovered items** (Step 5) are listed as `○ #43  Add dark mode toggle — recovered` with their URL, and the row reads `Create:            ✓ pass ({created} created, {recovered} recovered)`.
 
 **Epic-bound batches** add one line to the footer (between `Create` and the separator) reflecting Step 5.5; omit it entirely when no parent was bound:
 

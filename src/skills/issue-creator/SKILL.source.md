@@ -129,7 +129,8 @@ Each is named again at the step that reads it:
   `references/image-upload.md`, `references/confidence-scoring.md`,
   `references/clarify-intent.md`, `references/dup-score-fallback.md`,
   `references/error-messages.md`, `references/examples.md`,
-  `references/run-stats.md`, `references/self-improve.md`
+  `references/run-stats.md`, `references/self-improve.md`,
+  `references/resume-cut-off.md`
 - `references/docs/naming-conventions.md`,
   `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
   `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,

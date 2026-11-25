@@ -198,7 +198,9 @@ lacks. On the `conversation` path a hit is **never silently reused**: a slug is 
 identity, so print the epic and ask (default reuse); `--epic <n>` skips the search and Phase 1
 restores from `## Source`. Both fall back
 to **adoption** for an unmarked epic that looks like an interrupted run, and adoption always **asks
-once**.
+once**; on `--epic <n>` it restores the draft from the epic body (`references/epic-identity.md`,
+*Unmarked epic*). A reused or adopted epic is a cut-off run continuing: Phase 4 opens with the
+*Resume report* in `references/phase-contracts.md`.
 
 **Completion criteria:** the epic is `OPEN`, labelled `epic`, its number recorded for `--parent`,
 and its body holds exactly one source marker for this input and one sentinel pair.
@@ -297,6 +299,7 @@ the `✗ Missing bundled dependency` block from `references/error-messages.md` a
 - `references/acceptance-criteria.md` — unabridged run contract
 - `references/reporting.md` — step reports, review contract, closing summary
 - `references/run-stats.md` — run-stats footer contract
+- `references/resume-cut-off.md` — cut-off resume contract
 - `references/error-messages.md` — error catalog
 - `references/self-improve.md`
 - `references/docs/config-schema.md` — configuration schema (`platform`)

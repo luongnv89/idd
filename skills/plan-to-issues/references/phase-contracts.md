@@ -63,7 +63,8 @@ confirm gate. Fetch the epic, parse the fenced `## Source` with `references/plan
 unparseable — Source must contain `^#{3,4} Task` headings. Copy stored fields; do not mint
 `(needs review)` criteria that were not stored. Missing, empty, or unparseable `## Source`
 is a **stop** (failure block in `references/preflight.md`); never fall back to re-drafting,
-never run `sync`. Then continue as an idempotent re-run: file only what the epic does not
+never run `sync`. One exception: an epic with neither source marker adopts and restores from its
+Reporter Context (`references/epic-identity.md`, *Unmarked epic*). Then continue as an idempotent re-run: file only what the epic does not
 list. Full procedure: `references/input-resolution.md`.
 
 *Completion criteria (fresh):* every drafted task has an id, title, ≥ 1 acceptance criterion, a
@@ -112,6 +113,14 @@ and its body holds exactly one source marker for this input and one sentinel pai
 
 ## Phase 4 — File the issues, one batch per phase
 
+**Resume report.** <!-- a:pti-resume --> On a reused or adopted epic, before the first batch,
+compare the worklist with the children filed under it — each `Plan task: <id>` line and title, as
+sync mode's unmapped-task comparison does — and print the recovery block of
+`references/resume-cut-off.md`: the epic, the tasks filed, the first phase with an unfiled task. Where
+the two differ, print its stale notice naming each filed task whose id left the worklist or whose
+title changed, and each new task. The notice is report-only: file the new tasks; **never** re-file,
+edit or close a filed child. A changed task body under the same id and title is not detected.
+
 Format and invocation: `references/issue-creator-bridge.md`. One `/issue-creator … --parent <epic>`
 call **per phase** — batches of 5–15 keep rate limits, progress, and resumption at phase granularity.
 Non-negotiables:
@@ -125,10 +134,12 @@ Non-negotiables:
   additive, never removed), then **register every issue as a native sub-issue** of the epic — this,
   not `--parent`, gives the epic live status (bridge Step 4a; the API takes the child's database
   **`id`**, not its number).
-- After **every** phase, run the **dependency pass** (bridge Step 5): each `Dependencies` value
-  becomes a `Depends on #N` marker. Phases file in order, so cross-phase deps resolve.
+- After **every** phase, run the **dependency pass** (bridge Step 5): <!-- a:pti-dep-guard --> each `Dependencies` value
+  becomes a `Depends on #N` marker. Phases file in order, so cross-phase deps resolve. Append it
+  only when the body lacks that exact line, so a resumed pass adds no second marker.
 
-**Completion criteria:** created + skipped equals the filtered worklist count; every issue carries
+**Completion criteria:** created + skipped equals the filtered worklist count (an item
+`/issue-creator` reports as recovered counts as skipped); every issue carries
 `Part of #<epic>` and its full label set; `gh api --paginate …/issues/<epic>/sub_issues --jq '.[].number' | wc -l` matches;
 every task with dependencies carries `Depends on #N`; every id maps to exactly one issue. A task
 that failed to file is listed by id with its error — never silently dropped.

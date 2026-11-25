@@ -23,7 +23,8 @@ Apply in order; the first that resolves wins.
 2. **Explicit conversation flag** — `/plan-to-issues --from-conversation`. Wins over discovery.
    With `--epic <n>` this is a **resume**: bind `source.kind=conversation`, record the epic
    number, set `source.value` from the existing `<!-- plan-to-issues:conversation=<slug> -->`
-   marker (stop if missing or `plan=` present — `references/epic-identity.md` Step 0), and skip
+   marker (stop if missing or `plan=` present; an epic with neither marker takes *Unmarked epic* —
+   `references/epic-identity.md` Step 0), and skip
    the actionable-intent check on the current turns. Do not slug from `<n>` or current turns.
    Phase 1 then restores the worklist from that epic's `## Source` (below). Without `--epic`,
    the current turns must carry actionable intent as usual.

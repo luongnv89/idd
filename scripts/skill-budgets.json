@@ -26,32 +26,32 @@
         "files": [],
         "measured": 0
       },
-      "budget": 130001,
-      "measured": 130001,
+      "budget": 130181,
+      "measured": 130181,
       "skill_md": {
         "budget": 25315,
-        "measured": 24999
+        "measured": 25179
       }
     },
     "issue-analysis": {
       "always_read": {
-        "budget": 35684,
+        "budget": 35522,
         "files": [
           "references/output-and-persist.md",
           "references/subagent-steps.md"
         ],
-        "measured": 34668
+        "measured": 34498
       },
-      "budget": 181040,
-      "measured": 181040,
+      "budget": 183433,
+      "measured": 183433,
       "skill_md": {
-        "budget": 24543,
-        "measured": 24543
+        "budget": 25654,
+        "measured": 25654
       }
     },
     "issue-creator": {
       "always_read": {
-        "budget": 44058,
+        "budget": 46070,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,13 +60,13 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 44058
+        "measured": 46070
       },
-      "budget": 186799,
-      "measured": 186799,
+      "budget": 189613,
+      "measured": 189613,
       "skill_md": {
         "budget": 26487,
-        "measured": 25541
+        "measured": 25575
       }
     },
     "issue-pr-review": {
@@ -114,11 +114,11 @@
         ],
         "measured": 28301
       },
-      "budget": 150245,
-      "measured": 150245,
+      "budget": 152551,
+      "measured": 152551,
       "skill_md": {
-        "budget": 25659,
-        "measured": 25459
+        "budget": 26313,
+        "measured": 26313
       }
     },
     "plan-to-issues": {
@@ -129,11 +129,11 @@
         ],
         "measured": 5381
       },
-      "budget": 174493,
-      "measured": 174480,
+      "budget": 177441,
+      "measured": 177441,
       "skill_md": {
         "budget": 25900,
-        "measured": 25051
+        "measured": 25348
       }
     }
   }

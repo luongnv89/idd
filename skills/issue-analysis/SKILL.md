@@ -194,6 +194,7 @@ Check these files:
 - `references/inline-fallback.md` — Steps 2-7 without the Agent tool
 - `references/output-and-persist.md` — report rendering spec and JSON schema
 - `references/run-stats.md` — run-stats footer contract
+- `references/resume-cut-off.md`, `references/stage-file.md` — cut-off resume, stage files
 - `references/error-messages.md` — error catalog with triggers and exact output
 - `references/self-improve.md`
 - `references/examples.md` — worked example runs
@@ -300,6 +301,10 @@ After fetch:
 [1/8] Fetch          ✓ issue #N loaded ({type})
 ```
 
+### Resume a cut-off analysis <!-- a:ia-resume -->
+
+After Step 1, read `analysis-<N>.json` in the stage directory (`references/stage-file.md`). Its pin: `issue` is N, `commit_sha` equals `git rev-parse HEAD`, `updatedAt` is Step 1's raw string. Pin holds: print the recovery block of `references/resume-cut-off.md`, then take `findings` for Steps 2-5 and `synthesis` for Steps 6-7; Steps 8-9 always run. Pin broken: print the stale notice and run every step. View mode never reads it; a finished analysis leaves none, so its re-run starts fresh.
+
 ---
 
 ## Steps 2-7 — Explorer & Synthesizer
@@ -332,6 +337,8 @@ After the persist succeeds, post the analysis's recommended option as the issue'
 
 1. **Normalized issues only.** The plan's hash binds it to the body, and the resolver rewrites an un-normalized body before reading the plan. A body without `<!-- idd:normalized v1 -->` (a legacy `gitissue:normalized` one counts) prints *Plan refused — issue not normalized* and posts nothing.
 2. Post with `options[recommended_option - 1]` as the option and the analysis's `criteria` list, in the order *Posting a plan* gives: `plan-approved` removed and confirmed gone first, then the comment, then `planned`. A removal that cannot be confirmed prints *Plan approval label not removed* and posts nothing; a failed post prints *Plan comment not posted*. Either way the saved analysis stands: the run ends `PARTIAL`, never `BLOCKED`.
+
+**Resumed run.** <!-- a:ia-plan-resume --> Only when the stage file carried `plan: "pending"` — pin broken or not, since the post itself moves `updatedAt` — first read the issue as *Reading the issue* in `references/docs/plan-and-claim.md` does (`--claim-label ""`, no `--run`). `plan: current`: the comment is posted — skip step 2, leave `plan-approved` alone, add `planned`, report `✓ posted (recovered)`. Otherwise, and on every run with no such stage, post.
 
 Report it as a `Plan comment:` row in the *Final Report* block (`✓ posted`, or `✗` with the error's title).
 

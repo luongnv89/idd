@@ -251,6 +251,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/detection.md` — scoring, merge logic, Steps 3-7 prose procedure
 - `references/output-and-persist.md` — rendering, JSON schema, step reports
 - `references/run-stats.md` — run-stats footer contract
+- `references/resume-cut-off.md`, `references/stage-file.md` — cut-off resume and stage file contracts
 - `references/error-messages.md` — error catalog
 - `references/self-improve.md`
 - `references/examples.md` — worked example runs
@@ -327,6 +328,8 @@ One full-scope scanner per batch finds issues already fixed by commits/PRs **and
 - **Step 1b** — flags an open issue that a commit or merged-PR body names by number while that PR targeted a different issue, marking them `potentially_fixed` with evidence links.
 - **Step 2** — extracts keywords per title and body, scans the codebase for affected files, and returns pairwise file overlap as undirected `dependency_edges`. Affected files come from that scan, never the body.
 - **Step 3** — cycle detection, folded into the scripted block below.
+
+**Cut-off resume.** <!-- a:tr-resume --> As each scanner batch returns, add it to `triage.json` in the stage directory (`references/stage-file.md`), keyed by its issue numbers, with `git rev-parse HEAD` and each issue's Step 1 `updatedAt` as its pin. Before spawning, read that file: reuse a batch only when its HEAD equals the current one and every one of its issues is in Step 1's list with the same `updatedAt` string. Print the recovery block of `references/resume-cut-off.md` for the reused batches and its stale notice for the rest, then batch and scan only the issues no reused batch covers; name the reused batches under *Uncertainty*. Auto mode reuses a batch under the same pin. Once `.idd/triage.json` is written, remove the stage file.
 
 ---
 ## Steps 3-7 — Order, Parallel Sets, Staleness, Priority
