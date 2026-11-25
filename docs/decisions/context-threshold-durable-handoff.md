@@ -175,7 +175,7 @@ reviewed with no change.
 | `/issue-pr-review` | Reviewed, no change | The `gi-progress.py` record (#542). **Decisions kept:** the same auto-mode `--resume` rule, and `--review-only` reads and writes no record, so a cut-off review-only run starts over. |
 | `/issue-analysis` | Changed | A stage file keeps the explorer's and the synthesizer's validated returns, pinned to `HEAD` and the issue's `updatedAt`. A re-run with a holding pin skips Steps 2-7. Under `--plan` the stage outlives the persist until the plan post is verified, and a resumed run asks `gi-plan.py check` before posting again, whatever the pin says, because the post itself moves `updatedAt`. |
 | `/issue-triage` | Changed | Each returned scanner batch is staged, pinned to `HEAD` and to each issue's number and `updatedAt`. A re-run reuses the batches whose pin holds and scans the rest. Auto mode follows the same pin. |
-| `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment. Single Create keeps no record: its duplicate check flags the earlier create. |
+| `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment, only on an open issue whose backup comment is under 24 hours old. Single Create keeps no record: its duplicate check flags the earlier create. |
 | `/plan-to-issues` | Changed | A reused or adopted epic prints what was filed and what comes next, and reports a filed task whose id left the worklist or whose title changed. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body's Reporter Context, which holds the confirmed draft verbatim. The dependency pass appends a marker only when it is absent. |
 | `/init-idd` | Changed (report-only) | An existing `.idd.yml` is validated before the overwrite/merge/cancel choice and a failure prints one warning naming overwrite as the repair. Auto mode still takes cancel. |
 | `/idd-doctor` | Reviewed, no change | Read-only and one pass: a cut-off loses printed output only. |
@@ -207,7 +207,14 @@ removed at the skill's terminal persist. No script owns them and
 - `/issue-creator`: single Create keeps no record of the answers given before
   its create call, and an image uploaded by a run cut off before the create
   stays on the storage branch unreferenced; neither got a rule. Normalize: labels suggested by a run cut off before its
-  label step are not recovered. A batch item whose title was reworded between
+  label step are not recovered. A normalized issue has no normalization
+  comment by design when `/issue-resolver` normalized it inline (backup and
+  body edit only) or `issue.normalize_comment` was false at the time, so a
+  marker, a backup and no comment do not prove a cut-off. The tail recovery
+  therefore needs an open issue and a backup under 24 hours old: a cut-off
+  resumed later, or on a closed issue, keeps the *already normalized* stop and
+  never gets its comment, and an open issue the resolver normalized under 24
+  hours ago still gets one when `/issue-creator` is run on it. A batch item whose title was reworded between
   runs is not recovered and falls to the duplicate flag.
 - `/issue-analysis`: the inline path (no Agent tool) writes no stage, and a
   re-run of a *finished* analysis stays a fresh analysis.

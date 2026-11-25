@@ -62,6 +62,8 @@ issue-triage|tr-resume|scan only the issues no reused batch covers
 issue-triage|tr-resume|Auto mode reuses a batch under the same pin
 issue-triage|tr-resume|written, remove the stage file
 issue-creator|ic-normalize-tail|Only when .issue\.normalize_comment. is true.*viewerDidAuthor.*no later comment
+issue-creator|ic-normalize-tail|--json state,comments.*When the issue is open, the latest comment.*created in the last 24 hours.*no later comment
+issue-creator|ic-normalize-tail|closed issue or an older backup is a finished normalization.*never post it there
 issue-creator|ic-normalize-tail|are not recovered: they are the one step lost
 issue-creator|ic-backup-reuse|--json body,comments.*only when a backup comment with .viewerDidAuthor. true already contains that body byte for byte.*Any difference posts a new backup
 issue-creator|ic-batch-recover|never the backlog snapshot

@@ -28,7 +28,7 @@ If not found:
 
 Look for `<!-- idd:normalized v1 -->` (or legacy `<!-- gitissue:normalized v1 -->`) as a standalone HTML comment in the issue body.
 
-If found, first finish a cut-off run's tail. <!-- a:ic-normalize-tail --> Only when `issue.normalize_comment` is true, read `gh issue view {N} --json comments` live. When a comment with `viewerDidAuthor` true holds Step 8's backup summary line and no later comment opens with Step 10's `Normalized by IDD Stack` line, post Step 10's comment, print the recovery block of `references/resume-cut-off.md` with `✓ Issue #42: recovered — normalization comment posted`, and stop. Labels the cut-off run suggested are not recovered: they are the one step lost. Every other marker hit prints:
+If found, first finish a cut-off run's tail. <!-- a:ic-normalize-tail --> Only when `issue.normalize_comment` is true, read `gh issue view {N} --json state,comments` live. When the issue is open, the latest comment with `viewerDidAuthor` true that holds Step 8's backup summary line was created in the last 24 hours (`date -u` gives now), and no later comment opens with Step 10's `Normalized by IDD Stack` line, post Step 10's comment, print the recovery block of `references/resume-cut-off.md` with `✓ Issue #42: recovered — normalization comment posted`, and stop. A closed issue or an older backup is a finished normalization, which can lack that comment: never post it there. Labels the cut-off run suggested are not recovered: they are the one step lost. Every other marker hit prints:
 ```
 ✓ Issue #42 is already normalized (v1, 2026-03-20). No changes needed.
 ```

@@ -115,7 +115,7 @@ A legacy `.gitissue.yml` with no `.idd.yml` beside it **is** the existing config
 
 ### File exists — ask user
 
-If the file already exists, first run *Validate the written config* on it <!-- a:init-recheck --> — a failure prints only `⚠ existing .idd.yml fails validation — overwrite repairs it` — then show the prompt from `references/error-messages.md`:
+If the file already exists, first run *Validate the written config* on it <!-- a:init-recheck --> — a failure prints only `⚠ existing config fails validation — overwrite repairs it` — then show the prompt from `references/error-messages.md`:
 
 ```
 ⚠ .idd.yml already exists

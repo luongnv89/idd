@@ -27,10 +27,10 @@
         "measured": 0
       },
       "budget": 130172,
-      "measured": 130172,
+      "measured": 130170,
       "skill_md": {
         "budget": 25315,
-        "measured": 25170
+        "measured": 25168
       }
     },
     "issue-analysis": {
@@ -43,7 +43,7 @@
         "measured": 34498
       },
       "budget": 183404,
-      "measured": 183404,
+      "measured": 183402,
       "skill_md": {
         "budget": 25625,
         "measured": 25625
@@ -51,7 +51,7 @@
     },
     "issue-creator": {
       "always_read": {
-        "budget": 46186,
+        "budget": 46394,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 46186
+        "measured": 46394
       },
-      "budget": 189729,
-      "measured": 189729,
+      "budget": 189937,
+      "measured": 189937,
       "skill_md": {
         "budget": 26487,
         "measured": 25575
@@ -115,7 +115,7 @@
         "measured": 28301
       },
       "budget": 152551,
-      "measured": 152551,
+      "measured": 152549,
       "skill_md": {
         "budget": 26313,
         "measured": 26313
