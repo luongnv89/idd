@@ -1,10 +1,10 @@
 {
   "counts": {
     "config_keys": 118,
-    "flags": 30,
+    "flags": 33,
     "gate_headings": 30,
     "gh_call_files": 80,
-    "script_lines": 17328,
+    "script_lines": 17376,
     "scripts": 28,
     "skills": 9
   }

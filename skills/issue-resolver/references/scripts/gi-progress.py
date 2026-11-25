@@ -14,6 +14,13 @@ The store
   branch can commit it and no PR body can reach it, and in the *common* dir, so
   every worktree of one clone (auto-pilot's parallel lanes) shares one store.
   The resolver keys its record by issue number, the reviewer by PR number.
+  The reviewer's `--mode review-only` record is a separate file,
+  `issue-pr-review-<N>.review-only.json`, stamped `mode: "review-only"`; a
+  fix-mode record is stamped `mode: "fix"` (a record without the key is fix).
+  Neither mode reads, writes or clears the other's record: a record of the
+  other mode reads as `absent`. A review-only patch carrying an `effect` or
+  entering step 6 is exit 3, because a review-only run never fixes, pushes,
+  edits or merges.
   Directory mode 0700, files 0600, written atomically (temp file + rename)
   under an flock on `<store>/.lock`; the last writer wins. Every path the
   script compares is canonicalized with `os.path.realpath` on both sides.
@@ -30,8 +37,8 @@ Modes (exactly one)
   --clear  --skill S --number N   removes the record. Idempotent; prints
            {"cleared": bool, "path"}.
   --list                          prints {"records": [{"skill", "number",
-           "status", "step", "current", "age_s", "executor_match",
-           "caller_run_id"}]}. Read-only; an absent store is {"records": []}.
+           "mode", "status", "step", "current", "age_s", "executor_match",
+           "caller_run_id"}]}; `mode` is null for the resolver. Read-only; an absent store is {"records": []}.
   --read and --list never create the store.
 
 Patch keys (a closed set — anything else is exit 3, and nothing is written)
@@ -65,7 +72,7 @@ Forbidden keys (FORBIDDEN_KEYS: exit 3, nothing written)
   verified_head, soft_pass. Nor can a caller claim what the script measures:
   head, branch, toplevel, executor, lane, completed, current, schema, skill,
   number, created_at, updated_at, run_started_at, resumed, resumed_at,
-  base_sha, research_pin.
+  base_sha, research_pin, mode.
 
 Measured by the script on every --start/--write, never taken from the caller
   head (`git rev-parse --verify HEAD`, null on an unborn branch), branch (the
@@ -113,7 +120,7 @@ Binding (--read, measured live against git from the current directory)
 Exit codes
   0  answered — `--read` statuses and a `stale` verdict included. Read the
      JSON, never the exit status. This script never exits 1.
-  2  usage error (a bad --skill or --number included)
+  2  usage error (a bad --skill, --number or --mode included)
   3  invalid patch — a forbidden or unknown key, a bad value, an illegal
      transition or a counter moving backwards. Nothing was written.
   4  cannot complete — not a git work tree, git missing, no record to --write,
@@ -167,7 +174,10 @@ TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 WORD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}\Z")
 CRITERION_ID_RE = re.compile(r"^AC[1-9][0-9]{0,3}\Z")
 CRITERIA_MAX = 100
-NAME_RE = re.compile(r"^(issue-resolver|issue-pr-review)-([1-9][0-9]{0,9})\.json\Z")
+NAME_RE = re.compile(r"^(issue-resolver|issue-pr-review)-([1-9][0-9]{0,9})(\.review-only)?\.json\Z")
+# The reviewer's two modes keep separate records, so neither can adopt or
+# replace the other's. A record without the key is a fix-mode record.
+REVIEW_MODES = ("fix", "review-only")
 
 CLOSING = "closing"
 STEPS = {
@@ -203,12 +213,12 @@ FORBIDDEN_KEYS = frozenset({
     "qa_clean", "verdict", "ci_sha", "ci_status", "verified_head", "soft_pass",
     "head", "branch", "toplevel", "executor", "lane", "completed", "current",
     "schema", "skill", "number", "created_at", "updated_at", "run_started_at",
-    "resumed", "resumed_at", "base_sha", "research_pin",
+    "resumed", "resumed_at", "base_sha", "research_pin", "mode",
 })
 MEASURED_KEYS = ("schema", "skill", "number", "step", "current", "completed",
                  "head", "branch", "toplevel", "executor", "lane", "created_at",
                  "run_started_at", "updated_at", "resumed", "resumed_at",
-                 "caller_run_id")
+                 "caller_run_id", "mode")
 LEGACY_LOCAL = (".idd/", ".gitissue/")
 
 
@@ -726,11 +736,27 @@ def _merge(record: dict, patch: dict, skill: str, measured: dict, now: str,
     return out
 
 
-def _blank(skill: str, number: int, now: str) -> dict:
-    return {"schema": SCHEMA, "skill": skill, "number": number,
-            "step": STEPS[skill][0], "current": STEPS[skill][0], "completed": [],
-            "created_at": now, "run_started_at": now, "resumed": 0,
-            "resumed_at": None, "caller_run_id": None}
+def _blank(skill: str, number: int, now: str, review_mode: str | None = None) -> dict:
+    out = {"schema": SCHEMA, "skill": skill, "number": number,
+           "step": STEPS[skill][0], "current": STEPS[skill][0], "completed": [],
+           "created_at": now, "run_started_at": now, "resumed": 0,
+           "resumed_at": None, "caller_run_id": None}
+    if review_mode is not None:
+        out["mode"] = review_mode
+    return out
+
+
+def record_path(directory: str, skill: str, number: int, review_mode: str | None) -> str:
+    suffix = ".review-only" if review_mode == "review-only" else ""
+    return os.path.join(directory, f"{skill}-{number}{suffix}.json")
+
+
+def _review_only_guard(patch: dict) -> None:
+    """A review-only run never fixes, pushes, edits or merges: its record cannot say it did."""
+    if "effect" in patch:
+        raise InvalidInput("a review-only record carries no effect")
+    if patch.get("step") == 6:
+        raise InvalidInput("a review-only run has no step 6")
 
 
 # --- reading -----------------------------------------------------------------
@@ -744,6 +770,8 @@ def screen(record, skill: str, number: int) -> str | None:
         return "unknown schema"
     if record.get("skill") != skill or record.get("number") != number:
         return "names a different skill or number"
+    if "mode" in record and (skill != "issue-pr-review" or record["mode"] not in REVIEW_MODES):
+        return "unknown mode"
     content = {k: v for k, v in record.items()
                if k not in MEASURED_KEYS and k not in ("base_sha", "research_pin")}
     try:
@@ -788,8 +816,12 @@ def screen(record, skill: str, number: int) -> str | None:
     return None
 
 
-def load(path: str, skill: str, number: int) -> tuple[str, dict | None, str | None]:
-    """(status, record, reason) — status is ok | absent | corrupt | expired."""
+def load(path: str, skill: str, number: int,
+         review_mode: str | None = None) -> tuple[str, dict | None, str | None]:
+    """(status, record, reason) — status is ok | absent | corrupt | expired.
+
+    A reviewer record of the other mode reads as absent: neither mode adopts
+    the other's record."""
     try:
         st = os.lstat(path)
     except FileNotFoundError:
@@ -806,6 +838,8 @@ def load(path: str, skill: str, number: int) -> tuple[str, dict | None, str | No
     reason = screen(record, skill, number)
     if reason:
         return "corrupt", None, reason
+    if review_mode is not None and record.get("mode", "fix") != review_mode:
+        return "absent", None, None
     if _age_s(record["updated_at"]) > TTL_S:
         return "expired", None, "not written for seven days"
     return "ok", record, None
@@ -902,19 +936,22 @@ def _sweep(directory: str) -> None:
                 pass
 
 
-def start_or_write(skill: str, number: int, mode: str) -> dict:
+def start_or_write(skill: str, number: int, mode: str, review_mode: str | None = None) -> dict:
     patch = validate_patch(_read_patch(), skill, mode)
+    if review_mode == "review-only":
+        _review_only_guard(patch)
     measured = measure()
     directory = store_dir()
-    target = os.path.join(directory, f"{skill}-{number}.json")
+    target = record_path(directory, skill, number, review_mode)
     now = _stamp(_now())
     with _StoreLock(directory):
         if mode == "start":
             _sweep(directory)
-            record = _merge(_blank(skill, number, now), patch, skill, measured, now, mode)
+            record = _merge(_blank(skill, number, now, review_mode), patch, skill, measured,
+                            now, mode)
             replaced = os.path.lexists(target)
         else:
-            status, current, reason = load(target, skill, number)
+            status, current, reason = load(target, skill, number, review_mode)
             if status == "absent":
                 raise CannotComplete("no record to --write — run --start first")
             if status != "ok":
@@ -925,9 +962,9 @@ def start_or_write(skill: str, number: int, mode: str) -> dict:
     return {"written": True, "path": target, "replaced": replaced}
 
 
-def read(skill: str, number: int) -> dict:
-    path = os.path.join(store_dir(), f"{skill}-{number}.json")
-    status, record, reason = load(path, skill, number)
+def read(skill: str, number: int, review_mode: str | None = None) -> dict:
+    path = record_path(store_dir(), skill, number, review_mode)
+    status, record, reason = load(path, skill, number, review_mode)
     out = {"status": status, "path": path, "reason": reason, "age_s": None,
            "record": None, "binding": None}
     if status == "ok":
@@ -936,9 +973,9 @@ def read(skill: str, number: int) -> dict:
     return out
 
 
-def clear(skill: str, number: int) -> dict:
+def clear(skill: str, number: int, review_mode: str | None = None) -> dict:
     directory = store_dir()
-    target = os.path.join(directory, f"{skill}-{number}.json")
+    target = record_path(directory, skill, number, review_mode)
     if not os.path.isdir(directory):
         return {"cleared": False, "path": target}
     with _StoreLock(directory):
@@ -967,9 +1004,14 @@ def list_records() -> dict:
             if not match:
                 continue
             skill, number = match.group(1), int(match.group(2))
-            status, record, _ = load(os.path.join(directory, name), skill, number)
-            row = {"skill": skill, "number": number, "status": status, "step": None,
-                   "current": None, "age_s": None, "executor_match": None,
+            review_mode = None
+            if skill == "issue-pr-review":
+                review_mode = "review-only" if match.group(3) else "fix"
+            elif match.group(3):
+                continue
+            status, record, _ = load(os.path.join(directory, name), skill, number, review_mode)
+            row = {"skill": skill, "number": number, "mode": review_mode, "status": status,
+                   "step": None, "current": None, "age_s": None, "executor_match": None,
                    "caller_run_id": None}
             if record is not None:
                 who = record["executor"]
@@ -1008,19 +1050,25 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--list", action="store_true", help="list every record in the store")
     parser.add_argument("--skill", choices=SKILLS, help="issue-resolver or issue-pr-review")
     parser.add_argument("--number", type=_number, help="issue number (resolver) or PR number (reviewer)")
+    parser.add_argument("--mode", choices=REVIEW_MODES,
+                        help="issue-pr-review only: fix (default) or review-only, a separate record")
     args = parser.parse_args(argv)
-    if args.list and (args.skill or args.number):
-        parser.error("--list takes no --skill or --number")
+    if args.list and (args.skill or args.number or args.mode):
+        parser.error("--list takes no --skill, --number or --mode")
     if not args.list and (args.skill is None or args.number is None):
         parser.error("--skill and --number are required")
+    if args.mode and args.skill != "issue-pr-review":
+        parser.error("--mode applies to --skill issue-pr-review only")
+    review_mode = (args.mode or "fix") if args.skill == "issue-pr-review" else None
 
     try:
         if args.start or args.write:
-            result = start_or_write(args.skill, args.number, "start" if args.start else "write")
+            result = start_or_write(args.skill, args.number, "start" if args.start else "write",
+                                    review_mode)
         elif args.read:
-            result = read(args.skill, args.number)
+            result = read(args.skill, args.number, review_mode)
         elif args.clear:
-            result = clear(args.skill, args.number)
+            result = clear(args.skill, args.number, review_mode)
         else:
             result = list_records()
     except InvalidInput as exc:
