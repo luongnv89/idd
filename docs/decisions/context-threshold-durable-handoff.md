@@ -176,8 +176,8 @@ reviewed with no change.
 | `/issue-analysis` | Changed | A stage file keeps the explorer's and the synthesizer's validated returns, pinned to `HEAD` and the issue's `updatedAt`. A re-run with a holding pin skips Steps 2-7. Under `--plan` the stage outlives the persist until the plan post is verified, and a resumed run asks `gi-plan.py check` before posting again, whatever the pin says, because the post itself moves `updatedAt`. |
 | `/issue-triage` | Changed | Each returned scanner batch is staged, pinned to `HEAD` and to each issue's number and `updatedAt`. A re-run reuses the batches whose pin holds and scans the rest. Auto mode follows the same pin. |
 | `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment. Single Create keeps no record: its duplicate check flags the earlier create. |
-| `/plan-to-issues` | Changed | A reused or adopted epic prints what was filed and what comes next, and reports a worklist that differs from the filed tasks. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body. The dependency pass appends a marker only when it is absent. |
-| `/init-idd` | Changed (report-only) | An existing `.idd.yml` is validated before the overwrite/merge/cancel choice and a failure prints one warning. Auto mode still takes cancel. |
+| `/plan-to-issues` | Changed | A reused or adopted epic prints what was filed and what comes next, and reports a filed task whose id left the worklist or whose title changed. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body's Reporter Context, which holds the confirmed draft verbatim. The dependency pass appends a marker only when it is absent. |
+| `/init-idd` | Changed (report-only) | An existing `.idd.yml` is validated before the overwrite/merge/cancel choice and a failure prints one warning naming overwrite as the repair. Auto mode still takes cancel. |
 | `/idd-doctor` | Reviewed, no change | Read-only and one pass: a cut-off loses printed output only. |
 
 **The shared contract** is one closure leaf, `src/shared/references/resume-cut-off.md`,
@@ -199,10 +199,14 @@ removed at the skill's terminal persist. No script owns them and
 
 - `/plan-to-issues`, conversation path: a session cut off between the draft
   confirm and the epic create call has no durable record, so the draft is
-  drafted and confirmed again. A task whose body changed under the same id and
+  drafted and confirmed again. An unmarked epic whose Reporter Context does
+  not parse as plan grammar takes the *Cannot restore worklist* stop instead of
+  a restore. A task whose body changed under the same id and
   title is not detected; the stale notice never re-files, edits or closes a
   filed child.
-- `/issue-creator` Normalize: labels suggested by a run cut off before its
+- `/issue-creator`: single Create keeps no record of the answers given before
+  its create call, and an image uploaded by a run cut off before the create
+  stays on the storage branch unreferenced; neither got a rule. Normalize: labels suggested by a run cut off before its
   label step are not recovered. A batch item whose title was reworded between
   runs is not recovered and falls to the duplicate flag.
 - `/issue-analysis`: the inline path (no Agent tool) writes no stage, and a

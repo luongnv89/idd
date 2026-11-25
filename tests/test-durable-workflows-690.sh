@@ -55,7 +55,7 @@ issue-analysis|ia-resume|.commit_sha. equals .git rev-parse HEAD.*Pin broken: pr
 issue-analysis|ia-resume|View mode never reads it
 issue-analysis|ia-resume|references/resume-cut-off\.md
 issue-analysis|ia-stage-write|passes these checks, write.*references/stage-file\.md.*validated return as .synthesis.
-issue-analysis|ia-plan-resume|Only when the stage file carried .plan: "pending".*skip step 2.*Otherwise, and on every run with no such stage, post
+issue-analysis|ia-plan-resume|Only when the stage file read after Step 1 carried .plan: "pending"., pin broken or not.*skip step 2.*Otherwise, and on every run with no such stage, post
 issue-analysis|ia-persist|Remove the stage file.*once the plan post is verified
 issue-triage|tr-resume|reuse a batch only when its HEAD equals the current one.*same .updatedAt. string
 issue-triage|tr-resume|scan only the issues no reused batch covers
@@ -63,13 +63,15 @@ issue-triage|tr-resume|Auto mode reuses a batch under the same pin
 issue-triage|tr-resume|written, remove the stage file
 issue-creator|ic-normalize-tail|Only when .issue\.normalize_comment. is true.*viewerDidAuthor.*no later comment
 issue-creator|ic-normalize-tail|are not recovered: they are the one step lost
-issue-creator|ic-backup-reuse|only when a backup comment with .viewerDidAuthor. true already contains the live body byte for byte.*Any difference posts a new backup
+issue-creator|ic-backup-reuse|--json body,comments.*only when a backup comment with .viewerDidAuthor. true already contains that body byte for byte.*Any difference posts a new backup
 issue-creator|ic-batch-recover|never the backlog snapshot
 issue-creator|ic-batch-recover|gh issue list --author @me --state all --limit 200 --json number,title,createdAt,body,state
+issue-creator|ic-batch-recover|--jq .*part_of: .*scan\(.*with a parent bound, .\{parent\}. in its .part_of.
 issue-creator|ic-batch-recover|Never create it again.*recovered — already created as
 issue-creator|ic-batch-recover|A reworded title is not recovered
-plan-to-issues|pti-resume|references/resume-cut-off\.md.*report-only.*\*\*never\*\* re-file, edit or close a filed child
+plan-to-issues|pti-resume|references/resume-cut-off\.md.*stale notice only for a filed task.*report-only.*\*\*never\*\* re-file, edit or close a filed child
 plan-to-issues|pti-resume|same id and title is not detected
+plan-to-issues|pti-resume|added to the worklist since is one of those and is filed
 plan-to-issues|pti-adopt-restore|neither source marker.*Ask the adoption question once.*\*\*otherwise\*\* take the \*Cannot restore worklist\* stop
 plan-to-issues|pti-dep-guard|only when the body lacks that exact line'
 

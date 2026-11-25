@@ -26,11 +26,11 @@
         "files": [],
         "measured": 0
       },
-      "budget": 130181,
-      "measured": 130181,
+      "budget": 130172,
+      "measured": 130172,
       "skill_md": {
         "budget": 25315,
-        "measured": 25179
+        "measured": 25170
       }
     },
     "issue-analysis": {
@@ -42,16 +42,16 @@
         ],
         "measured": 34498
       },
-      "budget": 183433,
-      "measured": 183433,
+      "budget": 183404,
+      "measured": 183404,
       "skill_md": {
-        "budget": 25654,
-        "measured": 25654
+        "budget": 25625,
+        "measured": 25625
       }
     },
     "issue-creator": {
       "always_read": {
-        "budget": 46070,
+        "budget": 46186,
         "files": [
           "references/clarify-intent.md",
           "references/confidence-scoring.md",
@@ -60,10 +60,10 @@
           "references/image-upload.md",
           "references/modes.md"
         ],
-        "measured": 46070
+        "measured": 46186
       },
-      "budget": 189613,
-      "measured": 189613,
+      "budget": 189729,
+      "measured": 189729,
       "skill_md": {
         "budget": 26487,
         "measured": 25575
@@ -129,8 +129,8 @@
         ],
         "measured": 5381
       },
-      "budget": 177441,
-      "measured": 177441,
+      "budget": 177669,
+      "measured": 177669,
       "skill_md": {
         "budget": 25900,
         "measured": 25348

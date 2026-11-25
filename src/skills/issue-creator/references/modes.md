@@ -113,7 +113,7 @@ Stop.
 
 Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
 
-**Reuse a cut-off run's backup.** <!-- a:ic-backup-reuse --> First read `gh issue view {N} --json comments`: only when a backup comment with `viewerDidAuthor` true already contains the live body byte for byte, skip the post, print `○ recovered — backup comment already posted`, and go to Step 9. Any difference posts a new backup:
+**Reuse a cut-off run's backup.** <!-- a:ic-backup-reuse --> First read `gh issue view {N} --json body,comments`: only when a backup comment with `viewerDidAuthor` true already contains that body byte for byte, skip the post, print `○ recovered — backup comment already posted`, and go to Step 9. Any difference posts a new backup:
 
 ```bash
 gh issue comment {N} --body "<details><summary>Original issue body (backup by IDD Stack)</summary>
@@ -321,10 +321,11 @@ Create each approved issue sequentially using the same pipeline as single Create
 **Recover a cut-off batch.** <!-- a:ic-batch-recover --> Once, before the first create, read this login's newest issues live — never the backlog snapshot:
 
 ```bash
-gh issue list --author @me --state all --limit 200 --json number,title,createdAt,body,state
+gh issue list --author @me --state all --limit 200 --json number,title,createdAt,body,state \
+  --jq '[.[] | {number,title,createdAt,state,part_of: [(.body // "") | scan("(?i)part of #([0-9]+)") | .[0]]}]'
 ```
 
-An approved item is already created when one of them has its exact title and, with a parent bound, a `Part of #{parent}` line (any state); with no parent it must be open and created in the last 24 hours (`date -u` gives now). Never create it again: print `○ Item 2 recovered — already created as #43`, pass it to Step 5.5 with the created children, and count it as recovered in Step 6. A reworded title is not recovered; it falls to Step 3's duplicate flag. A failed read prints a `⚠` line and recovers nothing.
+An approved item is already created when one of them has its exact title and, with a parent bound, `{parent}` in its `part_of` (any state); with no parent it must be open and created in the last 24 hours (`date -u` gives now). Never create it again: print `○ Item 2 recovered — already created as #43`, pass it to Step 5.5 with the created children, and count it as recovered in Step 6. A reworded title is not recovered; it falls to Step 3's duplicate flag. A failed read prints a `⚠` line and recovers nothing.
 
 **Child hierarchy marker (only when a parent is bound in Step 4.5).** When — and only when — a `parent` is bound, append the hierarchy marker to **each child body** before `gh issue create`, on its own line at the very end of the body (after the Metadata section), mirroring how the children of an existing epic place it:
 

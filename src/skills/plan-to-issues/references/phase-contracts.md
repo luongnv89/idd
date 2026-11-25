@@ -116,10 +116,11 @@ and its body holds exactly one source marker for this input and one sentinel pai
 **Resume report.** <!-- a:pti-resume --> On a reused or adopted epic, before the first batch,
 compare the worklist with the children filed under it — each `Plan task: <id>` line and title, as
 sync mode's unmapped-task comparison does — and print the recovery block of
-`references/resume-cut-off.md`: the epic, the tasks filed, the first phase with an unfiled task. Where
-the two differ, print its stale notice naming each filed task whose id left the worklist or whose
-title changed, and each new task. The notice is report-only: file the new tasks; **never** re-file,
-edit or close a filed child. A changed task body under the same id and title is not detected.
+`references/resume-cut-off.md`: the epic, the tasks filed, and as `Next:` the first phase with an
+unfiled task (a task added to the worklist since is one of those and is filed). Print its stale
+notice only for a filed task whose id left the worklist or whose title changed. The notice is
+report-only: **never** re-file, edit or close a filed child. A changed task body under the same id
+and title is not detected.
 
 Format and invocation: `references/issue-creator-bridge.md`. One `/issue-creator … --parent <epic>`
 call **per phase** — batches of 5–15 keep rate limits, progress, and resumption at phase granularity.

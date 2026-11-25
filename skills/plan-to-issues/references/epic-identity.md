@@ -240,7 +240,8 @@ not the slug, is the stable handle. `sync <epic#>` only re-renders the map; it c
 
 **Step 2 — create.** The file-path title and plan-header intent do **not** apply. Title:
 `Epic: <confirmed title>` — the title the user confirmed in Phase 1 (Expected Output:
-`Epic: Harden the ingest path`). Intent text is the confirmed draft only. Do **not** put the
+`Epic: Harden the ingest path`). Intent text is the confirmed draft only: `confirmed-draft.txt`
+verbatim, which is what *Unmarked epic* restores from. Do **not** put the
 marker in the intent text. `--epic` skips this step: the epic already exists.
 
 **Step 4 — bind.** Append the conversation marker and, additionally, the `## Source` block holding

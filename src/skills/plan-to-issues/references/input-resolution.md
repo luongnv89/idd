@@ -182,7 +182,8 @@ This is the supported resume. It is still Create mode (it files remaining issues
    **unparseable**. The parse is **source-faithful**: copy stored fields, do not enrich, do
    not re-emit `(needs review)` criteria that were not stored.
 4. **Missing, empty, or unparseable `## Source` is a stop.** Print the *Cannot restore
-   worklist* block in `references/preflight.md`. Do not fall back to re-drafting from current
+   worklist* block in `references/preflight.md`. One exception: an epic with neither source
+   marker takes *Unmarked epic* (`references/epic-identity.md`) and restores from there. Do not fall back to re-drafting from current
    turns, and do not run `sync`.
 5. Continue Create mode as an **idempotent re-run**: Phase 3 binds to `#<n>` (skip slug
    search); Phase 4 files only tasks the epic does not already list.
