@@ -144,7 +144,8 @@ is fail-safe.
 ### Review-only record <!-- a:rvm-progress-review-only -->
 
 Under `--review-only`, add `--mode review-only` to every `gi-progress.py`
-call above: `--start`, `--write`, `--read` and `--clear`. That record is a
+call in this file: `--start`, `--write`, `--read` and the *Terminal outcomes*
+`--clear`. That record is a
 separate file, so a review-only run never reads, replaces or clears a fix-mode
 record, and a fix-mode run never adopts a review-only one: a record of the other
 mode reads `absent`. Write it at each `[N/7]` start for Steps 1-5, with
@@ -188,5 +189,6 @@ After the Step 7 report prints, at every Result — `PASS`, `MERGED`, `PARTIAL`,
 python3 shared/scripts/gi-progress.py --clear --skill issue-pr-review --number {N}
 ```
 
-A killed run prints no report, so only an interrupted review leaves a record; the
+Under `--review-only` that line adds `--mode review-only`, so it never clears a
+fix-mode record. A killed run prints no report, so only an interrupted review leaves a record; the
 script also expires records after seven days.

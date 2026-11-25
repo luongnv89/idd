@@ -3,7 +3,7 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 48605,
+        "budget": 48830,
         "files": [
           "references/preflight.md",
           "references/run-log.md",
@@ -11,10 +11,10 @@
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 48605
+        "measured": 48830
       },
-      "budget": 457265,
-      "measured": 457265,
+      "budget": 457490,
+      "measured": 457490,
       "skill_md": {
         "budget": 27956,
         "measured": 27956
@@ -71,7 +71,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 128538,
+        "budget": 128666,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 128538
+        "measured": 128666
       },
-      "budget": 348383,
-      "measured": 348383,
+      "budget": 348511,
+      "measured": 348511,
       "skill_md": {
         "budget": 33853,
         "measured": 33853

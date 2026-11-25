@@ -78,7 +78,7 @@ issue-resolver|rs-0j-resume-entry|Without it, resume only when the record is the
 issue-resolver|rs-0j-resume-entry|--no-resume.:\*\* never resume
 issue-pr-review|rvm-progress-resume|Without it, resume only when the record is the owner.s and idle.*age_s. is over 600
 issue-pr-review|rvm-progress-review-only|--mode review-only.*never reads, replaces or clears a fix-mode record.*never edits, commits, pushes or merges
-auto-pilot|ap-implicit-resume|would_reclaim. with .stale: true.*would_reacquire.*equals the .run_id. the first printed.*no lock at all
+auto-pilot|ap-implicit-resume|--issues. \(an issue.*would_reclaim. with .stale: true. and .same_host: true.*holder\.run_id.*would_reacquire.*lock\.run_id.*equals the .run_id. the first printed.*no lock at all
 auto-pilot|ap-step10-skill-resume|whose .mode. is not .review-only.
 issue-creator|ic-backup-reuse|--json body,comments.*only when a backup comment with .viewerDidAuthor. true already contains that body byte for byte.*Any difference posts a new backup
 issue-creator|ic-batch-recover|never the backlog snapshot
@@ -317,7 +317,7 @@ probe() { # probe — prints "<status> <stale> <lock run_id> <state run_id>"
   local st lk
   st="$(python3 "$ST" --read --dry-run --dir "$PD" 2>/dev/null)"
   lk="$(python3 "$ST" --lock --resume --dry-run --pid $$ --dir "$PD" 2>/dev/null)"
-  python3 -c 'import json,sys; s=json.loads(sys.argv[1] or "{}"); l=json.loads(sys.argv[2]); h=l.get("holder") or l.get("lock") or {}; print(l.get("status"), l.get("stale"), h.get("run_id"), s.get("run_id"))' "$st" "$lk"
+  python3 -c 'import json,sys; s=json.loads(sys.argv[1] or "{}"); l=json.loads(sys.argv[2]); h=l.get("holder") if l.get("status")=="would_reclaim" else l.get("lock"); h=h or {}; print(l.get("status"), l.get("stale") and l.get("same_host"), h.get("run_id"), s.get("run_id"))' "$st" "$lk"
 }
 LOCK_BEFORE="$(cat "$PD/run.lock" 2>/dev/null)"; STATE_BEFORE="$(cat "$PD/run-state.json" 2>/dev/null)"
 read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
@@ -327,6 +327,19 @@ read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
 [ -n "$LOCK_BEFORE" ] && [ "$(cat "$PD/run.lock")" = "$LOCK_BEFORE" ] && [ "$(cat "$PD/run-state.json")" = "$STATE_BEFORE" ] \
   && pass "T8: the probes write nothing" || fail "T8: the probes write nothing"
 python3 "$ST" --unlock --force --dir "$PD" >/dev/null 2>&1
+# A finished run's leftover state plus a dead lock left by a different run: the
+# probe's would-be payload carries the state's id, but the holder's id differs.
+python3 - "$PD/run.lock" "$DEADPID" <<'PY'
+import json, socket, sys, datetime
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+json.dump({"run_id": "20200101T000000Z-1", "pid": int(sys.argv[2]), "host": socket.gethostname(),
+           "started_at": now, "heartbeat": now}, open(sys.argv[1], "w"))
+PY
+read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
+[ "$P_STATUS" = would_reclaim ] && [ "$P_LOCK" = 20200101T000000Z-1 ] && [ "$P_LOCK" != "$P_STATE" ] \
+  && pass "T8: a dead lock from another run is no implicit resume (holder id differs)" \
+  || fail "T8: a dead lock from another run is no implicit resume ($P_STATUS $P_LOCK $P_STATE)"
+rm -f "$PD/run.lock"
 read -r P_STATUS P_STALE P_LOCK P_STATE <<<"$(probe)"
 [ "$P_STATUS" = would_acquire ] && [ -n "$P_STATE" ] \
   && pass "T8: no lock with a leftover state is no implicit resume (would_acquire)" \
