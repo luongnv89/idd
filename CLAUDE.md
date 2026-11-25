@@ -69,7 +69,7 @@ src/
 │       ├── static-checks.md       # Lint/format/type-check table (issue-resolver, issue-pr-review)
 │       ├── run-stats.md           # Run-cost footer contract
 │       ├── resume-cut-off.md      # Cut-off resume contract (issue-analysis, issue-triage, issue-creator, plan-to-issues)
-│       ├── stage-file.md          # Stage-file contract (issue-analysis, issue-triage)
+│       ├── stage-file.md          # Stage-file contract (issue-analysis, issue-triage, issue-creator, plan-to-issues)
 │       └── self-improve.md        # Rules behind every skill's Self-Improve section
 │
 ├── skills/
@@ -176,7 +176,7 @@ Code `1` is reserved for a **script-specific verdict** — an answer the script 
 
 A reference file that more than one skill needs unchanged has one authored source (issue #560):
 
-- **Source** lives at `src/shared/references/<name>.md` — flat, lowercase-hyphen names, `.md` only. Today: `run-stats.md` and `self-improve.md` (every skill), `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md` (issue-resolver, issue-pr-review), `resume-cut-off.md` (issue-analysis, issue-triage, issue-creator, plan-to-issues) and `stage-file.md` (issue-analysis, issue-triage).
+- **Source** lives at `src/shared/references/<name>.md` — flat, lowercase-hyphen names, `.md` only. Today: `run-stats.md` and `self-improve.md` (every skill), `practice-packs.md` with the eight `practice-*.md` checklists and `static-checks.md` (issue-resolver, issue-pr-review), `resume-cut-off.md` (issue-analysis, issue-triage, issue-creator, plan-to-issues) and `stage-file.md` (issue-analysis, issue-triage, issue-creator, plan-to-issues).
 - **Discovery is the citation.** A skill gets the file when any of its authored files cites `references/<name>.md`; no other token exists. Add that path to the skill's *Bundled dependency precheck* list.
 - **Emitted** byte-identical to `references/<name>.md` in each citing skill, with no banner and no rewrite.
 - **Closure leaf.** The file is never scanned, so it must carry no rewritable token (a runtime-doc, shared-agent, shared-script or skill token); the build aborts on one.
