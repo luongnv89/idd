@@ -1,6 +1,6 @@
 # ADR — Context-Threshold Compaction and Durable Re-entry
 
-**Status:** Accepted (2026-10-21); amended 2026-10-22 by [#542](https://github.com/luongnv89/idd/issues/542) — see *Amendment — durable progress records (#542)*.
+**Status:** Accepted (2026-10-21); amended 2026-10-22 by [#542](https://github.com/luongnv89/idd/issues/542) — see *Amendment — durable progress records (#542)* — and 2026-11-25 by [#690](https://github.com/luongnv89/idd/issues/690) — see *Amendment — every skill reviewed for cut-off resume (#690)*.
 **Issue:** [#540](https://github.com/luongnv89/idd/issues/540).
 **Runtime contract:** [context-threshold.md](https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md).
 
@@ -156,6 +156,72 @@ Rejected for #542: extending `gi-state.py` (its store is relative to the working
 directory and holds one run, so each worktree would keep its own copy) and a
 marker on GitHub (a PR body or comment is attacker-writable, and no PR exists
 before the resolver delivers).
+
+## Amendment — every skill reviewed for cut-off resume (#690)
+
+**Accepted:** 2026-11-25. **Issue:** [#690](https://github.com/luongnv89/idd/issues/690).
+
+Issue #690 asks that every skill's workflow survive a cut-off session: finished
+steps are kept, a new session on the same task continues from the first
+unfinished step, it says what it recovered, and it redoes whatever no longer
+matches the repo, issue or PR. All nine skills were reviewed against that. Four
+gained resume rules, one gained a report-only check, and four are recorded as
+reviewed with no change.
+
+| Skill | Outcome | Mechanism, or the decision recorded |
+|---|---|---|
+| `/auto-pilot` | Reviewed, no change | `gi-state.py` run state, the run lock and the Step 1.0 resume gate already cover it. Resume needs the explicit `--resume`; a bare re-run takes the stale or fresh path. |
+| `/issue-resolver` | Reviewed, no change | The `gi-progress.py` record (#542). **Decision kept:** in auto mode a re-run without `--resume` starts over (`--start` replaces the record); an interactive run asks. |
+| `/issue-pr-review` | Reviewed, no change | The `gi-progress.py` record (#542). **Decisions kept:** the same auto-mode `--resume` rule, and `--review-only` reads and writes no record, so a cut-off review-only run starts over. |
+| `/issue-analysis` | Changed | A stage file keeps the explorer's and the synthesizer's validated returns, pinned to `HEAD` and the issue's `updatedAt`. A re-run with a holding pin skips Steps 2-7. Under `--plan` the stage outlives the persist until the plan post is verified, and a resumed run asks `gi-plan.py check` before posting again, whatever the pin says, because the post itself moves `updatedAt`. |
+| `/issue-triage` | Changed | Each returned scanner batch is staged, pinned to `HEAD` and to each issue's number and `updatedAt`. A re-run reuses the batches whose pin holds and scans the rest. Auto mode follows the same pin. |
+| `/issue-creator` | Changed | Batch reads this login's issues live before the first create and never creates an item twice. Normalize reuses a backup comment that already holds the live body, and posts a missing normalization comment after a cut-off between the body edit and that comment. Single Create keeps no record: its duplicate check flags the earlier create. |
+| `/plan-to-issues` | Changed | A reused or adopted epic prints what was filed and what comes next, and reports a worklist that differs from the filed tasks. `--epic <n>` on an unmarked epic adopts it and restores the draft from the epic body. The dependency pass appends a marker only when it is absent. |
+| `/init-idd` | Changed (report-only) | An existing `.idd.yml` is validated before the overwrite/merge/cancel choice and a failure prints one warning. Auto mode still takes cancel. |
+| `/idd-doctor` | Reviewed, no change | Read-only and one pass: a cut-off loses printed output only. |
+
+**The shared contract** is one closure leaf, `src/shared/references/resume-cut-off.md`,
+bundled into the four changed skills that print a recovery block: saved
+progress is a hint and never an authority, an effect is read live before it is
+repeated, stale progress is named and redone, and the recovery block and stale
+notice have one shape. A second leaf, `src/shared/references/stage-file.md`,
+holds the stage-file contract for the two skills that write one.
+
+**Stage files** live in `<git common dir>/idd/stage/` (`analysis-<N>.json`,
+`triage.json`), beside the progress records and for the same reasons: no
+branch can commit them and no stash or clean-tree check sees them. They are
+written through a temp file and an atomic rename, refused through a symlinked
+directory, read as untrusted data that never reaches a command line, and
+removed at the skill's terminal persist. No script owns them and
+`gi-progress.py` is unchanged: it reads only `idd/progress/`.
+
+**What is still lost** — each is at most the step in progress, or a recorded limit:
+
+- `/plan-to-issues`, conversation path: a session cut off between the draft
+  confirm and the epic create call has no durable record, so the draft is
+  drafted and confirmed again. A task whose body changed under the same id and
+  title is not detected; the stale notice never re-files, edits or closes a
+  filed child.
+- `/issue-creator` Normalize: labels suggested by a run cut off before its
+  label step are not recovered. A batch item whose title was reworded between
+  runs is not recovered and falls to the duplicate flag.
+- `/issue-analysis`: the inline path (no Agent tool) writes no stage, and a
+  re-run of a *finished* analysis stays a fresh analysis.
+- `/issue-triage`: a PR merged between the cut-off and the resume, with
+  `HEAD` unmoved, is not seen by a reused batch; reused batches are named
+  under *Uncertainty*.
+- `/init-idd`: the pre-choice check reports; it does not re-run the merge
+  strategy check or the starter recipe of a run cut off after the write.
+- `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`: the three decisions
+  kept above. On those paths "continues instead of starting over" holds only
+  with `--resume` or the interactive prompt.
+
+Rejected for #690: a new `--resume` flag or config key on the five changed
+skills (the surface counts stay where they were), a stage store under
+`.idd/cache/` (an untracked file there can reach a stash or fail a clean-tree
+check), a stage file for `/plan-to-issues` (it writes to the tracker only),
+and editing the resolver, reviewer or auto-pilot, whose bundles sit at or over
+the release growth cap.
 
 ## Sources
 
