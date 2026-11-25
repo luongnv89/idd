@@ -168,7 +168,7 @@ partial backlog silently.
 **`conversation`** — draft from the user's turns, print compact rows plus the epic title, ask
 once: `[Y]es / [e]dit / [n]o`. **No auto-accept.** Persist the draft as plan-grammar markdown
 under `## Source`. `--epic <n>` restores that block via `plan-parsing.md`. The confirmed draft is
-staged until the epic holds it, and a re-run reuses it (*Staged draft* in
+staged until the epic holds it, and a re-run with a user present can reuse it (*Staged draft* in
 `references/input-resolution.md`).
 
 *Completion criteria:* every task has an id, title, ≥ 1 criterion, `Dependencies`, and an effort;

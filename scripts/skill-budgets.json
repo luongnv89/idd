@@ -129,11 +129,11 @@
         ],
         "measured": 5381
       },
-      "budget": 180356,
-      "measured": 180356,
+      "budget": 180615,
+      "measured": 180615,
       "skill_md": {
         "budget": 25900,
-        "measured": 25533
+        "measured": 25556
       }
     }
   }

@@ -157,11 +157,13 @@ place of faithfulness, and the same worklist schema out.
 
 A conversation-path run without `--epic` reads `plan-draft.json` before it drafts. Its pin:
 `created_at` under 24 hours old, and `draft` written to `confirmed-draft.txt` hashes to
-`draft_sha`. Off its pin, it is deleted and the run drafts as usual. On its pin, print the
-recovery block of `references/resume-cut-off.md` (*Recovered:* the title and the task count,
-*Next:* Phase 2), then ask once: `Reuse the draft confirmed earlier? [Y/n]`; with no user present
-(`IDD_AUTO_MODE=1`) reuse it. `n` deletes it and drafts afresh. A reused draft is the confirmed
-draft: the confirm gate is not asked again. Phase 3's epic identity still runs live, so an epic
+`draft_sha`. Off its pin, it is deleted and the run drafts as usual. On its pin with no user
+present (`IDD_AUTO_MODE=1`), never reuse it: nothing ties it to this conversation, and a reuse
+would skip the confirm gate. Leave it in place, print `○ Staged draft found — not reused without a
+user present`, and draft as usual; the confirm gate still applies. Otherwise print the recovery
+block of `references/resume-cut-off.md` (*Recovered:* the title and the task count, *Next:*
+Phase 2), then ask once: `Reuse the draft confirmed earlier? [Y/n]`. `n` deletes it and drafts
+afresh. A reused draft is the confirmed draft: the confirm gate is not asked again. Phase 3's epic identity still runs live, so an epic
 the earlier run created, marked or unmarked, is found and reused or adopted, never created twice.
 
 ### Drafting from a requirements document

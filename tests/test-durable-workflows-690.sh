@@ -74,6 +74,7 @@ issue-analysis|ia-inline-stage|A step is finished only once its .\[k/8\]. line h
 issue-analysis|ia-resume|an inline run also reuses each step in .inline_steps.
 plan-to-issues|pti-staged-draft|.created_at. under 24 hours old.*hashes to.*.draft_sha.
 plan-to-issues|pti-staged-draft|Phase 3.s epic identity still runs live.*never created twice
+plan-to-issues|pti-staged-draft|with no user present \(.IDD_AUTO_MODE=1.\), never reuse it.*the confirm gate still applies
 issue-resolver|rs-0j-resume-entry|Without it, resume only when the record is the owner.s and idle.*age_s. is over 600.*Otherwise the record is ignored
 issue-resolver|rs-0j-resume-entry|--no-resume.:\*\* never resume
 issue-pr-review|rvm-progress-resume|Without it, resume only when the record is the owner.s and idle.*age_s. is over 600
